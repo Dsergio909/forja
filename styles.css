@@ -1,0 +1,776 @@
+/* ==========================================================================
+   FORJA - Dirección de Arte v2 «Revista de sala» (styles.css)
+   Cumple rigurosamente con CONTRATOS.md y DIRECCION_FORJA_v2.md
+   - Tipografía: Instrument Serif (titulares) + Bricolage Grotesque (cuerpo y números)
+   - Paleta canónica: Papel #F3F0E8, Papel 2 #E9E4D8, Tinta #17171A, Tinta suave #6B675F,
+     Lima #C8F03C, Alerta #E2553A.
+   - Radios permitidos: SOLO 28px (tarjetas y fotos) y 999px (píldoras, botones y chips).
+   - Sin bordes en cajas · Sombra única en barra flotante y modales.
+   - Modo claro por defecto · Clase .oscuro para temporizador y cámara.
+   ========================================================================== */
+
+/* --- Variables y Paleta Canónica Forja v2 --- */
+:root {
+  /* Paleta Revista de sala */
+  --papel: #F3F0E8;
+  --papel2: #E9E4D8;
+  --tinta: #17171A;
+  --tinta-suave: #6B675F;
+  --lima: #C8F03C;
+  --alerta: #E2553A;
+
+  /* Alias obligatorios de CONTRATOS.md */
+  --fondo: var(--papel);
+  --superficie: var(--papel2);
+  --superficie2: #DCD7CB;
+  --texto: var(--tinta);
+  --sutil: var(--tinta-suave);
+  --acento: var(--lima);
+  --acento-hover: #b8e030;
+  --ok: var(--lima);
+  --ok-bg: rgba(200, 240, 60, 0.22);
+  --alerta-bg: rgba(226, 85, 58, 0.15);
+  --peligro: var(--alerta);
+  --peligro-bg: rgba(226, 85, 58, 0.15);
+
+  /* Radios canónicos estrictos (SOLO 28px y 999px) */
+  --radio: 28px;
+  --radio-sm: 28px;
+  --radio-lg: 28px;
+  --radio-pildora: 999px;
+
+  /* Sombras editoriales */
+  --sombra: 0 10px 30px rgba(23, 23, 26, 0.18);
+  --sombra-suave: 0 4px 14px rgba(23, 23, 26, 0.05);
+
+  /* Medidas de layout */
+  --alto-cabecera: 56px;
+  --alto-barra-abajo: 64px;
+
+  /* Tipografías locales */
+  --fuente: 'Bricolage Grotesque', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --fuente-serif: 'Instrument Serif', Georgia, serif;
+}
+
+/* --- Modo Oscuro Opcional (.oscuro para temporizador de descanso y cámara) --- */
+.oscuro,
+.phone-viewport.theme-dark {
+  --papel: #17171A;
+  --papel2: #222226;
+  --tinta: #F3F0E8;
+  --tinta-suave: #8E8A82;
+  --superficie2: #2B2B31;
+
+  --fondo: var(--papel);
+  --superficie: var(--papel2);
+  --texto: var(--tinta);
+  --sutil: var(--tinta-suave);
+
+  background-color: var(--papel);
+  color: var(--tinta);
+}
+
+/* Reseteo básico y ergonomía táctil */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background-color: #DCD7CB; /* Fondo del visor exterior en PC */
+  color: var(--tinta);
+  font-family: var(--fuente);
+  font-size: 16px;
+  line-height: 1.45;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   ESTRUCTURA PRINCIPAL Y CONTENEDOR 390x844 (Centrado en PC)
+   ========================================================================== */
+#app {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 430px;
+  height: 100dvh;
+  margin: 0 auto;
+  position: relative;
+  background-color: var(--papel);
+  box-shadow: 0 12px 40px rgba(23, 23, 26, 0.16);
+  overflow: hidden;
+  transition: max-width 0.25s ease;
+}
+
+#app.ancho-extendido {
+  max-width: 860px;
+}
+
+/* Capa de grano sutil editorial sobre todo el viewport */
+.grain-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.035'/%3E%3C/svg%3E");
+  border-radius: inherit;
+  z-index: 15;
+}
+
+/* ==========================================================================
+   TRATAMIENTO FOTOGRÁFICO Y VIDEO (.foto-ejercicio)
+   Filtro unificado + radio 28px sin bordes
+   ========================================================================== */
+.foto-ejercicio,
+.media-treated {
+  filter: contrast(1.05) saturate(0.9);
+  object-fit: cover;
+  display: block;
+  width: 100%;
+  border-radius: 28px;
+  border: none;
+}
+
+/* ==========================================================================
+   CABECERA LIMPIA EDITORIAL
+   ========================================================================== */
+#cabecera {
+  height: var(--alto-cabecera);
+  min-height: var(--alto-cabecera);
+  background-color: var(--papel);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 20;
+  user-select: none;
+}
+
+.cabecera-logo-titulo {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+#titulo-pantalla {
+  font-family: var(--fuente-serif);
+  font-size: 28px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--tinta);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
+}
+
+#titulo-pantalla em {
+  font-style: italic;
+}
+
+.cabecera-acciones {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-icono-cabecera {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background-color: var(--papel2);
+  color: var(--tinta);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: transform 140ms ease, background-color 140ms ease;
+}
+
+.btn-icono-cabecera:active {
+  transform: scale(0.93);
+}
+
+/* ==========================================================================
+   MAIN: VISTA / ROUTER
+   ========================================================================== */
+#vista {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: calc(var(--alto-barra-abajo) + 36px);
+  position: relative;
+  z-index: 5;
+}
+
+#vista::-webkit-scrollbar {
+  display: none;
+}
+
+/* ==========================================================================
+   BARRA DE NAVEGACIÓN FLOTANTE (Canónica Forja v2)
+   Píldora tinta con el activo en círculo lima
+   ========================================================================== */
+.floating-navbar,
+#barra-abajo {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  height: 64px;
+  background-color: var(--tinta);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(23, 23, 26, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 8px;
+  z-index: 30;
+  border: none;
+  user-select: none;
+}
+
+.floating-navbar .nav-item,
+#barra-abajo .nav-item {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  color: var(--papel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  transition: transform 140ms ease, background-color 140ms ease, color 140ms ease;
+  flex: none;
+}
+
+.floating-navbar .nav-item:active,
+#barra-abajo .nav-item:active {
+  transform: scale(0.92);
+}
+
+.floating-navbar .nav-item.active,
+#barra-abajo .nav-item.active {
+  background-color: var(--lima);
+  color: var(--tinta);
+}
+
+.floating-navbar .nav-item .nav-label,
+#barra-abajo .nav-item .nav-label {
+  display: none; /* Icono centrado canónico en la píldora flotante */
+}
+
+.floating-navbar .nav-item .nav-icono,
+#barra-abajo .nav-item .nav-icono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* ==========================================================================
+   CLASES REQUERIDAS POR CONTRATOS.MD
+   ========================================================================== */
+
+/* 1. .pantalla: contenedor principal con padding amplio */
+.pantalla {
+  padding: 8px 20px 24px;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 2. .tarjeta: sin bordes, separada por color papel2, radio 28px */
+.tarjeta {
+  background-color: var(--papel2);
+  border: none;
+  border-radius: 28px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 3. .fila: flex horizontal con gap */
+.fila {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 4. .col: flex vertical */
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+/* 5. .grande: número héroe en Bricolage 800 con tabular-nums */
+.grande {
+  font-family: var(--fuente);
+  font-size: 64px;
+  font-weight: 800;
+  line-height: 0.95;
+  color: var(--tinta);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+/* 6. .sutil: texto suave */
+.sutil {
+  color: var(--tinta-suave);
+  font-size: 14px;
+  line-height: 1.45;
+  font-weight: 400;
+}
+
+/* 7. .chip y variantes .chip.ok, .chip.alerta (radios 999px) */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background-color: var(--papel2);
+  color: var(--tinta);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  width: fit-content;
+  border: none;
+}
+
+.chip.ok {
+  background-color: var(--ok-bg);
+  color: var(--tinta);
+}
+
+.chip.alerta {
+  background-color: var(--alerta-bg);
+  color: var(--alerta);
+}
+
+/* 8. .btn y variantes: píldoras con radio 999px */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 22px;
+  border-radius: 999px;
+  font-family: var(--fuente);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  background-color: var(--papel2);
+  color: var(--tinta);
+  transition: transform 140ms ease, background-color 140ms ease, opacity 140ms ease;
+  user-select: none;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Botón principal canónico: Lima 60px con texto 17px en tinta */
+.btn.primario,
+.btn-primary-lima {
+  min-height: 60px;
+  height: 60px;
+  background-color: var(--lima);
+  color: var(--tinta);
+  font-size: 17px;
+  font-weight: 600;
+  padding: 0 24px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+.btn.primario:active,
+.btn-primary-lima:active {
+  background-color: #bce635;
+  transform: scale(0.97);
+}
+
+.btn.peligro {
+  background-color: var(--alerta);
+  color: #FFFFFF;
+}
+
+.btn.peligro:active {
+  background-color: #cf4930;
+  transform: scale(0.97);
+}
+
+.btn.fantasma {
+  background-color: transparent;
+  color: var(--tinta);
+  border: 1px solid rgba(23, 23, 26, 0.12);
+}
+
+.btn.fantasma:active {
+  background-color: var(--papel2);
+}
+
+.btn.redondo {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 999px;
+  padding: 0;
+}
+
+/* 9. .campo: input/textarea/select con label */
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.campo label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tinta-suave);
+  padding-left: 4px;
+}
+
+input,
+select,
+textarea,
+.campo input,
+.campo textarea,
+.campo select,
+input.campo,
+textarea.campo,
+select.campo {
+  background-color: var(--papel2);
+  color: var(--tinta);
+  border: none;
+  border-radius: 999px;
+  font-family: var(--fuente);
+  font-size: 16px;
+  padding: 12px 18px;
+  outline: none;
+  box-sizing: border-box;
+  min-height: 50px;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+textarea,
+.campo textarea,
+textarea.campo {
+  border-radius: 28px;
+  min-height: 96px;
+  resize: vertical;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  background-color: #E2DDD0;
+  box-shadow: 0 0 0 2px rgba(23, 23, 26, 0.15);
+}
+
+/* Casillas y radios con color lima */
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  min-height: auto;
+  padding: 0;
+  accent-color: var(--tinta);
+  cursor: pointer;
+}
+
+/* 10. .lista y .lista > .item (radio 28px sin bordes) */
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+}
+
+.lista > .item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  background-color: var(--papel2);
+  border: none;
+  border-radius: 28px;
+  gap: 12px;
+  transition: background-color 0.15s ease;
+}
+
+/* 11. .barra-prog con hijo .relleno (radio 999px) */
+.barra-prog,
+.progress-bar-track {
+  width: 100%;
+  height: 4px;
+  background-color: rgba(23, 23, 26, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.barra-prog > .relleno,
+.progress-bar-fill {
+  height: 100%;
+  background-color: var(--lima);
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+
+.barra-prog > .relleno.ok {
+  background-color: var(--lima);
+}
+
+/* 12. .grid2: 2 columnas */
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+
+/* 13. .oculto */
+.oculto {
+  display: none !important;
+}
+
+/* 14. .titulo-seccion: Instrument Serif */
+.titulo-seccion,
+h1, h2, h3 {
+  font-family: var(--fuente-serif);
+  font-weight: 400;
+  color: var(--tinta);
+  letter-spacing: -0.01em;
+}
+
+.titulo-seccion {
+  font-size: 26px;
+  line-height: 1.15;
+  margin-top: 4px;
+}
+
+.titulo-seccion em,
+h1 em, h2 em, h3 em {
+  font-style: italic;
+}
+
+/* 15. .vacio: estado sin datos */
+.vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--tinta-suave);
+  gap: 14px;
+  width: 100%;
+}
+
+.vacio .cargando-icono,
+.vacio .vacio-icono {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tinta);
+  animation: pulsoSuave 1.5s ease-in-out infinite;
+}
+
+@keyframes pulsoSuave {
+  0%, 100% { opacity: 0.4; transform: scale(0.95); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+/* ==========================================================================
+   COMPONENTES UI: AVISOS (TOASTS) Y MODALES DIÁLOGOS
+   ========================================================================== */
+#contenedor-avisos {
+  position: absolute;
+  bottom: calc(var(--alto-barra-abajo) + 32px);
+  left: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.aviso-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background-color: var(--tinta);
+  color: var(--papel);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(23, 23, 26, 0.22);
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  animation: avisoEntrada 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.aviso-toast .aviso-icono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--lima);
+  flex-shrink: 0;
+}
+
+.aviso-toast.error .aviso-icono {
+  color: var(--alerta);
+}
+
+.aviso-toast.saliendo {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+@keyframes avisoEntrada {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Modales y Diálogos */
+#contenedor-dialogos {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+}
+
+.dialogo-overlay,
+.modal-forja-overlay {
+  pointer-events: auto;
+  position: absolute;
+  inset: 0;
+  background-color: rgba(23, 23, 26, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeOverlay 0.2s ease forwards;
+}
+
+.dialogo-caja {
+  background-color: var(--papel);
+  border: none;
+  border-radius: 28px;
+  padding: 28px 24px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 16px 40px rgba(23, 23, 26, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: modalEntrada 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.dialogo-titulo {
+  font-family: var(--fuente-serif);
+  font-size: 26px;
+  font-weight: 400;
+  color: var(--tinta);
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.dialogo-cuerpo {
+  font-size: 15px;
+  color: var(--tinta-suave);
+  line-height: 1.5;
+}
+
+.dialogo-botones {
+  display: flex;
+  flex-direction: row-reverse;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+@keyframes fadeOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalEntrada {
+  from {
+    opacity: 0;
+    transform: scale(0.93) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Tarjeta de error de router resiliente */
+.error-pantalla {
+  background-color: var(--papel2);
+  border-radius: 28px;
+  padding: 28px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.error-pantalla .icono-error {
+  color: var(--alerta);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

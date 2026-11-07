@@ -1,0 +1,174 @@
+{
+ "dias": {
+  "lunes": {
+   "nombre": "Empuje: pecho, hombro y tríceps",
+   "ejercicios": [
+    {
+     "id": "press_inclinado_mancuernas_30",
+     "series": 3,
+     "reps": "6-8"
+    },
+    {
+     "id": "elevaciones_laterales_polea_cadera",
+     "series": 3,
+     "reps": "10-12"
+    },
+    {
+     "id": "press_pecho_en_polea",
+     "series": 3,
+     "reps": "8-10"
+    },
+    {
+     "id": "extension_triceps_sobre_cabeza_polea",
+     "series": 3,
+     "reps": "8-10"
+    },
+    {
+     "id": "press_militar_mancuernas_sentado",
+     "series": 2,
+     "reps": "6-8"
+    },
+    {
+     "id": "aperturas_en_polea_media",
+     "series": 2,
+     "reps": "10-12"
+    },
+    {
+     "id": "pushdown_triceps_polea",
+     "series": 2,
+     "reps": "8-10"
+    }
+   ]
+  },
+  "martes": {
+   "nombre": "Pierna y abdomen",
+   "ejercicios": [
+    {
+     "id": "sentadilla_hack_inversa",
+     "series": 3,
+     "reps": "6-8"
+    },
+    {
+     "id": "curl_femoral_sentado",
+     "series": 3,
+     "reps": "8-10"
+    },
+    {
+     "id": "hip_thrust_banco_mancuerna",
+     "series": 3,
+     "reps": "8-10"
+    },
+    {
+     "id": "extension_cuadriceps_maquina",
+     "series": 2,
+     "reps": "10-12"
+    },
+    {
+     "id": "abduccion_cadera_maquina",
+     "series": 2,
+     "reps": "12-15"
+    },
+    {
+     "id": "elevacion_talones_prensa",
+     "series": 3,
+     "reps": "10-12"
+    },
+    {
+     "id": "elevacion_de_piernas_colgado",
+     "series": 3,
+     "reps": "8-12"
+    }
+   ]
+  },
+  "viernes": {
+   "nombre": "Espalda y brazos (alternando)",
+   "ejercicios": [
+    {
+     "id": "dominadas_neutras",
+     "series": 3,
+     "reps": "6-8"
+    },
+    {
+     "id": "curl_bayesiano_polea",
+     "series": 3,
+     "reps": "6-8"
+    },
+    {
+     "id": "remo_soporte_pecho",
+     "series": 3,
+     "reps": "6-8"
+    },
+    {
+     "id": "extension_triceps_sobre_cabeza_polea",
+     "series": 2,
+     "reps": "8-10"
+    },
+    {
+     "id": "jalon_pecho_polea",
+     "series": 3,
+     "reps": "6-8"
+    },
+    {
+     "id": "curl_martillo_mancuernas",
+     "series": 2,
+     "reps": "6-8"
+    },
+    {
+     "id": "remo_unilateral_polea",
+     "series": 2,
+     "reps": "8-10"
+    },
+    {
+     "id": "encogimientos_mancuernas_inclinado",
+     "series": 3,
+     "reps": "8-10"
+    },
+    {
+     "id": "colgado_pasivo_barra_dorsal",
+     "series": 1,
+     "reps": "30-45 s"
+    }
+   ]
+  },
+  "sabado": {
+   "nombre": "Torso: hombro, espalda 2 y antebrazo",
+   "ejercicios": [
+    {
+     "id": "remo_pecho_apoyado_mancuernas",
+     "series": 3,
+     "reps": "8-10"
+    },
+    {
+     "id": "elevaciones_laterales_mancuerna_pie",
+     "series": 3,
+     "reps": "10-15"
+    },
+    {
+     "id": "pullover_polea_alta",
+     "series": 2,
+     "reps": "10-12"
+    },
+    {
+     "id": "face_pull_polea",
+     "series": 3,
+     "reps": "12-15"
+    },
+    {
+     "id": "curl_predicador_maquina",
+     "series": 2,
+     "reps": "6-8"
+    },
+    {
+     "id": "curl_muneca_mancuerna",
+     "series": 2,
+     "reps": "12-15"
+    },
+    {
+     "id": "isometria_manual_de_cuello",
+     "series": 2,
+     "reps": "12-15"
+    }
+   ]
+  }
+ }
+}
