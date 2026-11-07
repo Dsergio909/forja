@@ -237,6 +237,13 @@ function mostrarErrorEnVista(vista, rutaConfig, error) {
  */
 async function iniciar() {
   try {
+    // 0. Modo sin internet desde el primer segundo (antes esperaba al asistente inicial; fix 7-nov)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch((errSw) => {
+        console.warn('[App] Advertencia al registrar sw.js:', errSw);
+      });
+    }
+
     // 1. Iconos vectoriales
     inicializarIconosUI();
 
@@ -290,12 +297,7 @@ async function iniciar() {
       }
     }
 
-    // 5. Registro del Service Worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').catch((errSw) => {
-        console.warn('[App] Advertencia al registrar sw.js:', errSw);
-      });
-    }
+    // 5. (El service worker ya se registró en el paso 0)
 
     // 6. Configurar escuchador de hash y cargar vista
     window.addEventListener('hashchange', cargarRuta);
