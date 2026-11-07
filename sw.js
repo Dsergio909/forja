@@ -7,7 +7,7 @@
    - CACHÉ PRIMERO para: multimedia (media/) y librerías/modelos externos (CDN).
    ========================================================================== */
 
-const CACHE_NAME = 'forja-20261107-1757';
+const CACHE_NAME = 'forja-20261107-1807';
 
 // Lista completa de archivos de la app para precaché
 const ARCHIVOS_APP = [

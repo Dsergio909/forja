@@ -488,6 +488,9 @@ export async function montar(contenedor, params = []) {
     else if (tabActiva === 'ejercicio') {
       const mapaPRs = prs(todasSeries);
       const prActual = ejercicioSeleccionadoId ? mapaPRs[ejercicioSeleccionadoId] : null;
+      // La serie real del récord (para mostrar «40 kg/lado» o «placa 5», no solo «40»; fix 7-nov)
+      const seriePR = prActual ? todasSeries.find(s => s.ejercicioId === ejercicioSeleccionadoId &&
+        s.kg === prActual.kg && s.reps === prActual.reps && (!prActual.fecha || s.fecha === prActual.fecha)) : null;
 
       // Selector estilizado
       const ejerciciosConSeries = new Set(todasSeries.map(s => s.ejercicioId).filter(Boolean));
@@ -560,7 +563,9 @@ export async function montar(contenedor, params = []) {
         ),
         h('span', { style: 'font-size: 14px; color: var(--lima, #C8F03C); font-weight: 600;' }, nombreEjSel),
         prActual ? h('div', { class: 'progreso-record-metric' },
-          h('span', { class: 'grande' }, `${prActual.kg != null ? prActual.kg : 'PC'} × ${prActual.reps}`),
+          h('span', { class: 'grande' }, prActual.kg != null ? String(prActual.kg) + ' × ' + prActual.reps : `${prActual.reps} reps`),
+          h('span', { class: 'sutil', style: 'display:block;font-size:14px;margin-top:4px;' },
+            seriePR ? formatearCargaSerie(seriePR) + (seriePR.porLado ? ' (el 1RM cuenta los dos lados)' : '') : ''),
           h('svg', { class: 'record-underline-svg', viewBox: '0 0 230 18' },
             h('path', { class: 'record-underline-path', d: 'M 6 13 C 65 5, 120 15, 222 8' })
           ),

@@ -68,7 +68,9 @@
    "media/fotos/colgado_pasivo_barra_0.jpg",
    "media/fotos/colgado_pasivo_barra_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: One_Handed_Hang (dominio público)"
+  "foto_fuente": "free-exercise-db: One_Handed_Hang (dominio público)",
+  "video": "media/videos/colgado_pasivo_barra.mp4",
+  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
  },
  {
   "id": "curl_bayesiano_polea",
@@ -197,7 +199,9 @@
    "media/fotos/curl_inclinado_mancuernas_0.jpg",
    "media/fotos/curl_inclinado_mancuernas_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Incline_Dumbbell_Curl (dominio público)"
+  "foto_fuente": "free-exercise-db: Incline_Dumbbell_Curl (dominio público)",
+  "video": "media/videos/curl_inclinado_mancuernas.mp4",
+  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
  },
  {
   "id": "curl_martillo_mancuernas",
