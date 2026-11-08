@@ -7,6 +7,12 @@
  * - dominadas x6 x6 x4 / dominadas 6,6,4 / dominadas 8 8 -> peso corporal
  * - bayesiano 10kg 6 6, 7.5kg 7 / bayesiano 7,5 8 8 -> dos pesos distintos y coma decimal
  * - dorian 40/lado 6 6 5, hoy solo hice 4 en martillo con 10 -> múltiples ejercicios en un mensaje
+ * - 4 de 8 en martillo con 10 -> curl_martillo_mancuernas, 4 series de 8 reps con 10 kg
+ * - hoy hice 12 series de 3 en jalon con 40 -> 12 series de 3 reps con 40 kg
+ * - bayesiano 3x10 con 20 -> 3 series de 10 reps con 20 kg
+ * - 12 series de 3 -> 12 series de 3 reps (ejercicioId null y duda)
+ * - 4 de 8 -> 4 series de 8 reps (ejercicioId null y duda)
+ * - 3x10 con 20 -> 3 series de 10 reps con 20 kg (ejercicioId null y duda)
  * - hice dominadas 7 6 5 y luego jalon con 50 kilos 8 8 -> separación por conectores
  * - tricep polea torre 2 40 9 -> nota de máquina «torre 2»
  * - femoral placa 5 8 8 7 -> máquinas de placas (unidad 'placa')
@@ -142,18 +148,21 @@ function esEjercicioCorporal(ej) {
 }
 
 /**
- * Limpia en bucle todas las partículas conversacionales al inicio de un candidato a ejercicio.
+ * Limpia en bucle todas las partículas conversacionales al inicio/final de un candidato a ejercicio.
  * @param {string} str
  * @returns {string}
  */
 function limpiarPrefijosConversacionales(str) {
   if (!str) return '';
   let limpio = str.trim();
-  const regexPrefijo = /^(?:hoy|ayer|hice|hizo|meti|metí|saque|saqué|pude|entrene|entrené|solo|en|con|de|el|la|los|las)\s+/i;
+  const regexPrefijo = /^(?:hoy|ayer|hice|hizo|hicimos|meti|metí|metimos|saque|saqué|pude|pudimos|entrene|entrené|solo|en|el|la|los|las)\s+/i;
   while (regexPrefijo.test(limpio)) {
     limpio = limpio.replace(regexPrefijo, '').trim();
   }
-  return limpio.replace(/\s+(?:en|con|de)$/i, '').trim();
+  // Limpiar conectores preposicionales sobrantes al inicio o al final
+  limpio = limpio.replace(/^(?:en|con|de)\s+/i, '').trim();
+  limpio = limpio.replace(/\s+(?:en|con|de)$/i, '').trim();
+  return limpio;
 }
 
 /**
@@ -178,7 +187,7 @@ function extraerReps(str) {
     if (matchSoloNxM) {
       const seriesCount = parseInt(matchSoloNxM[1], 10);
       const repCount = parseInt(matchSoloNxM[2], 10);
-      if (seriesCount > 0 && seriesCount <= 20 && repCount > 0 && repCount <= 100) {
+      if (seriesCount > 0 && seriesCount <= 50 && repCount > 0 && repCount <= 100) {
         for (let i = 0; i < seriesCount; i++) reps.push(repCount);
         return reps;
       }
@@ -195,7 +204,7 @@ function extraerReps(str) {
   if (matchNxM) {
     const seriesCount = parseInt(matchNxM[1], 10);
     const repCount = parseInt(matchNxM[2], 10);
-    if (seriesCount > 0 && seriesCount <= 20 && repCount > 0 && repCount <= 100) {
+    if (seriesCount > 0 && seriesCount <= 50 && repCount > 0 && repCount <= 100) {
       for (let i = 0; i < seriesCount; i++) reps.push(repCount);
       return reps;
     }
@@ -240,8 +249,12 @@ function empiezaConEjercicio(str, listaEjercicios = []) {
   if (!limpio) return false;
 
   // Patrón conversacional como "hoy solo hice 4 en martillo con 10"
-  const regexConv = /(?:hoy\s+)?(?:solo\s+)?(?:hice|hizo|meti|metí|saque|saqué|pude)\s+(\d+)\s*(?:reps?|repeticiones)?\s+(?:en|de)\s+([a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+?)\s+con\s+(\d+(?:[.,]\d+)?)/i;
+  const regexConv = /(?:hoy\s+|ayer\s+)?(?:solo\s+)?(?:hice|hizo|meti|metí|saque|saqué|pude|entrene|entrené)\s+(\d+)\s*(?:reps?|repeticiones)?\s+(?:en|de)\s+([a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+?)\s+con\s+(\d+(?:[.,]\d+)?)/i;
   if (regexConv.test(limpio)) return true;
+
+  // Patrón estructurado como "4 de 8 en martillo con 10" o "12 series de 3 en jalon con 40"
+  const regexEstructurado = /(?:hoy\s+|ayer\s+)?(?:solo\s+)?(?:hice|hizo|meti|metí|saque|saqué|pude|entrene|entrené)?\s*(?:\d+\s+(?:series\s+de|de)\s+\d+|\d+\s*x\s*\d+)\s*(?:reps?|repeticiones)?\s+(?:en|de)\s+([a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+)/i;
+  if (regexEstructurado.test(limpio)) return true;
 
   // Limpiar palabras introductorias compuestas en bucle
   limpio = limpiarPrefijosConversacionales(limpio);
@@ -338,6 +351,8 @@ function separarEnSegmentos(texto, listaEjercicios = []) {
                            /\b(?:placas?|pines|pin)\b/i.test(trimmedResto) ||
                            /\bcon\s+\d+/i.test(trimmedResto) ||
                            /\d+\/lado/i.test(trimmedResto) ||
+                           /\b\d+\s+(?:series\s+de|de)\s+\d+\b/i.test(trimmedResto) ||
+                           /\b\d+\s*x\s*\d+\b/i.test(trimmedResto) ||
                            (!esDecimal && /^\s*\d+(?:[.,]\d+)?\s+\d+/i.test(trimmedResto));
 
       if ((esNuevoEjercicio || esCambioPeso) && !esDecimal) {
@@ -412,14 +427,14 @@ function parsearBloque(linea, listaEjercicios = []) {
     texto = texto.replace(matchPlaca[0], ' ');
   }
 
-  // 4. Patrones conversacionales en lenguaje natural:
-  // Ej: "hoy solo hice 4 en martillo con 10" / "solo hice 4 en martillo con 10"
-  const regexConv = /(?:hoy\s+)?(?:solo\s+)?(?:hice|hizo|meti|metí|saque|saqué|pude)\s+(\d+)\s*(?:reps?|repeticiones)?\s+(?:en|de)\s+([a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+?)\s+con\s+(\d+(?:[.,]\d+)?)\s*(?:kg|kilos?|k\b)?/i;
-  const matchConv = texto.match(regexConv);
-  if (matchConv) {
-    const repsNum = parseInt(matchConv[1], 10);
-    const nombreEj = matchConv[2].trim();
-    const kgNum = parseFloat(matchConv[3].replace(',', '.'));
+  // 4. Patrones conversacionales de UNA sola serie explícita (ej: "hoy solo hice 4 en martillo con 10")
+  // Lookahead negativo asegura que NO sea un patrón estructurado "4 de 8" ni "4 series de 8"
+  const regexConvUnaSerie = /(?:hoy\s+|ayer\s+)?(?:solo\s+)?(?:hice|hizo|meti|metí|saque|saqué|pude|entrene|entrené)\s+(\d+)(?!\s+(?:series\s+de|de)\s+\d+)\s*(?:reps?|repeticiones)?\s+(?:en|de)\s+([a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+?)\s+con\s+(\d+(?:[.,]\d+)?)\s*(?:kg|kilos?|k\b)?/i;
+  const matchConvUna = texto.match(regexConvUnaSerie);
+  if (matchConvUna) {
+    const repsNum = parseInt(matchConvUna[1], 10);
+    const nombreEj = matchConvUna[2].trim();
+    const kgNum = parseFloat(matchConvUna[3].replace(',', '.'));
     const ranking = buscarEjercicio(nombreEj, listaEjercicios);
     const top = ranking[0] || null;
     const ejercicioId = top && top.puntaje >= 0.4 ? top.id : null;
@@ -456,7 +471,72 @@ function parsearBloque(linea, listaEjercicios = []) {
     texto = texto.replace(matchKg[0], ' ');
   }
 
-  // 7. Extraer nombre de ejercicio candidato y resto de datos numéricos
+  // 7. Patrones estructurados de series y reps:
+  // - "N series de M" (ej: "12 series de 3", "12 series de 3 en jalon con 40")
+  // - "N de M" (ej: "4 de 8", "4 de 8 en martillo con 10")
+  // - "NxM" o "N x M" (ej: "3x10", "bayesiano 3x10 con 20", "3x10 con 20")
+  let setsEstructurado = null;
+  let repsEstructurado = null;
+  let matchEstructuradoStr = null;
+
+  const mSeriesDe = texto.match(/\b(\d+)\s+series\s+de\s+(\d+)\b/i);
+  if (mSeriesDe) {
+    setsEstructurado = parseInt(mSeriesDe[1], 10);
+    repsEstructurado = parseInt(mSeriesDe[2], 10);
+    matchEstructuradoStr = mSeriesDe[0];
+  } else {
+    const mDe = texto.match(/\b(\d+)\s+de\s+(\d+)\b/i);
+    if (mDe) {
+      setsEstructurado = parseInt(mDe[1], 10);
+      repsEstructurado = parseInt(mDe[2], 10);
+      matchEstructuradoStr = mDe[0];
+    } else {
+      const mNxM = texto.match(/\b(\d+)\s*x\s*(\d+)\b/i);
+      if (mNxM) {
+        setsEstructurado = parseInt(mNxM[1], 10);
+        repsEstructurado = parseInt(mNxM[2], 10);
+        matchEstructuradoStr = mNxM[0];
+      }
+    }
+  }
+
+  if (matchEstructuradoStr && setsEstructurado > 0 && setsEstructurado <= 50 && repsEstructurado > 0 && repsEstructurado <= 100) {
+    const restoTexto = texto.replace(matchEstructuradoStr, ' ').trim();
+    const nombreLimpio = limpiarPrefijosConversacionales(restoTexto);
+
+    let ejercicioId = null;
+    let opciones = [];
+
+    if (nombreLimpio) {
+      const ranking = buscarEjercicio(nombreLimpio, listaEjercicios);
+      const top = ranking[0] || null;
+      if (top && top.puntaje >= 0.4) {
+        ejercicioId = top.id;
+      }
+      opciones = ranking.slice(0, 3).map(r => r.id);
+    }
+
+    for (let i = 0; i < setsEstructurado; i++) {
+      series.push({ kg, reps: repsEstructurado, unidad });
+    }
+
+    return {
+      item: {
+        ejercicioId,
+        opciones,
+        kg,
+        unidad,
+        porLado,
+        series,
+        maquina,
+        nota
+      },
+      duda: ejercicioId ? null : original,
+      esContinuacion: false
+    };
+  }
+
+  // 8. Extraer nombre de ejercicio candidato y resto de datos numéricos convencionales
   const regexPrimerNumero = /(?:\b\d+(?:[.,]\d+)?|\bx\s*\d+)/i;
   const matchInicioNum = texto.match(regexPrimerNumero);
 
@@ -469,7 +549,7 @@ function parsearBloque(linea, listaEjercicios = []) {
     nombreCandidato = texto.trim();
   }
 
-  // Limpiar en bucle todas las partículas conversacionales al inicio/final del nombre (BAJO-01)
+  // Limpiar partículas conversacionales al inicio/final del nombre
   nombreCandidato = limpiarPrefijosConversacionales(nombreCandidato);
 
   // Inversión: "3x8 50kg jalon"
@@ -550,13 +630,11 @@ function parsearBloque(linea, listaEjercicios = []) {
 
   // Parsear resto de datos para reps y kg si no se habían extraído
   if (kg !== null) {
-    // Si el peso ya se extrajo explícitamente (ej: "femoral placa 5 8 8 7" o "jalon con 50 kilos 8 8")
     const repsArr = extraerReps(restoDatos);
     for (const r of repsArr) {
       series.push({ kg, reps: r, unidad });
     }
   } else if (/^(?:(\d+(?:[.,]\d+)?)\s+)?(\d+)\s*x\s*(\d+)$/i.test(restoDatos.trim())) {
-    // CRÍTICO-01: Formato "3x8" o "45 3x8" evaluado antes para no perder el peso antecedente
     const matchNxM = restoDatos.trim().match(/^(?:(\d+(?:[.,]\d+)?)\s+)?(\d+)\s*x\s*(\d+)$/i);
     if (matchNxM[1]) kg = parseFloat(matchNxM[1].replace(',', '.'));
     const sets = parseInt(matchNxM[2], 10);
@@ -565,7 +643,6 @@ function parsearBloque(linea, listaEjercicios = []) {
       series.push({ kg, reps: repsVal, unidad });
     }
   } else if (/^(\d+(?:[.,]\d+)?)\s+(?:x\s*\d+[\s,]*)+$/i.test(restoDatos.trim())) {
-    // CRÍTICO-01: Formato con peso seguido de xN: "80 x5 x5 x5" o "40 x6 x6 x4"
     const matchPeso = restoDatos.trim().match(/^(\d+(?:[.,]\d+)?)\s+(.*)$/i);
     kg = parseFloat(matchPeso[1].replace(',', '.'));
     const repsArr = extraerReps(matchPeso[2]);
@@ -573,13 +650,11 @@ function parsearBloque(linea, listaEjercicios = []) {
       series.push({ kg, reps: r, unidad });
     }
   } else if (/^\s*(?:x\s*\d+[\s,]*)+$/i.test(restoDatos.trim()) || (esCorporal && /x\s*\d+/i.test(restoDatos))) {
-    // Formato exclusivo de peso corporal con x: "dominadas x6 x6 x4" o "x6 x6 x4"
     const repsArr = extraerReps(restoDatos);
     for (const r of repsArr) {
       series.push({ kg: null, reps: r, unidad });
     }
   } else if (/^\d+(?:\s*,\s*\d+)+$/.test(restoDatos.trim())) {
-    // Formato de lista de reps con comas "6,6,4" o "6, 6, 4"
     const repsArr = extraerReps(restoDatos);
     for (const r of repsArr) {
       series.push({ kg: null, reps: r, unidad });
@@ -607,7 +682,6 @@ function parsearBloque(linea, listaEjercicios = []) {
         series.push({ kg: null, reps: numeros[0], unidad });
       }
     } else if (numeros.length === 2) {
-      // En ejercicios corporales, 2 números ("dominadas 8 8") son 2 series de peso corporal
       if (esCorporal && numeros[0] <= 40 && numeros[1] <= 40 && Number.isInteger(numeros[0])) {
         series.push({ kg: null, reps: numeros[0], unidad });
         series.push({ kg: null, reps: numeros[1], unidad });
@@ -616,7 +690,6 @@ function parsearBloque(linea, listaEjercicios = []) {
         series.push({ kg, reps: numeros[1], unidad });
       }
     } else if (numeros.length >= 3) {
-      // ALTO-03: Diferenciar lastre claro (dominadas 10 6 6 6, fondos 15 8 8) de fatiga corporal (dominadas 7 6 5)
       const repsSubsiguientes = numeros.slice(1);
       const difSubsiguientes = Math.max(...repsSubsiguientes) - Math.min(...repsSubsiguientes);
       const sonSubsiguientesConsistentes = repsSubsiguientes.every(n => n <= 30) && difSubsiguientes <= 2;

@@ -1,5 +1,6 @@
 // js/hoy.js - Pantalla «Hoy» de Forja (Dirección de Arte v2 «Revista de Sala»)
 // Portada editorial: saludo con día y rutina, titular Instrument Serif enorme,
+// caja «¿Cómo te fue hoy?» para consulta rápida al Coach, tarjeta de nivel,
 // chips del día (proteína, agua, pasos, sueño) con barra fina lima, tarjeta de ejercicio hero de 420px,
 // carrusel horizontal de ejercicios y botón lima canónico adaptativo.
 
@@ -9,6 +10,7 @@ import { ejercicios, rutina, perfil } from './datos.js';
 import { pesoSugerido } from './calculos.js';
 import { ir } from './app.js';
 import { icono } from './iconos.js';
+import { tarjetaNivel } from './logros.js';
 
 let cleanupFn = null;
 let fechaVista = null;
@@ -162,6 +164,88 @@ export async function montar(contenedor, params = []) {
       font-weight: 500;
       line-height: 1.35;
       margin-top: 2px;
+    }
+    /* Estilos para la caja rápida del Coach y tarjeta de nivel */
+    .hoy-caja-coach {
+      background-color: var(--superficie2, #E9E4D8);
+      border-radius: 28px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      cursor: pointer;
+      transition: transform 120ms ease;
+    }
+    .hoy-caja-coach:active {
+      transform: scale(0.99);
+    }
+    .hoy-caja-coach-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .hoy-caja-coach-titulo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hoy-caja-coach-titulo {
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--texto, #17171A);
+      margin: 0;
+    }
+    .hoy-caja-coach-sublink {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--sutil, #5D5951);
+    }
+    .hoy-caja-coach-form {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin: 0;
+    }
+    .hoy-caja-coach-input {
+      flex: 1;
+      min-width: 0;
+      height: 44px;
+      border-radius: 999px;
+      border: none;
+      background-color: var(--fondo, #F3F0E8);
+      padding: 0 16px;
+      font-size: 13px;
+      font-family: inherit;
+      color: var(--texto, #17171A);
+    }
+    .hoy-caja-coach-input:focus {
+      outline: 2px solid var(--lima, #C8F03C);
+    }
+    .hoy-caja-coach-btn {
+      min-width: 44px;
+      min-height: 44px;
+      width: 44px;
+      height: 44px;
+      border-radius: 999px;
+      border: none;
+      background-color: var(--lima, #C8F03C);
+      color: #17171A;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: transform 120ms ease;
+    }
+    .hoy-caja-coach-btn:active {
+      transform: scale(0.92);
+    }
+    .tarjeta-nivel-widget {
+      transition: transform 120ms ease;
+    }
+    .tarjeta-nivel-widget:active {
+      transform: scale(0.98);
     }
     .chips-nutricion-row {
       display: flex;
@@ -524,6 +608,39 @@ export async function montar(contenedor, params = []) {
     ajuste('diario-' + hoyStr, { pasos: 0, suenoH: null })
   ]);
 
+  // Cargar widget de tarjeta de nivel (desde ./logros.js)
+  let nodoNivel = null;
+  try {
+    if (typeof tarjetaNivel === 'function') {
+      nodoNivel = await tarjetaNivel();
+    }
+  } catch (err) {
+    console.warn('Error al cargar tarjetaNivel:', err);
+  }
+
+  if (!nodoNivel) {
+    nodoNivel = h('div', {
+      class: 'tarjeta tarjeta-nivel-widget',
+      style: 'background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; text-decoration: none; color: inherit;',
+      on: { click: () => ir('#logros') }
+    },
+      h('div', { style: 'display: flex; justify-content: space-between; align-items: baseline;' },
+        h('div', { style: 'display: flex; align-items: center; gap: 8px;' },
+          icono('coach', 18),
+          h('span', { style: 'font-weight: 700; font-size: 15px; color: var(--texto, #17171A);' }, 'Nivel 1 · Hierro crudo')
+        ),
+        h('span', { style: 'font-size: 13px; font-weight: 700; color: var(--texto, #17171A);' }, '0%')
+      ),
+      h('div', { style: 'width: 100%; height: 6px; background-color: rgba(23, 23, 26, 0.08); border-radius: 999px; overflow: hidden;' },
+        h('div', { style: 'width: 0%; height: 100%; background-color: var(--lima, #C8F03C); border-radius: 999px;' })
+      ),
+      h('div', { style: 'display: flex; justify-content: space-between; align-items: center;' },
+        h('span', { style: 'font-size: 12px; color: var(--sutil, #6B675F);' }, '0 XP acumulada'),
+        h('span', { style: 'font-size: 13px; font-weight: 700; color: var(--texto, #17171A); text-decoration: underline;' }, 'Ver logros')
+      )
+    );
+  }
+
   const mapaCatalogo = new Map(catalogoEjercicios.map(e => [e.id, e]));
 
   // ==========================================
@@ -615,6 +732,71 @@ export async function montar(contenedor, params = []) {
     datosPerfil?.metaMes ? h('p', { class: 'hoy-meta-mes' }, `Meta del mes: ${datosPerfil.metaMes}`) : null
   );
   pantalla.appendChild(headerHoy);
+
+  // ==========================================
+  // CAJA «¿CÓMO TE FUE HOY?» Y TARJETA DE NIVEL
+  // (SIEMPRE visibles todos los días debajo del titular, antes de la rutina o descanso)
+  // ==========================================
+  const inputCoach = h('input', {
+    type: 'text',
+    class: 'hoy-caja-coach-input',
+    placeholder: '«Dormí 5 horas y me duele el hombro» o «Hice jalón 45 8 8 6»',
+    'aria-label': 'Mensaje para el coach'
+  });
+
+  const enviarAlCoach = (texto) => {
+    const t = String(texto || '').trim();
+    if (t) {
+      try {
+        sessionStorage.setItem('forja-coach-pendiente', t);
+      } catch (_) {}
+    }
+    ir('#coach');
+  };
+
+  inputCoach.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      enviarAlCoach(inputCoach.value);
+    }
+  });
+
+  inputCoach.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+
+  const cajaCoach = h('div', {
+    class: 'tarjeta hoy-caja-coach',
+    on: { click: () => ir('#coach') }
+  },
+    h('div', { class: 'hoy-caja-coach-top' },
+      h('div', { class: 'hoy-caja-coach-titulo-wrap' },
+        icono('coach', 18),
+        h('h3', { class: 'hoy-caja-coach-titulo' }, '¿Cómo te fue hoy?')
+      ),
+      h('span', { class: 'hoy-caja-coach-sublink' }, 'Preguntar al Coach')
+    ),
+    h('form', {
+      class: 'hoy-caja-coach-form',
+      on: {
+        submit: (e) => {
+          e.preventDefault();
+          enviarAlCoach(inputCoach.value);
+        }
+      }
+    },
+      inputCoach,
+      h('button', {
+        type: 'submit',
+        class: 'hoy-caja-coach-btn',
+        'aria-label': 'Enviar al Coach'
+      }, icono('flecha-derecha', 18))
+    )
+  );
+
+  // Se muestran SIEMPRE, todos los días, debajo del titular, antes de la rutina o del aviso de descanso
+  pantalla.appendChild(cajaCoach);
+  pantalla.appendChild(nodoNivel);
 
   // ==========================================
   // 2. CHIPS DEL DÍA: PROTEÍNA, AGUA, PASOS Y SUEÑO

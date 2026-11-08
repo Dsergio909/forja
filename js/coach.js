@@ -1,13 +1,14 @@
 // js/coach.js — Pantalla de Coach («¿cómo voy?») sin internet
 // Implementa chat guardado en el store 'chat', respuestas por reglas y WebLLM con streaming.
 // Cumple con CONTRATOS.md, ENCARGO_APP.md y DIRECCION_FORJA_v2.md
+// Soporta interpretarMensaje (puro), confirmación de series y detección de bienestar.
 
 import * as db from './db.js';
 import * as ui from './ui.js';
 import * as datos from './datos.js';
 import * as calculos from './calculos.js';
 import * as config from './config.js';
-import { buscarEjercicio } from './parser.js';
+import { buscarEjercicio, entenderTexto } from './parser.js';
 import { icono } from './iconos.js';
 import { mdAHtml } from './markdown.js';
 
@@ -156,7 +157,7 @@ function esErrorMemoria(err) {
 }
 
 /**
- * CFG-01: Normaliza y sincroniza el modelo del ajuste 'ia' con config.WEBLLM_MODELO
+ * Normaliza y sincroniza el modelo del ajuste 'ia' con config.WEBLLM_MODELO
  * y config.WEBLLM_MODELO_RESPALDO evitando que valores obsoletos desincronicen el Coach.
  */
 function normalizarModeloConfig(modeloCandidato) {
@@ -173,7 +174,7 @@ async function obtenerAjusteIASincronizado() {
   const modeloPrincipal = config.WEBLLM_MODELO || 'Qwen3.5-2B-q4f16_1-MLC';
   const aj = await db.ajuste('ia', { activa: false, modelo: modeloPrincipal });
   const modeloSinc = normalizarModeloConfig(aj?.modelo);
-  // 7-nov: el modelo 2B trababa el celular de Sergio → quien lo tenía queda con la IA APAGADA y el modelo liviano.
+  // El modelo 2B trababa el celular de Sergio → quien lo tenía queda con la IA APAGADA y el modelo liviano.
   const veniaDel2B = typeof aj?.modelo === 'string' && /\b2B\b|1\.5B/.test(aj.modelo);
   const estado = { activa: veniaDel2B ? false : Boolean(aj?.activa), modelo: modeloSinc };
   if (aj && aj.modelo !== modeloSinc) {
@@ -224,7 +225,7 @@ export function clasificarPregunta(texto) {
   const n = normalizar(texto);
   if (!n) return null;
 
-  // 0. «¿sabes quién soy?» / «¿cómo me llamo?» / «¿qué sabes de mí?» (7-nov: antes caía en la IA)
+  // 0. «¿sabes quién soy?» / «¿cómo me llamo?» / «¿qué sabes de mí?»
   if (/\b(quien soy|sabes quien soy|como me llamo|mi nombre|que sabes de mi|me conoces|sabes algo de mi|mis datos)\b/.test(n)) {
     return { tipo: 'QUIEN_SOY' };
   }
@@ -253,7 +254,7 @@ export function clasificarPregunta(texto) {
     return { tipo: 'QUE_TOCA_HOY' };
   }
 
-  // 4. Preguntas de peso corporal y medidas (COA-NEW-02: interceptar antes de PESO_USO)
+  // 4. Preguntas de peso corporal y medidas
   if (
     /^(mi peso|peso|peso actual|peso corporal|cintura|mi cintura|mis medidas|medidas|grasa|mi grasa)\b/.test(n) ||
     /\b(mi peso|peso actual|peso corporal|cuanto peso|cuanto estoy pesando|pesando actualmente|que peso tengo|cuanto peso tengo)\b/.test(n) ||
@@ -287,7 +288,7 @@ export function clasificarPregunta(texto) {
   m = n.match(/(?:como\s+(?:se\s+hace|hago|hacer|ejecuto|ejecutar|realizar|se\s+realiza|es\s+la\s+tecnica|es)|tecnica\s+de|pasos\s+de|claves\s+de|instrucciones\s+(?:para|de)|guia\s+de)\s*(.+)/);
   if (m) return { tipo: 'COMO_SE_HACE', termino: m[1].trim() };
 
-  // Reconocimiento flexible por palabras clave (COA-NEW-02: solo para ejercicios si no se refieren a medidas corporales)
+  // Reconocimiento flexible por palabras clave
   if (/\b(peso|kilos|kg)\b/.test(n)) {
     const term = n.replace(/\b(que|cual|cuanto|le|debo|usar|uso|pongo|meto|hago|peso|kilos|kg|en|para|a|de|con)\b/g, ' ').replace(/\s+/g, ' ').trim();
     if (term && term.length >= 3 && !/\b(actual|corporal|corporales|hoy|ayer|semana|meta|perdi|subi|baje|bajado|subido|perdido|cuerpo|cintura|grasa|tengo)\b/.test(term)) {
@@ -307,7 +308,214 @@ export function clasificarPregunta(texto) {
 }
 
 // ============================================================================
-// 3. RESPUESTAS POR REGLAS (CÁLCULOS DETERMINÍSTICOS SIN EMOJIS)
+// 3. DETECCIÓN DE BIENESTAR E INTERPRETACIÓN DE MENSAJES (RONDA 7 / 8)
+// ============================================================================
+
+/**
+ * Detecta indicadores de bienestar físico en el texto: cansancio, horas de sueño, dolor o nivel de energía.
+ * Función pura auxiliar sin efectos secundarios.
+ * @param {string} texto
+ * @returns {{ cansancio: boolean, suenoH: number|null, dolor: string, energia: number|null } | null}
+ */
+export function detectarBienestar(texto) {
+  if (!texto || typeof texto !== 'string') return null;
+  const tNorm = normalizar(texto);
+  let cansancio = false;
+  let suenoH = null;
+  let dolor = '';
+  let energia = null;
+
+  // 1. Detección de horas de sueño (ej: 'dormi 5 horas', 'dormí 5h', '5 horas de sueño')
+  const matchSueno = texto.match(/(?:dormi|dormí|duermo|descans[eé])\s+(?:solo\s+|apenas\s+|unas?\s+)?(\d+(?:[.,]\d+)?)\s*(?:h\b|horas?)/i) ||
+                     texto.match(/(\d+(?:[.,]\d+)?)\s*(?:h\b|horas?)\s+de\s+suen[oó]/i) ||
+                     texto.match(/(?:dormi|dormí)\s+(\d+(?:[.,]\d+)?)\b/i);
+  if (matchSueno) {
+    suenoH = parseFloat(matchSueno[1].replace(',', '.'));
+    if (suenoH <= 6) {
+      cansancio = true;
+    }
+  } else if (/\b(dormi poco|dormi mal|dormi fatal|no dormi|casi no dormi|insomnio)\b/i.test(tNorm)) {
+    cansancio = true;
+  }
+
+  // 2. Detección de cansancio / fatiga / estrés / energía
+  if (/\b(cansad[oa]s?|muy cansad[oa]s?|agotad[oa]s?|fatigad[oa]s?|reventad[oa]s?|destruid[oa]s?|muert[oa]s?|fundid[oa]s?|sin energ[ií]a|poca energ[ií]a|sin fuerzas?|estresad[oa]s?|estres|estr[eé]s)\b/i.test(texto) ||
+      /\b(cansad[oa]s?|agotad[oa]s?|fatigad[oa]s?|sin energia|poca energia|estresad[oa]s?|estres)\b/i.test(tNorm)) {
+    cansancio = true;
+  }
+  if (/\b(sin energ[ií]a|cero energ[ií]a)\b/i.test(texto) || /\b(sin energia|cero energia)\b/i.test(tNorm)) {
+    energia = 1;
+    cansancio = true;
+  } else if (/\b(poca energ[ií]a|baja energ[ií]a)\b/i.test(texto) || /\b(poca energia|baja energia)\b/i.test(tNorm)) {
+    energia = 2;
+    cansancio = true;
+  }
+
+  // 3. Detección de dolor articular o molestias
+  const matchDolor = texto.match(/(?:me duele|dolor en|dolor de|molestia en|tengo\s+(?:un\s+)?dolor\s+en|tengo\s+(?:una\s+)?molestia\s+en|siento\s+dolor\s+en)\s+(?:mucho\s+)?(?:el\s+|la\s+|los\s+|las\s+|mi\s+|mis\s+)?([a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+?)(?: pero| y|,|\.|$|\bdespues|\bhoy)/i);
+  if (matchDolor) {
+    dolor = matchDolor[1].trim().toLowerCase();
+  } else {
+    const articulaciones = ['hombro', 'rodilla', 'codo', 'espalda', 'lumbar', 'muneca', 'muñeca', 'cuello', 'cadera', 'tobillo', 'pecho'];
+    for (const art of articulaciones) {
+      if (new RegExp(`\\b(dolor|molestia|duele).*\\b${art}\\b|\\b${art}\\b.*\\b(dolor|molestia|duele)\\b`, 'i').test(tNorm)) {
+        dolor = art === 'muneca' ? 'muñeca' : art;
+        break;
+      }
+    }
+  }
+
+  if (cansancio || suenoH !== null || dolor || energia !== null) {
+    return {
+      cansancio: Boolean(cansancio),
+      suenoH: suenoH !== null ? suenoH : null,
+      dolor: dolor || '',
+      energia: energia !== null ? energia : null
+    };
+  }
+  return null;
+}
+
+/**
+ * Obtiene el catálogo de ejercicios de datos.js con fallback para rutas de test runners.
+ */
+async function obtenerEjerciciosSeguro() {
+  let lista = [];
+  try {
+    lista = await datos.ejercicios();
+  } catch (_) {}
+  if (!lista || lista.length === 0) {
+    const rutas = ['../data/ejercicios.json', 'data/ejercicios.json', './data/ejercicios.json', '../../data/ejercicios.json'];
+    for (const r of rutas) {
+      try {
+        const resp = await fetch(r);
+        if (resp.ok) {
+          lista = await resp.json();
+          break;
+        }
+      } catch (_) {}
+    }
+  }
+  return lista || [];
+}
+
+/**
+ * Interpreta texto en lenguaje natural reconociendo series de entrenamiento y/o estados de bienestar.
+ * Función pura: NO modifica DOM ni persiste nada en IndexedDB.
+ * Cumple con los contratos de coach_* de pruebas_r7.html.
+ *
+ * @param {string} texto
+ * @returns {Promise<{
+ *   series: Array<Object>|null,
+ *   bienestar: { cansancio: boolean, suenoH: number|null, dolor: string, energia: number|null }|null,
+ *   respuesta: string
+ * }>}
+ */
+export async function interpretarMensaje(texto) {
+  if (!texto || typeof texto !== 'string') {
+    return { series: [], bienestar: null, respuesta: '' };
+  }
+
+  const [listaEjs, bienestar] = await Promise.all([
+    obtenerEjerciciosSeguro(),
+    Promise.resolve(detectarBienestar(texto))
+  ]);
+
+  // ANTES de llamar a entenderTexto:
+  // 1. Quita del texto la parte de bienestar (corta desde « pero », « y estoy », « estoy », « dormi », « dormí », « me duele », « cansad»)
+  let textoParaParser = texto;
+  const regexCorteBienestar = /(?:^|[,;.]?\s+)(?:pero\b|(?:y\s+)?estoy\b|(?:y\s+)?dormi\b|(?:y\s+)?dormí\b|(?:y\s+)?me\s+duele\b|cansad\w*)/i;
+  const matchCorte = regexCorteBienestar.exec(textoParaParser);
+  if (matchCorte) {
+    textoParaParser = textoParaParser.slice(0, matchCorte.index).trim();
+  }
+
+  // 2. Quita palabras de relleno al inicio («hoy», «hice», «meti», «metí»)
+  while (/^(?:hoy|ayer|hice|hizo|meti|metí|metimos|solo)\s+/i.test(textoParaParser)) {
+    textoParaParser = textoParaParser.replace(/^(?:hoy|ayer|hice|hizo|meti|metí|metimos|solo)\s+/i, '').trim();
+  }
+
+  // 3. Extraer series mediante parser.js
+  let parsed = { items: [], dudas: [] };
+  if (textoParaParser && typeof entenderTexto === 'function') {
+    try {
+      parsed = entenderTexto(textoParaParser, listaEjs);
+    } catch (_) {}
+  }
+
+  // 4. series SOLO debe incluir ítems con ejercicioId reconocido (no null)
+  // y, si el texto no trae ningún nombre de ejercicio, series = []
+  const itemsValidos = (parsed?.items || [])
+    .filter(it =>
+      it && it.ejercicioId && Array.isArray(it.series) && it.series.length > 0 &&
+      it.series.some(s => s && typeof s.reps === 'number' && s.reps > 0)
+    )
+    .map(it => {
+      for (const s of it.series) {
+        if (!s.ejercicioId) s.ejercicioId = it.ejercicioId;
+      }
+      return it;
+    });
+
+  const series = itemsValidos;
+
+  // Generar respuesta explicativa y consejo prudente
+  let respuesta = '';
+
+  if (series && series.length > 0) {
+    const lineasEjs = series.map(it => {
+      const ejObj = listaEjs.find(e => e.id === it.ejercicioId);
+      const nombre = ejObj?.nombre || it.ejercicioId || 'Ejercicio detectado';
+      const cargaTxt = it.kg !== null ? ui.formatoKg(it.kg, it.porLado, it.unidad) : 'peso corporal';
+      const repsTxt = it.series.map(s => s.reps).join(', ');
+      return `• **${nombre}**: ${it.series.length} ${it.series.length === 1 ? 'serie' : 'series'} con ${cargaTxt} (${repsTxt} reps)`;
+    }).join('\n');
+
+    const consejos = [];
+    if (bienestar?.cansancio || (bienestar?.suenoH && bienestar.suenoH <= 6)) {
+      consejos.push('Consejo del coach: Noté tu cansancio; para la sesión de hoy mantén el peso y deja 2-3 RIR o baja 1 serie para no sobrecargar el sistema nervioso.');
+    }
+    if (bienestar?.dolor) {
+      consejos.push(`Cuidado con el dolor en ${bienestar.dolor}: evita entrenar movimientos que causen molestia en esa articulación hoy; si persiste, consulta a un médico (sin diagnósticos).`);
+    }
+
+    if (consejos.length > 0) {
+      respuesta = `Entendí tu entrenamiento:\n${lineasEjs}\n\n${consejos.join('\n\n')}\n\nPuedes confirmar y guardar estas series con el botón de abajo.`;
+    } else {
+      respuesta = `Entendí tu entrenamiento:\n${lineasEjs}\n\n¿Deseas confirmar y guardar estas series en tu sesión de hoy?`;
+    }
+  } else if (bienestar) {
+    const partesReg = [];
+    if (bienestar.suenoH) partesReg.push(`${bienestar.suenoH} horas de sueño`);
+    if (bienestar.cansancio && !bienestar.suenoH) partesReg.push('estado de cansancio');
+    if (bienestar.dolor) partesReg.push(`molestia en ${bienestar.dolor}`);
+
+    const consejos = [];
+    if (bienestar.cansancio || (bienestar.suenoH && bienestar.suenoH <= 6)) {
+      consejos.push('Consejo del coach: Con poco descanso o cansancio acumulado, mantén el peso y deja 2-3 RIR o baja 1 serie para priorizar recuperación.');
+    }
+    if (bienestar.dolor) {
+      consejos.push(`Respecto al dolor en ${bienestar.dolor}: no entrenes ese movimiento hoy, prioriza ejercicios sin impacto en esa zona y consulta a un especialista si el dolor persiste (sin diagnósticos médicos).`);
+    }
+    if (!consejos.length) {
+      consejos.push('Consejo del coach: Registrado en tu seguimiento diario. Mantén buena hidratación y descanso.');
+    }
+
+    respuesta = `Anotado en tu bienestar (${partesReg.join(' y ')}).\n\n${consejos.join('\n\n')}`;
+  } else {
+    const c = clasificarPregunta(texto);
+    if (c) {
+      respuesta = await responder(texto);
+    } else {
+      respuesta = mensajeSugerencias();
+    }
+  }
+
+  return { series, bienestar, respuesta };
+}
+
+// ============================================================================
+// 4. RESPUESTAS POR REGLAS (CÁLCULOS DETERMINÍSTICOS SIN EMOJIS)
 // ============================================================================
 
 /** «¿Sabes quién soy?»: responde con el perfil y el resumen de lo registrado (sin IA). */
@@ -335,7 +543,7 @@ async function responderQuienSoy() {
 
 async function responderComoVoy() {
   const [perfil, series, sesiones, medidas, comidas, ejs, rut] = await Promise.all([
-    datos.perfil(), db.todos('series'), db.todos('sesiones'), db.todos('medidas'), db.todos('comidas'), datos.ejercicios(), datos.rutina()
+    datos.perfil(), db.todos('series'), db.todos('sesiones'), db.todos('medidas'), db.todos('comidas'), obtenerEjerciciosSeguro(), datos.rutina()
   ]);
   const hoyISO = ui.hoyISO(), lunesISO = lunesSemanaISO();
   const d7 = new Date(); d7.setDate(d7.getDate() - 7);
@@ -376,7 +584,7 @@ async function responderComoVoy() {
   });
   const txtPR = prsRec.length ? `**Récords nuevos (últimos 7 días)**:\n${prsRec.join('\n')}` : '**Récords personales**: Sin récords nuevos en los últimos 7 días. Consistencia.';
 
-  // 5. Tendencias peso y cintura (COA-01: ordenar medidas por fecha ascendente antes de calcular)
+  // 5. Tendencias peso y cintura (ordenadas ascendente por fecha)
   const medidasOrdenadas = [...medidas].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
   const vPeso = medidasOrdenadas.filter(m => m.peso != null).map(m => ({ fecha: m.fecha, valor: Number(m.peso) }));
   const vCint = medidasOrdenadas.filter(m => m.cintura != null).map(m => ({ fecha: m.fecha, valor: Number(m.cintura) }));
@@ -395,11 +603,43 @@ async function responderComoVoy() {
   const metaProt = perfil?.proteina || 128;
   const txtProt = `**Proteína promedio (últimos 7 días)**: **${promProt} g/día** (meta: ${metaProt} g/día)`;
 
-  return `**Resumen de tu progreso**:\n\n${txtMeta}\n\n${txtSes}\n\n${txtMusc}\n\n${txtPR}\n\n${txtTend}\n\n${txtProt}`;
+  // 7. Bienestar reciente (cansancio en los últimos días)
+  let cansancioReciente = false;
+  let diasConCansancio = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const fIso = fechaLocalISO(d);
+    try {
+      const dia = await db.ajuste('diario-' + fIso, null);
+      if (dia?.cansancio) {
+        cansancioReciente = true;
+        diasConCansancio++;
+      }
+    } catch (_) {}
+  }
+  let txtBienestar = '';
+  if (cansancioReciente) {
+    txtBienestar = `\n\n**Bienestar reciente**: Has reportado cansancio en los últimos días (${diasConCansancio} ${diasConCansancio === 1 ? 'día' : 'días'}). Consejo: Mantén el peso, deja 2-3 RIR o reduce 1 serie por ejercicio para priorizar recuperación.`;
+  }
+
+  // 8. Nivel en Forja (logros.js)
+  let txtLogros = '';
+  try {
+    const { calcularLogros } = await import('./logros.js');
+    if (typeof calcularLogros === 'function') {
+      const infoLogros = await calcularLogros();
+      if (infoLogros?.nivel) {
+        txtLogros = `\n\n**Nivel en Forja**: **Nivel ${infoLogros.nivel} · ${infoLogros.nombreNivel || ''}** (${infoLogros.xp || 0} XP).`;
+      }
+    }
+  } catch (_) {}
+
+  return `**Resumen de tu progreso**:\n\n${txtMeta}\n\n${txtSes}\n\n${txtMusc}\n\n${txtPR}\n\n${txtTend}\n\n${txtProt}${txtBienestar}${txtLogros}`;
 }
 
 async function responderPesoUso(termino) {
-  const ejs = await datos.ejercicios();
+  const ejs = await obtenerEjerciciosSeguro();
   const ej = encontrarEjercicio(termino, ejs);
   if (!ej) return '¿En qué ejercicio quieres saber el peso sugerido? Ej: *«¿Qué peso uso en Jalón al pecho?»* o *«¿Qué peso uso en Sentadilla?»*.';
 
@@ -409,7 +649,6 @@ async function responderPesoUso(termino) {
   }
   series.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || ((b.hora || 0) - (a.hora || 0)));
   const ultFecha = series[0].fecha;
-  // COA-02: ordenar las series de la última sesión cronológicamente (ascendente por hora)
   const ultSeries = series
     .filter(s => s.fecha === ultFecha)
     .sort((a, b) => (a.hora || 0) - (b.hora || 0));
@@ -442,7 +681,7 @@ async function responderProteinaLlevo() {
 async function responderQueTocaHoy() {
   const dias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
   const diaSem = dias[new Date().getDay()];
-  const [rut, ejs, perfil] = await Promise.all([datos.rutina(), datos.ejercicios(), datos.perfil()]);
+  const [rut, ejs, perfil] = await Promise.all([datos.rutina(), obtenerEjerciciosSeguro(), datos.perfil()]);
   const cfg = rut?.dias?.[diaSem];
   const diaNom = diaSem.charAt(0).toUpperCase() + diaSem.slice(1);
   const metaProt = perfil?.proteina || 128;
@@ -459,7 +698,6 @@ async function responderQueTocaHoy() {
     if (seriesEj.length && ej) {
       seriesEj.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || ((b.hora || 0) - (a.hora || 0)));
       const ultFecha = seriesEj[0].fecha;
-      // COA-02: ordenar las series de la última sesión en orden ascendente por hora
       const ultS = seriesEj
         .filter(s => s.fecha === ultFecha)
         .sort((a, b) => (a.hora || 0) - (b.hora || 0));
@@ -472,13 +710,8 @@ async function responderQueTocaHoy() {
   return txt;
 }
 
-/**
- * COA-NEW-01: Búsqueda de última vez por grupo muscular (pecho, espalda, pierna, etc.)
- * Mapea nombres coloquiales a la terminología anatómica utilizada en data/ejercicios.json
- * y compara mediante inclusión sobre musculos_principales, musculos_secundarios y temas.
- */
 async function responderUltimaVez(termino) {
-  const ejs = await datos.ejercicios();
+  const ejs = await obtenerEjerciciosSeguro();
   const musculos = [
     'piernas', 'pierna', 'cuadriceps', 'isquios', 'femoral', 'gluteo', 'gemelos',
     'hombros', 'hombro', 'espalda', 'pecho', 'biceps', 'triceps', 'abdomen',
@@ -538,7 +771,6 @@ async function responderUltimaVez(termino) {
 
   series.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || ((b.hora || 0) - (a.hora || 0)));
   const ultFecha = series[0].fecha;
-  // COA-02: ordenar las series de la última sesión en orden ascendente por hora
   const ultSeries = series
     .filter(s => s.fecha === ultFecha)
     .sort((a, b) => (a.hora || 0) - (b.hora || 0));
@@ -549,7 +781,7 @@ async function responderUltimaVez(termino) {
 }
 
 async function responderComoSeHace(termino) {
-  const ejs = await datos.ejercicios();
+  const ejs = await obtenerEjerciciosSeguro();
   const ej = encontrarEjercicio(termino, ejs);
   if (!ej) return '¿Sobre qué ejercicio quieres ver la técnica? Ej: *«¿Cómo se hace jalón al pecho?»* o *«Técnica de sentadilla»*.';
 
@@ -568,10 +800,6 @@ async function responderComoSeHace(termino) {
   return txt;
 }
 
-/**
- * COA-NEW-02: Responde consultas de peso corporal, baja/subida de peso y medidas
- * evitando que sean tratadas erróneamente como pedidos de peso para ejercicios.
- */
 async function responderMedidas(subtipo = 'peso') {
   const [medidas, perfil] = await Promise.all([
     db.todos('medidas'),
@@ -675,7 +903,7 @@ async function responderMedidas(subtipo = 'peso') {
 }
 
 // ============================================================================
-// 4. IA LOCAL CON WEBLLM
+// 5. IA LOCAL CON WEBLLM
 // ============================================================================
 
 function tieneWebGPU() {
@@ -684,7 +912,7 @@ function tieneWebGPU() {
 
 async function armarResumenParaIA() {
   const [perfil, series, medidas, comidas, ejs] = await Promise.all([
-    datos.perfil(), db.todos('series'), db.todos('medidas'), db.todos('comidas'), datos.ejercicios()
+    datos.perfil(), db.todos('series'), db.todos('medidas'), db.todos('comidas'), obtenerEjerciciosSeguro()
   ]);
   const hoyISO = ui.hoyISO(), d14 = new Date();
   d14.setDate(d14.getDate() - 14);
@@ -692,7 +920,6 @@ async function armarResumenParaIA() {
   const diffMeta = perfil?.metaFecha ? Math.ceil((new Date(perfil.metaFecha + 'T00:00:00') - new Date(hoyISO + 'T00:00:00')) / 86400000) : 'N/D';
 
   const prs = Object.entries(calculos.prs(series)).slice(0, 12).map(([id, p]) => `${ejs.find(e => e.id === id)?.nombre || id}: ${ui.formatoKg(p.kg, p.porLado, p.unidad)} x ${p.reps}`).join('; ');
-  // COA-NEW-03: ordenar cronológicamente de forma ascendente tanto por fecha como por hora ((a.hora || 0) - (b.hora || 0))
   const s14 = series
     .filter(s => s.fecha >= iso14 && s.fecha <= hoyISO)
     .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '') || ((a.hora || 0) - (b.hora || 0)));
@@ -703,7 +930,6 @@ async function armarResumenParaIA() {
   }
   const entreno = Object.entries(pf).map(([f, it]) => `${f}: ${it.join(', ')}`).join('\n');
 
-  // COA-01: ordenar medidas cronológicamente por fecha antes de extraer el último valor y calcular tendencia
   const medidasOrdenadas = [...medidas].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
   const vPeso = medidasOrdenadas.filter(m => m.peso != null).map(m => ({ fecha: m.fecha, valor: Number(m.peso) }));
   const vCint = medidasOrdenadas.filter(m => m.cintura != null).map(m => ({ fecha: m.fecha, valor: Number(m.cintura) }));
@@ -720,12 +946,7 @@ async function armarResumenParaIA() {
   return `DATOS DEL USUARIO (FORJA):\n- Perfil: ${perfil?.nombre || 'el usuario'}, meta: ${perfil?.metaNombre || 'Grado'} (${perfil?.metaFecha || 'N/D'}, faltan ${diffMeta} días). Meta mes: "${perfil?.metaMes || 'N/D'}".\n- Objetivos diarios: ${perfil?.kcal || 2200} kcal, ${perfil?.proteina || 128}g prot, ${perfil?.aguaVasos || 10} vasos agua.\n- Tendencias: Peso ${ultP?.valor ?? 'N/D'}kg (${tPeso !== null ? tPeso.toFixed(2) + 'kg/sem' : 'N/D'}), cintura ${ultC?.valor ?? 'N/D'}cm (${tCint !== null ? tCint.toFixed(2) + 'cm/sem' : 'N/D'}).\n- Proteína promedio: ${promProt}g/día.\n- PRs: ${prs || 'Sin registros'}.\n- Entrenamientos recientes:\n${entreno || 'Sin entrenamientos recientes'}\n- Reglas del coach:\n- ${reglas}`;
 }
 
-/**
- * Descarga o inicializa el motor de WebLLM para su uso sin conexión.
- * Si el modelo grande falla por memoria, ofrece cambiar al de respaldo de config.js.
- * Exportada para ser utilizada tanto por el Coach como por Ajustes.
- */
-let promesaCarga = null;   // 7-nov: una sola carga compartida; quien llega después ESPERA (antes recibía null → «reading 'chat'»)
+let promesaCarga = null;
 const oyentesAvance = new Set();
 
 export async function descargarModelo(alAvance, modelo = null) {
@@ -763,7 +984,7 @@ async function cargarMotorInterno(alAvance, modelo) {
     try {
       mlcEngine = await webllm.CreateMLCEngine(modeloACargar, {
         initProgressCallback: rep => { if (typeof alAvance === 'function') alAvance(rep); }
-      }, { context_window_size: 2048 });   // memoria de conversación corta: menos RAM y menos traba en el celular
+      }, { context_window_size: 2048 });
       mlcEngine._modeloCargado = modeloACargar;
       await db.ponerAjuste('ia', { ...aj, activa: true, modelo: modeloACargar });
       if (estadoPantalla?.actualizarModo) estadoPantalla.actualizarModo(true, modeloACargar);
@@ -800,9 +1021,6 @@ async function cargarMotorInterno(alAvance, modelo) {
   }
 }
 
-/**
- * Borra los pesos y cachés del modelo local para liberar almacenamiento
- */
 export async function borrarModelo() {
   if (enGeneracion && mlcEngine && typeof mlcEngine.interruptGenerate === 'function') {
     try { mlcEngine.interruptGenerate(); } catch (_) {}
@@ -866,7 +1084,6 @@ async function responderConIA(pregunta, onChunk, onProgreso) {
     }
 
     const contexto = await armarResumenParaIA();
-    // COA-03: excluir la pregunta recién guardada del historial previo para no duplicarla
     const todosMsgs = (await db.todos('chat')).sort((a, b) => (a.hora || 0) - (b.hora || 0));
     const ultimo = todosMsgs[todosMsgs.length - 1];
     const sinActual = (ultimo && ultimo.rol === 'yo' && ultimo.texto === pregunta)
@@ -925,26 +1142,26 @@ export async function responder(texto, { onChunk, onProgreso } = {}) {
 }
 
 // ============================================================================
-// 5. INTERFAZ DE USUARIO (ROUTER APP.JS - DIRECCIÓN DE ARTE FORJA V2)
+// 6. INTERFAZ DE USUARIO (ROUTER APP.JS - DIRECCIÓN DE ARTE FORJA V2)
 // ============================================================================
 
 const CSS_COACH = `
-.coach-pantalla { display: flex; flex-direction: column; height: 100%; max-height: calc(100vh - 120px); max-width: 520px; margin: 0 auto; box-sizing: border-box; padding: 8px 16px 12px; background: var(--papel, #F3F0E8); color: var(--tinta, #17171A); font-family: 'Bricolage Grotesque', system-ui, sans-serif; }
-.coach-cabecera { display: flex; justify-content: space-between; align-items: center; padding: 4px 0 10px; flex-shrink: 0; }
+.coach-pantalla { display: flex; flex-direction: column; height: calc(100dvh - 150px); max-height: calc(100dvh - 150px); max-width: 520px; margin: 0 auto; box-sizing: border-box; padding: 4px 16px 110px; background: var(--papel, #F3F0E8); color: var(--tinta, #17171A); font-family: 'Bricolage Grotesque', system-ui, sans-serif; overflow: hidden; }
+.coach-cabecera { display: flex; justify-content: space-between; align-items: center; padding: 4px 0 8px; flex-shrink: 0; }
 .coach-cabecera-texto { display: flex; flex-direction: column; gap: 2px; }
-.coach-titulo { font-family: 'Instrument Serif', Georgia, serif; font-size: 32px; font-weight: 400; line-height: 1.05; color: var(--tinta, #17171A); letter-spacing: -0.01em; margin: 0; }
+.coach-titulo { font-family: 'Instrument Serif', Georgia, serif; font-size: 28px; font-weight: 400; line-height: 1.05; color: var(--tinta, #17171A); letter-spacing: -0.01em; margin: 0; }
 .coach-titulo em { font-style: italic; }
 .coach-estado { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--tinta-suave, #5D5951); }
 .coach-punto { width: 6px; height: 6px; border-radius: 999px; background-color: var(--lima, #C8F03C); }
 .coach-btn-limpiar { width: 48px; height: 48px; min-width: 48px; min-height: 48px; border-radius: 999px; background: var(--papel2, #E9E4D8); border: none; color: var(--tinta, #17171A); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 140ms, background 140ms; }
 .coach-btn-limpiar:active { transform: scale(0.94); background: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }
-.coach-chips { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 8px 0 12px; flex-shrink: 0; min-height: 68px; scrollbar-width: none; -ms-overflow-style: none; }
+.coach-chips { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 4px 0 8px; flex-shrink: 0; min-height: 54px; scrollbar-width: none; -ms-overflow-style: none; }
 .coach-chips::-webkit-scrollbar { display: none; }
 .coach-chip-btn { flex-shrink: 0; min-height: 48px; font-family: 'Bricolage Grotesque', sans-serif; font-size: 13px; font-weight: 600; padding: 0 16px; border-radius: 999px; border: none; background: var(--papel2, #E9E4D8); color: var(--tinta, #17171A); cursor: pointer; transition: transform 140ms, background 140ms, color 140ms; white-space: nowrap; display: inline-flex; align-items: center; }
 .coach-chip-btn:active { transform: scale(0.96); background: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }
-.coach-mensajes { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 0; display: flex; flex-direction: column; gap: 14px; scrollbar-width: none; -ms-overflow-style: none; }
+.coach-mensajes { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 0; display: flex; flex-direction: column; gap: 12px; scrollbar-width: none; -ms-overflow-style: none; overflow-x: hidden; }
 .coach-mensajes::-webkit-scrollbar { display: none; }
-.coach-msg { max-width: 86%; padding: 14px 18px; border-radius: 28px; font-family: 'Bricolage Grotesque', sans-serif; font-size: 15px; line-height: 1.45; word-break: break-word; }
+.coach-msg { max-width: 88%; padding: 12px 16px; border-radius: 28px; font-family: 'Bricolage Grotesque', sans-serif; font-size: 15px; line-height: 1.45; word-break: break-word; overflow-wrap: break-word; }
 .coach-msg-coach { align-self: flex-start; background: var(--papel2, #E9E4D8); color: var(--tinta, #17171A); }
 .coach-msg-yo { align-self: flex-end; background: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }
 .coach-msg-cuerpo p { margin: 0 0 8px 0; }
@@ -957,8 +1174,8 @@ const CSS_COACH = `
 .coach-msg-meta { font-size: 11px; margin-top: 6px; display: flex; justify-content: flex-end; font-variant-numeric: tabular-nums; }
 .coach-msg-coach .coach-msg-meta { color: var(--tinta-suave, #5D5951); }
 .coach-msg-yo .coach-msg-meta { color: rgba(243, 240, 232, 0.65); }
-.coach-barra { display: flex; gap: 10px; padding: 12px 0 4px; align-items: center; }
-.coach-in { flex: 1; height: 52px; min-height: 52px; padding: 0 20px; border-radius: 999px; background: var(--papel2, #E9E4D8); border: none; color: var(--tinta, #17171A); font-family: 'Bricolage Grotesque', sans-serif; font-size: 15px; outline: none; box-sizing: border-box; transition: box-shadow 150ms; }
+.coach-barra { display: flex; gap: 8px; padding: 8px 0 0; align-items: center; flex-shrink: 0; }
+.coach-in { flex: 1; height: 52px; min-height: 52px; padding: 0 18px; border-radius: 999px; background: var(--papel2, #E9E4D8); border: none; color: var(--tinta, #17171A); font-family: 'Bricolage Grotesque', sans-serif; font-size: 15px; outline: none; box-sizing: border-box; transition: box-shadow 150ms; }
 .coach-in:focus { box-shadow: 0 0 0 2px var(--tinta, #17171A); }
 .coach-in::placeholder { color: var(--tinta-suave, #5D5951); }
 .coach-btn-env { width: 52px; height: 52px; min-width: 52px; min-height: 52px; border-radius: 999px; border: none; background: var(--lima, #C8F03C); color: var(--tinta, #17171A); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 140ms; flex-shrink: 0; }
@@ -966,12 +1183,23 @@ const CSS_COACH = `
 .coach-btn-env:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 .coach-link { color: inherit; text-decoration: underline; font-weight: 600; }
 .coach-icono { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.coach-tarjeta-series { background: var(--papel, #F3F0E8); border-radius: 28px; padding: 12px 14px; margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.coach-fila-botones { display: flex; gap: 8px; margin-top: 6px; }
+.coach-btn-accion { min-height: 48px; padding: 0 16px; border-radius: 999px; border: none; font-family: 'Bricolage Grotesque', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: transform 140ms ease; flex: 1; }
+.coach-btn-accion:active { transform: scale(0.96); }
+.coach-btn-guardar { background: var(--lima, #C8F03C); color: var(--tinta, #17171A); }
+.coach-btn-corregir { background: var(--papel2, #E9E4D8); color: var(--tinta, #17171A); }
+.coach-btn-opcion { min-height: 44px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(23, 23, 26, 0.15); background: var(--papel2, #E9E4D8); color: var(--tinta, #17171A); font-family: 'Bricolage Grotesque', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; }
+.coach-btn-opcion:active { background: var(--lima, #C8F03C); }
 `;
 
 export async function montar(contenedor, params = []) {
   desmontar();
   let procesando = false;
-  const ajIA = await obtenerAjusteIASincronizado();
+  const [ajIA, catalogoEjercicios] = await Promise.all([
+    obtenerAjusteIASincronizado(),
+    obtenerEjerciciosSeguro()
+  ]);
   const modNombre = ajIA.modelo || config.WEBLLM_MODELO || 'Qwen';
   const modo = ajIA.activa ? `IA: ${modNombre}` : 'Reglas';
 
@@ -1030,7 +1258,7 @@ export async function montar(contenedor, params = []) {
       ui.h('input', {
         type: 'text',
         class: 'coach-in',
-        placeholder: 'Pregunta algo al coach...',
+        placeholder: 'Pregunta algo o anota cómo te fue...',
         autocomplete: 'off'
       }),
       ui.h('button', {
@@ -1089,7 +1317,7 @@ export async function montar(contenedor, params = []) {
     burbuja({
       rol: 'coach',
       hora: Date.now(),
-      texto: '¡Hola! Soy tu coach personal en **Forja**.\n\nPuedes preguntarme cómo vas, tu peso y evolución de medidas, qué peso usar hoy con doble progresión, cuánta proteína llevas o la técnica de cualquier ejercicio. Toca una sugerencia arriba o escribe lo que necesites.'
+      texto: '¡Hola! Soy tu coach personal en **Forja**.\n\nPuedes contarme cómo te fue (ej. *«hice jalon 45 8 8 6 pero estoy cansado»*), preguntarme cómo vas, tu evolución de peso, qué peso usar hoy o la técnica de cualquier ejercicio.'
     });
   }
 
@@ -1097,14 +1325,180 @@ export async function montar(contenedor, params = []) {
     procesando = true;
     inputEl.disabled = true;
     if (btnEnvEl) btnEnvEl.disabled = true;
+
     const yo = { hora: Date.now(), rol: 'yo', texto };
     await db.guardar('chat', yo);
     burbuja(yo);
 
-    const bCoach = burbuja({ rol: 'coach', hora: Date.now(), texto: '...' });
-    const cEl = bCoach.querySelector('.coach-msg-cuerpo');
-
     try {
+      // 1. Interpretar mensaje reconociendo series y/o bienestar
+      const interp = await interpretarMensaje(texto);
+
+      // 2. Guardar bienestar en ajuste diario si se detectó
+      if (interp?.bienestar) {
+        const claveDiario = 'diario-' + ui.hoyISO();
+        const diarioActual = await db.ajuste(claveDiario, { pasos: 0, suenoH: null, energia: null, cansancio: false, dolor: '', nota: '' });
+        const nuevoDiario = {
+          ...diarioActual,
+          ...(interp.bienestar.suenoH !== null && interp.bienestar.suenoH !== undefined ? { suenoH: interp.bienestar.suenoH } : {}),
+          ...(interp.bienestar.cansancio !== undefined ? { cansancio: Boolean(interp.bienestar.cansancio) } : {}),
+          ...(interp.bienestar.energia !== null && interp.bienestar.energia !== undefined ? { energia: interp.bienestar.energia } : {}),
+          ...(interp.bienestar.dolor ? { dolor: interp.bienestar.dolor } : {})
+        };
+        await db.ponerAjuste(claveDiario, nuevoDiario);
+      }
+
+      // 3. Si trae series: Tarjeta de confirmación interactiva
+      if (interp?.series && interp.series.length > 0) {
+        const bCoach = burbuja({ rol: 'coach', hora: Date.now(), texto: interp.respuesta });
+        await db.guardar('chat', { hora: Date.now(), rol: 'coach', texto: interp.respuesta });
+
+        const tarjetaConfirmacion = ui.h('div', { class: 'coach-tarjeta-series' });
+
+        for (const item of interp.series) {
+          const ejObj = catalogoEjercicios.find(e => e.id === item.ejercicioId);
+          const filaEj = ui.h('div', { style: 'display: flex; flex-direction: column; gap: 4px;' });
+
+          if (item.ejercicioId && ejObj) {
+            filaEj.appendChild(ui.h('div', { style: 'font-weight: 700;' }, ejObj.nombre));
+            const cargaTxt = item.kg !== null ? ui.formatoKg(item.kg, item.porLado, item.unidad) : 'peso corporal';
+            const repsTxt = item.series.map(s => s.reps).join(', ');
+            filaEj.appendChild(ui.h('div', { style: 'font-size: 13px; color: var(--tinta-suave, #5D5951);' },
+              `${item.series.length} ${item.series.length === 1 ? 'serie' : 'series'} · ${cargaTxt} · ${repsTxt} reps`
+            ));
+          } else {
+            // No reconoció el ejercicio -> consultar con 3 opciones
+            const preguntaDuda = ui.h('div', {},
+              ui.h('div', { style: 'font-weight: 700; margin-bottom: 6px;' }, '¿Cuál de estos ejercicios fue?'),
+              ui.h('div', { style: 'display: flex; flex-direction: column; gap: 6px;' })
+            );
+            const opcionesContenedor = preguntaDuda.querySelector('div:last-child');
+            const idsOpciones = (item.opciones && item.opciones.length > 0)
+              ? item.opciones.slice(0, 3)
+              : catalogoEjercicios.slice(0, 3).map(e => e.id);
+
+            for (const opcId of idsOpciones) {
+              const opcEj = catalogoEjercicios.find(e => e.id === opcId);
+              const btnOpc = ui.h('button', {
+                type: 'button',
+                class: 'coach-btn-opcion',
+                on: {
+                  click: () => {
+                    item.ejercicioId = opcId;
+                    preguntaDuda.innerHTML = `<strong>${opcEj?.nombre || opcId}</strong>`;
+                    const cargaTxt = item.kg !== null ? ui.formatoKg(item.kg, item.porLado, item.unidad) : 'peso corporal';
+                    const repsTxt = item.series.map(s => s.reps).join(', ');
+                    preguntaDuda.appendChild(ui.h('div', { style: 'font-size: 13px; color: var(--tinta-suave, #5D5951); margin-top: 2px;' },
+                      `${item.series.length} series · ${cargaTxt} · ${repsTxt} reps`
+                    ));
+                  }
+                }
+              }, opcEj?.nombre || opcId);
+              opcionesContenedor.appendChild(btnOpc);
+            }
+            filaEj.appendChild(preguntaDuda);
+          }
+          tarjetaConfirmacion.appendChild(filaEj);
+        }
+
+        const filaBotones = ui.h('div', { class: 'coach-fila-botones' },
+          ui.h('button', {
+            type: 'button',
+            class: 'coach-btn-accion coach-btn-corregir',
+            on: {
+              click: () => {
+                try { sessionStorage.setItem('forja-registro-pendiente', texto); } catch (_) {}
+                window.location.hash = '#registrar';
+              }
+            }
+          }, 'Corregir'),
+          ui.h('button', {
+            type: 'button',
+            class: 'coach-btn-accion coach-btn-guardar',
+            on: {
+              click: async (ev) => {
+                ev.target.disabled = true;
+                const hoy = ui.hoyISO();
+                let sesiones = await db.filtrar('sesiones', s => s.fecha === hoy);
+                let sesionId;
+                if (sesiones.length > 0) {
+                  sesionId = sesiones[0].id;
+                } else {
+                  const nuevaSes = await db.guardar('sesiones', {
+                    fecha: hoy,
+                    inicio: Date.now(),
+                    fin: null,
+                    nota: ''
+                  });
+                  sesionId = nuevaSes.id;
+                }
+
+                const seriesPrevias = await db.todos('series');
+                const prsPrevios = calculos.prs(seriesPrevias);
+                let totalGuardadas = 0;
+                const records = [];
+
+                for (const it of interp.series) {
+                  if (!it.ejercicioId) continue;
+                  const ejObj = catalogoEjercicios.find(e => e.id === it.ejercicioId);
+                  const prPrev = prsPrevios[it.ejercicioId];
+                  for (const s of it.series) {
+                    const kgS = s.kg ?? it.kg ?? null;
+                    const repsS = s.reps;
+                    await db.guardar('series', {
+                      fecha: hoy,
+                      hora: Date.now(),
+                      ejercicioId: it.ejercicioId,
+                      kg: kgS,
+                      porLado: Boolean(it.porLado),
+                      reps: repsS,
+                      rir: null,
+                      fallo: false,
+                      maquina: it.maquina || '',
+                      nota: it.nota || '',
+                      sesionId
+                    });
+                    totalGuardadas++;
+                    if (kgS && repsS) {
+                      const unoRM = calculos.unoRM(kgS, repsS);
+                      if (!prPrev || unoRM > (prPrev.unoRM || 0)) {
+                        const nom = ejObj?.nombre || it.ejercicioId;
+                        if (!records.includes(nom)) records.push(nom);
+                      }
+                    }
+                  }
+                }
+
+                tarjetaConfirmacion.remove();
+                let resumenTexto = `¡Listo! Guardé ${totalGuardadas} ${totalGuardadas === 1 ? 'serie' : 'series'} en tu sesión de hoy.`;
+                if (records.length > 0) {
+                  resumenTexto += `\n\n¡Nuevo récord personal en **${records.join(', ')}**!`;
+                }
+                burbuja({ rol: 'coach', hora: Date.now(), texto: resumenTexto });
+                await db.guardar('chat', { hora: Date.now(), rol: 'coach', texto: resumenTexto });
+                ui.aviso('Series guardadas en tu sesión', 'ok');
+              }
+            }
+          }, 'Guardar')
+        );
+
+        tarjetaConfirmacion.appendChild(filaBotones);
+        bCoach.querySelector('.coach-msg-cuerpo').appendChild(tarjetaConfirmacion);
+        scroll();
+        return;
+      }
+
+      // 4. Si solo fue bienestar (sin series)
+      if (interp?.bienestar) {
+        burbuja({ rol: 'coach', hora: Date.now(), texto: interp.respuesta });
+        await db.guardar('chat', { hora: Date.now(), rol: 'coach', texto: interp.respuesta });
+        return;
+      }
+
+      // 5. Flujo normal de reglas o IA para preguntas y consultas
+      const bCoach = burbuja({ rol: 'coach', hora: Date.now(), texto: '...' });
+      const cEl = bCoach.querySelector('.coach-msg-cuerpo');
+
       const resp = await responder(texto, {
         onProgreso: p => {
           if (!estadoPantalla || estadoPantalla.raiz !== raiz) return;
@@ -1125,15 +1519,12 @@ export async function montar(contenedor, params = []) {
       }
     } catch (err) {
       const errTxt = `No pude responder: ${err.message || err}`;
-      if (estadoPantalla && estadoPantalla.raiz === raiz) {
-        cEl.innerHTML = renderMarkdown(errTxt);
-      }
+      burbuja({ rol: 'coach', hora: Date.now(), texto: errTxt });
       await db.guardar('chat', { hora: Date.now(), rol: 'coach', texto: errTxt });
     } finally {
       procesando = false;
       inputEl.disabled = false;
       if (btnEnvEl) btnEnvEl.disabled = false;
-      // COA-04: enfocar inputEl únicamente si sigue montado en el documento activo
       if (inputEl && typeof document !== 'undefined' && document.body.contains(inputEl)) {
         inputEl.focus();
         scroll();
@@ -1148,10 +1539,20 @@ export async function montar(contenedor, params = []) {
   contenedor.appendChild(raiz);
   estadoPantalla = { raiz, actualizarModo };
   scroll();
+
+  // Ronda 7 / 8: Si hay mensaje pendiente en sessionStorage, procesarlo como si lo escribiera el usuario
+  try {
+    const pend = sessionStorage.getItem('forja-coach-pendiente');
+    if (pend) {
+      sessionStorage.removeItem('forja-coach-pendiente');
+      setTimeout(() => {
+        enviar(pend);
+      }, 60);
+    }
+  } catch (_) {}
 }
 
 export function desmontar() {
-  // COA-04: interrumpir la generación en streaming si el usuario sale de la pantalla
   if (enGeneracion && mlcEngine && typeof mlcEngine.interruptGenerate === 'function') {
     try { mlcEngine.interruptGenerate(); } catch (_) {}
   }

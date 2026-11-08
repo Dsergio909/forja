@@ -4,13 +4,15 @@
  * Ronda de Diseño v2 y Auditoría — Dirección de arte «Revista de sala»:
  * - Sin emojis: usa icono(nombre) de ./iconos.js (mas, menos, check, microfono, reloj, borrar, editar, etc.).
  * - Modo serie por serie con video/foto del ejercicio arriba (<video autoplay muted loop playsinline class='foto-ejercicio'>).
- * - Números héroe de kg y reps con clase .grande (76-96px) en Bricolage Grotesque tabular-nums.
+ * - Números héroe de kg y reps con clase .grande en Bricolage Grotesque tabular-nums.
  * - Botones − / + redondos grandes táctiles (>= 48px).
  * - Esfuerzo en 5 píldoras canónicas (Fácil 3 · 2 · 1 · 0 · Fallo) en grilla adaptable a 360px y >= 48px de alto.
  * - Botón principal lima píldora «Guardar serie N de M» con burbuja de icono check.
  * - Temporizador de descanso resiliente (C-01): guarda hora de fin en localStorage, sobrevive al bloqueo del celular
  *   (visibilitychange + WakeLock + Notification) y a cambiar de pantalla (barra flotante global + temporizadorActivo()).
  * - Al cambiar de ejercicio limpia el estado sucio y carga pesoSugerido() de la última sesión (C-02).
+ * - Integración con sessionStorage 'forja-registro-pendiente' para texto rápido al montar.
+ * - Padding inferior >= 110 px y total adaptación responsive para dispositivos de 360-430 px.
  * - Cumple con todos los contratos de CONTRATOS.md y requerimientos de ENCARGO_APP.md.
  */
 
@@ -32,6 +34,7 @@ let fechaSeleccionada = (() => {
 })();
 let listaEjercicios = [];
 let modoActivo = 'serie'; // 'serie' | 'texto' (por defecto serie por serie según v2)
+let textoModoTexto = ''; // Memoria para texto en modo rápido
 
 /**
  * Actualiza la fecha activa en memoria y sincroniza en sessionStorage (A2-02, B-04)
@@ -168,8 +171,6 @@ async function cargarEstadoParaEjercicio(ejercicioId, fecha) {
         .filter(s => s.fecha === ultimaFecha)
         .sort((a, b) => (a.hora || 0) - (b.hora || 0));
 
-      // Si las series son de una sesión previa, calculamos doble progresión con pesoSugerido;
-      // si ya hizo una serie hoy en esta misma fecha, mantenemos la carga recién usada hoy.
       if (ultimaFecha === fecha) {
         const refHoy = seriesUltima[seriesUltima.length - 1];
         estadoSerie.esPesoCorporal = (refHoy.kg === null || refHoy.kg === undefined);
@@ -195,7 +196,6 @@ async function cargarEstadoParaEjercicio(ejercicioId, fecha) {
     // Fallback limpio si falla la lectura de historial
   }
 
-  // Sin historial previo para este ejercicio: inicializar valores limpios según el ejercicio (A2-03)
   let sugVacia = null;
   try {
     sugVacia = pesoSugerido([], ej || {});
@@ -312,7 +312,6 @@ function sincronizarBarraFlotante(estado) {
     return;
   }
 
-  // Si el widget grande de Registrar está visible en el DOM actual, ocultamos la barra flotante para no duplicar
   const domGrande = document.getElementById('reg-timer-display');
   if (domGrande && document.body.contains(domGrande)) {
     removerBarraFlotante();
@@ -447,7 +446,6 @@ async function detenerTemporizador() {
     localStorage.removeItem(STORAGE_TIMER_EJERCICIO);
   } catch (e) {}
 
-  // A-04: Remover únicamente el nodo del temporizador sin borrar lo que el usuario está escribiendo
   const widgetTimer = document.querySelector('.reg-descanso-container');
   if (widgetTimer) {
     widgetTimer.remove();
@@ -477,8 +475,7 @@ async function ajustarTiempoTemporizador(deltaSeg) {
 }
 
 /**
- * Verifica y actualiza los nodos del temporizador (tanto el bloque grande en Registrar
- * como la barra flotante en otras pantallas). Si llegó a 0, dispara la alerta.
+ * Verifica y actualiza los nodos del temporizador. Si llegó a 0, dispara la alerta.
  */
 function actualizarNodosTemporizador() {
   const estado = leerDatosTemporizador();
@@ -563,7 +560,6 @@ function registrarListenersGlobalesTimer() {
 /**
  * Verifica si hay un temporizador de descanso corriendo en localStorage,
  * mantiene activa la barra flotante en cualquier pantalla y devuelve su estado (C-01).
- * Puede ser invocada por app.js u otros módulos al cambiar de ruta.
  * @returns {{activo: boolean, ejercicio: string, inicio: number, fin: number, duracion: number, restanteMs: number, restanteSeg: number}|null}
  */
 export function temporizadorActivo() {
@@ -840,7 +836,7 @@ async function renderModoSerie() {
   const { n, m } = await obtenerNumerosSerie(estadoSerie.ejercicioId, fechaSeleccionada);
   const textoPrevio = (await obtenerTextoUltimaSesion(estadoSerie.ejercicioId, fechaSeleccionada)) || 'Primera vez registrando este ejercicio';
 
-  // 1. Barra superior con selector de ejercicio agrupado (M2-02) y sincronización de hash (B2-02)
+  // 1. Barra superior con selector de ejercicio agrupado
   const topBar = h('div', { class: 'registro-top-bar' });
   const select = h('select', {
     class: 'reg-select-ejercicio',
@@ -906,10 +902,10 @@ async function renderModoSerie() {
   topBar.appendChild(h('span', { class: 'chip-serie-badge' }, `SERIE ${n} DE ${m}`));
   contenedor.appendChild(topBar);
 
-  // 2. Video o foto del ejercicio pequeño (160 px, radio 28)
+  // 2. Video o foto del ejercicio
   contenedor.appendChild(renderMediaEjercicio(ejAct));
 
-  // 3. Área héroe con números 96 px en Bricolage Grotesque tabular-nums
+  // 3. Área héroe con números en Bricolage Grotesque tabular-nums
   const gridHeroes = h('div', { class: 'registro-inputs-grid' });
 
   // Tarjeta Kilos
@@ -929,7 +925,6 @@ async function renderModoSerie() {
     id: 'kgValue'
   }, valorKgTexto));
 
-  // M2-01: Actualización DOM quirúrgica en steppers y chips sin innerHTML = '' ni recargar video
   const refrescarDOMKg = () => {
     const elKgVal = document.getElementById('kgValue');
     const elKgLabel = cardKg.querySelector('.counter-label');
@@ -965,7 +960,6 @@ async function renderModoSerie() {
     }
   };
 
-  // A2-03: Lastre progresivo gradual desde 2.5 kg en corporales al tocar +
   const modKg = (delta) => {
     if (estadoSerie.esPesoCorporal) {
       estadoSerie.esPesoCorporal = false;
@@ -997,7 +991,6 @@ async function renderModoSerie() {
   );
   cardKg.appendChild(steppersKg);
 
-  // Chips sutiles para tipo de peso
   const chipsPeso = h('div', { class: 'reg-chips-row' },
     h('button', {
       type: 'button',
@@ -1045,7 +1038,6 @@ async function renderModoSerie() {
   cardReps.appendChild(h('span', { class: 'counter-label' }, 'repeticiones'));
   cardReps.appendChild(h('span', { class: 'counter-number grande', id: 'repsValue' }, String(estadoSerie.reps)));
 
-  // M2-01: Actualización DOM quirúrgica en steppers de reps
   const modReps = (delta) => {
     estadoSerie.reps = Math.max(1, estadoSerie.reps + delta);
     const elReps = document.getElementById('repsValue');
@@ -1106,7 +1098,7 @@ async function renderModoSerie() {
   // 5. Texto de comparación previa
   contenedor.appendChild(h('p', { class: 'previous-record-text' }, textoPrevio));
 
-  // 6. Campos opcionales de máquina y nota (sin bordes toscos)
+  // 6. Campos opcionales de máquina y nota
   const extraFields = h('div', { class: 'reg-campos-extra grid2' },
     h('div', { class: 'col' },
       h('label', { class: 'sutil' }, 'Máquina:'),
@@ -1152,7 +1144,6 @@ async function renderModoSerie() {
         });
         aviso('Serie registrada', 'ok');
         const ej = listaEjercicios.find(e => e.id === estadoSerie.ejercicioId);
-        // M-02: Solo iniciar el temporizador si se está registrando en la fecha de hoy
         if (fechaSeleccionada === hoyISO()) {
           await iniciarTemporizador(ej ? ej.nombre : 'Descanso', obtenerDescansoSeg(estadoSerie.ejercicioId));
         } else {
@@ -1178,10 +1169,15 @@ function renderModoTexto() {
   const inputTexto = h('textarea', {
     class: 'reg-textarea',
     rows: '3',
-    placeholder: 'Ej: dorian 40/lado 6 6 5, martillo 10 4 · bayesiano 10kg 6 6, 7,5kg 7 · femoral placa 5 8 8 7'
+    placeholder: 'Ej: dorian 40/lado 6 6 5, martillo 10 4 · bayesiano 10kg 6 6, 7,5kg 7 · 4 de 8 en martillo con 10'
   });
 
+  if (textoModoTexto) {
+    inputTexto.value = textoModoTexto;
+  }
+
   const parsear = (val) => {
+    textoModoTexto = val;
     if (!val.trim()) {
       vistaPreviaItems = [];
       vistaPreviaDudas = [];
@@ -1276,7 +1272,7 @@ function renderModoTexto() {
         tarjeta.appendChild(chips);
       }
 
-      // Carga y Por lado (A-02: sincronizar s.kg de todas las series hijas al editar el peso general)
+      // Carga y Por lado
       const etiquetaCarga = item.unidad === 'placa' ? 'Placa / Pin:' : 'Kilos:';
       tarjeta.appendChild(h('div', { class: 'fila reg-mt-half reg-alinear-centro' },
         h('div', { class: 'col' },
@@ -1407,11 +1403,11 @@ function renderModoTexto() {
 
           if (n > 0) {
             aviso(`¡${n} series guardadas!`, 'ok');
+            textoModoTexto = '';
             inputTexto.value = '';
             vistaPreviaItems = [];
             vistaPreviaDudas = [];
             renderPrevia();
-            // M-02: Solo iniciar el temporizador si la fecha activa es hoy
             if (ultimoId && fechaSeleccionada === hoyISO()) {
               const ej = listaEjercicios.find(e => e.id === ultimoId);
               await iniciarTemporizador(ej ? ej.nombre : 'Descanso', obtenerDescansoSeg(ultimoId));
@@ -1453,10 +1449,16 @@ function renderModoTexto() {
     ),
     h('div', { class: 'fila reg-espacio-entre reg-mt-half' },
       h('button', { class: 'btn primario', on: { click: () => parsear(inputTexto.value) } }, 'Interpretar'),
-      h('button', { class: 'btn fantasma', on: { click: () => { inputTexto.value = ''; parsear(''); } } }, 'Limpiar')
+      h('button', { class: 'btn fantasma', on: { click: () => { textoModoTexto = ''; inputTexto.value = ''; parsear(''); } } }, 'Limpiar')
     )
   ));
   contenedor.appendChild(contenedorPrevia);
+
+  // Si ya tiene texto precargado (ej. desde sessionStorage), interpretarlo de inmediato
+  if (inputTexto.value.trim()) {
+    parsear(inputTexto.value);
+  }
+
   return contenedor;
 }
 
@@ -1547,7 +1549,7 @@ async function renderListaSeries() {
 }
 
 /**
- * Diálogo interactivo para editar una serie ya guardada (con scroll interno A-03 y refresco de etiqueta B-02).
+ * Diálogo interactivo para editar una serie ya guardada.
  * @param {Object} s Serie a editar
  */
 async function editarSerieDialogo(s) {
@@ -1638,6 +1640,7 @@ async function editarSerieDialogo(s) {
 
 /**
  * Inyecta los estilos de diseño canónico Forja v2 para la pantalla Registrar.
+ * Ajustado para no tapar contenido (padding-bottom >= 110 px) y responsive 360-430 px.
  */
 function inyectarEstilos() {
   if (typeof document === 'undefined' || document.getElementById('forja-reg-styles')) return;
@@ -1651,66 +1654,109 @@ function inyectarEstilos() {
       --lima: #C8F03C;
     }
 
-    .reg-pantalla { display: flex; flex-direction: column; gap: 16px; padding-bottom: 96px; max-width: 520px; margin: 0 auto; }
+    /* Padding-bottom 120px para asegurar espacio sobre barra flotante en 360px */
+    .reg-pantalla {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding-bottom: 120px;
+      max-width: 520px;
+      margin: 0 auto;
+      box-sizing: border-box;
+      width: 100%;
+    }
 
-    /* Diálogo con scroll interno para móvil con teclado virtual (A-03) */
-    .dialogo-caja { max-height: 85dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    /* Diálogo con scroll interno para móvil con teclado virtual y por encima de la barra */
+    .dialogo-caja {
+      max-height: 85dvh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      z-index: 500;
+      box-sizing: border-box;
+    }
     .dialogo-cuerpo { overflow-y: visible; }
-    .reg-dialogo-cuerpo-scroll { max-height: 62dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 4px; }
+    .reg-dialogo-cuerpo-scroll {
+      max-height: 60dvh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-right: 4px;
+      box-sizing: border-box;
+    }
 
     /* Barra de fecha */
-    .reg-barra-fecha { align-items: center; justify-content: space-between; padding: 10px 16px; border-radius: 999px; background-color: var(--superficie2, #E9E4D8); }
-    .reg-btn-fecha { width: 48px; height: 48px; min-width: 48px; min-height: 48px; border-radius: 999px; display: flex; align-items: center; justify-content: center; padding: 0; color: var(--texto, #17171A); border: none; }
+    .reg-barra-fecha {
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background-color: var(--superficie2, #E9E4D8);
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .reg-btn-fecha {
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      min-height: 48px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      color: var(--texto, #17171A);
+      border: none;
+    }
     .reg-centro { align-items: center; text-align: center; }
     .reg-etiqueta-fecha { position: relative; cursor: pointer; font-weight: 600; font-size: 15px; }
     .reg-input-fecha-oculto { opacity: 0; position: absolute; inset: 0; cursor: pointer; width: 100%; height: 100%; }
     .reg-btn-hoy { margin-top: 4px; font-size: 11px; border-radius: 999px; padding: 4px 10px; cursor: pointer; border: none; }
 
     /* Selector de pestañas */
-    .reg-pestanas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .reg-pestanas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; box-sizing: border-box; }
     .reg-pestana { min-height: 48px; border-radius: 999px; font-weight: 600; font-size: 14px; cursor: pointer; border: none; }
     .reg-pestana.activo { background-color: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }
     .reg-pestana.inactivo { background-color: var(--superficie2, #E9E4D8); color: var(--texto, #17171A); }
 
     /* Modo Serie: Top bar & Video */
-    .registro-top-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+    .registro-top-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; width: 100%; box-sizing: border-box; }
     .reg-select-ejercicio { flex: 1; min-height: 48px; border-radius: 999px; border: none; background-color: var(--superficie2, #E9E4D8); color: var(--texto, #17171A); padding: 8px 14px; font-weight: 600; font-size: 14px; outline: none; }
     .chip-serie-badge { background-color: var(--superficie2, #E9E4D8); border-radius: 999px; padding: 6px 14px; color: var(--texto, #17171A); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; white-space: nowrap; }
-    .registro-video-box { width: 100%; height: 160px; border-radius: 28px; overflow: hidden; position: relative; background-color: var(--tinta, #17171A); margin-bottom: 4px; }
+    .registro-video-box { width: 100%; height: 160px; border-radius: 28px; overflow: hidden; position: relative; background-color: var(--tinta, #17171A); margin-bottom: 4px; box-sizing: border-box; }
     .foto-ejercicio { width: 100%; height: 100%; object-fit: cover; display: block; filter: contrast(1.05) saturate(0.9); }
     .reg-placeholder-media { display: flex; align-items: center; justify-content: center; height: 100%; background: linear-gradient(180deg, rgba(23,23,26,0.6) 0%, #17171A 100%); color: #F3F0E8; font-family: 'Instrument Serif', Georgia, serif; font-size: 22px; }
 
     /* Modo Serie: Inputs Grid y Héroes */
-    .registro-inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
-    .counter-card { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 16px 12px 14px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .registro-inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; width: 100%; box-sizing: border-box; }
+    .counter-card { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 16px 12px 14px; display: flex; flex-direction: column; align-items: center; text-align: center; box-sizing: border-box; }
     .counter-label { font-size: 13px; font-weight: 500; color: var(--tinta-suave, #5D5951); margin-bottom: 2px; }
-    .counter-number.grande, .counter-card .grande { font-family: 'Bricolage Grotesque', sans-serif; font-size: 76px; font-weight: 800; line-height: 0.95; color: var(--texto, #17171A); font-variant-numeric: tabular-nums; margin-bottom: 10px; letter-spacing: -0.03em; }
+    .counter-number.grande, .counter-card .grande { font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(56px, 16vw, 76px); font-weight: 800; line-height: 0.95; color: var(--texto, #17171A); font-variant-numeric: tabular-nums; margin-bottom: 10px; letter-spacing: -0.03em; }
     @media (min-width: 420px) { .counter-number.grande, .counter-card .grande { font-size: 96px; } }
-    .counter-number.grande.texto-corporal { font-size: 32px; line-height: 1.2; margin: 18px 0 18px; letter-spacing: -0.02em; }
+    .counter-number.grande.texto-corporal { font-size: 30px; line-height: 1.2; margin: 18px 0 18px; letter-spacing: -0.02em; }
     .stepper-controls { display: flex; gap: 8px; width: 100%; justify-content: center; }
     .btn-stepper { width: 48px; height: 48px; min-width: 48px; min-height: 48px; background-color: var(--superficie, #F3F0E8); border: none; border-radius: 999px; color: var(--texto, #17171A); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 120ms ease; }
     .btn-stepper:active { transform: scale(0.93); }
 
-    /* Selector de esfuerzo en 5 píldoras (>= 48px ALTO-03 y grilla 360px MEDIO-04) */
-    .effort-section { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+    /* Selector de esfuerzo en 5 píldoras (>= 48px táctil y grilla 360px adaptable) */
+    .effort-section { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; width: 100%; box-sizing: border-box; }
     .effort-label { font-size: 13px; font-weight: 500; color: var(--tinta-suave, #5D5951); padding-left: 4px; }
-    .effort-pills-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; width: 100%; }
-    .effort-pill { min-height: 48px; height: 48px; padding: 0 6px; background-color: var(--superficie2, #E9E4D8); border-radius: 999px; border: none; color: var(--texto, #17171A); font-family: 'Bricolage Grotesque', sans-serif; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color 160ms, color 160ms, transform 120ms; }
+    .effort-pills-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; width: 100%; box-sizing: border-box; }
+    .effort-pill { min-height: 48px; height: 48px; padding: 0 4px; background-color: var(--superficie2, #E9E4D8); border-radius: 999px; border: none; color: var(--texto, #17171A); font-family: 'Bricolage Grotesque', sans-serif; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; display: flex; align-items: center; justify-content: center; box-sizing: border-box; transition: background-color 160ms, color 160ms, transform 120ms; }
+    @media (max-width: 380px) { .effort-pill { font-size: 11px; padding: 0 2px; } }
     .effort-pill:active { transform: scale(0.95); }
     .effort-pill.selected { background-color: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }
     .effort-pill.fallo-pill { color: #A02B14; }
     .effort-pill.fallo-pill.selected { background-color: #B83218; color: var(--papel, #F3F0E8); }
 
     /* Comparativa previa */
-    .previous-record-text { text-align: center; font-size: 14px; color: var(--tinta-suave, #5D5951); margin: 6px 0 10px; font-weight: 400; }
+    .previous-record-text { text-align: center; font-size: 14px; color: var(--tinta-suave, #5D5951); margin: 6px 0 10px; font-weight: 400; word-break: break-word; }
 
     /* Botón Canónico Lima Píldora */
-    .btn-primary-lima { width: 100%; height: 60px; background-color: var(--lima, #C8F03C); border: none; border-radius: 999px; color: var(--tinta, #17171A); font-family: 'Bricolage Grotesque', sans-serif; font-size: 17px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 26px; cursor: pointer; text-decoration: none; transition: transform 160ms cubic-bezier(.2,.8,.2,1); }
+    .btn-primary-lima { width: 100%; height: 60px; background-color: var(--lima, #C8F03C); border: none; border-radius: 999px; color: var(--tinta, #17171A); font-family: 'Bricolage Grotesque', sans-serif; font-size: 17px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 26px; cursor: pointer; text-decoration: none; box-sizing: border-box; transition: transform 160ms cubic-bezier(.2,.8,.2,1); }
     .btn-primary-lima:active { transform: scale(0.97); }
     .btn-icon-bubble { width: 44px; height: 44px; background-color: var(--tinta, #17171A); border-radius: 999px; display: flex; align-items: center; justify-content: center; color: var(--lima, #C8F03C); flex-shrink: 0; }
 
-    /* Temporizador Descanso estilo Pantalla 3 (modo oscuro / fondo tinta, paleta unificada BAJO-03) */
-    .screen-descanso-content.oscuro { background-color: var(--tinta, #17171A); color: var(--papel, #F3F0E8); border-radius: 28px; padding: 24px 20px; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: 0 10px 30px rgba(23,23,26,.18); }
+    /* Temporizador Descanso estilo Pantalla 3 */
+    .screen-descanso-content.oscuro { background-color: var(--tinta, #17171A); color: var(--papel, #F3F0E8); border-radius: 28px; padding: 24px 20px; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: 0 10px 30px rgba(23,23,26,.18); width: 100%; box-sizing: border-box; }
     .descanso-header-box { display: flex; flex-direction: column; align-items: center; gap: 6px; }
     .descanso-header-box .micro-label { color: var(--lima, #C8F03C); font-size: 12px; font-weight: 600; }
     .descanso-quote { font-family: 'Instrument Serif', Georgia, serif; font-size: 26px; color: var(--papel, #F3F0E8); font-weight: 400; }
@@ -1718,19 +1764,19 @@ function inyectarEstilos() {
     .timer-ring-container { position: relative; width: 240px; height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 12px 0; }
     .timer-ring-svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
     .timer-center-text { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; }
-    .timer-countdown.grande { font-family: 'Bricolage Grotesque', sans-serif; font-size: 76px; font-weight: 800; color: var(--papel, #F3F0E8); line-height: 0.95; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+    .timer-countdown.grande { font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(60px, 18vw, 76px); font-weight: 800; color: var(--papel, #F3F0E8); line-height: 0.95; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
     .timer-caption { font-size: 13px; color: var(--papel-2, #E9E4D8); opacity: 0.72; margin-top: 6px; font-weight: 500; }
-    .next-set-card { width: 100%; background-color: var(--tinta-tarjeta, #232328); border-radius: 28px; padding: 16px 20px; text-align: left; display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
-    .next-set-title { font-size: 15px; font-weight: 600; color: var(--papel, #F3F0E8); }
-    .next-set-sub { font-size: 13px; color: var(--papel-2, #E9E4D8); opacity: 0.75; line-height: 1.4; }
-    .descanso-actions-row { width: 100%; display: flex; gap: 12px; }
+    .next-set-card { width: 100%; background-color: var(--tinta-tarjeta, #232328); border-radius: 28px; padding: 16px 20px; text-align: left; display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; box-sizing: border-box; }
+    .next-set-title { font-size: 15px; font-weight: 600; color: var(--papel, #F3F0E8); word-break: break-word; }
+    .next-set-sub { font-size: 13px; color: var(--papel-2, #E9E4D8); opacity: 0.75; line-height: 1.4; word-break: break-word; }
+    .descanso-actions-row { width: 100%; display: flex; gap: 12px; box-sizing: border-box; }
     .btn-timer-secondary { flex: 1; height: 56px; background-color: var(--tinta-tarjeta, #232328); border: none; border-radius: 999px; color: var(--papel, #F3F0E8); font-family: 'Bricolage Grotesque', sans-serif; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 140ms ease; }
     .btn-timer-secondary:active { transform: scale(0.97); }
     .btn-timer-skip { flex: 1; height: 56px; background-color: var(--lima, #C8F03C); border: none; border-radius: 999px; color: var(--tinta, #17171A); font-family: 'Bricolage Grotesque', sans-serif; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 140ms ease; }
     .btn-timer-skip:active { transform: scale(0.97); }
 
     /* Barra flotante global de descanso en otras pantallas (C-01) */
-    .reg-timer-flotante { position: fixed; left: 50%; transform: translateX(-50%); bottom: 92px; width: calc(100% - 32px); max-width: 480px; background-color: var(--tinta, #17171A); color: var(--papel, #F3F0E8); border-radius: 999px; padding: 8px 10px 8px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 10px 30px rgba(23,23,26,.18); z-index: 450; }
+    .reg-timer-flotante { position: fixed; left: 50%; transform: translateX(-50%); bottom: 92px; width: calc(100% - 32px); max-width: 480px; background-color: var(--tinta, #17171A); color: var(--papel, #F3F0E8); border-radius: 999px; padding: 8px 10px 8px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 10px 30px rgba(23,23,26,.18); z-index: 450; box-sizing: border-box; }
     .reg-timer-flotante-info { display: flex; align-items: center; gap: 10px; background: none; border: none; color: inherit; cursor: pointer; padding: 0; text-align: left; min-width: 0; flex: 1; min-height: 44px; }
     .reg-timer-flotante-icono { color: var(--lima, #C8F03C); display: inline-flex; align-items: center; flex-shrink: 0; }
     .reg-timer-flotante-tiempo { font-family: 'Bricolage Grotesque', sans-serif; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--lima, #C8F03C); flex-shrink: 0; }
@@ -1739,21 +1785,21 @@ function inyectarEstilos() {
     .reg-timer-flotante-btn { min-height: 48px; padding: 0 16px; border-radius: 999px; border: none; background-color: var(--tinta-tarjeta, #232328); color: var(--papel, #F3F0E8); font-family: 'Bricolage Grotesque', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
     .reg-timer-flotante-btn.lima { background-color: var(--lima, #C8F03C); color: var(--tinta, #17171A); }
 
-    /* Chips y ajustes de Modo Serie (ALTO-03: min-height 48px para accesibilidad táctil) */
-    .reg-chips-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+    /* Chips y ajustes de Modo Serie */
+    .reg-chips-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 8px; width: 100%; box-sizing: border-box; }
     .reg-chip-toggle { border-radius: 999px; border: none; padding: 0 16px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; background-color: var(--superficie, #F3F0E8); color: var(--texto, #17171A); cursor: pointer; }
     .reg-chip-toggle.activo { background-color: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }
-    .reg-campos-extra { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 14px 18px; margin-bottom: 6px; }
+    .reg-campos-extra { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 14px 18px; margin-bottom: 6px; width: 100%; box-sizing: border-box; }
 
-    /* Modo Texto (radio canónico 28px MEDIO-02) */
-    .reg-caja-texto { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
-    .reg-textarea { width: 100%; min-height: 88px; resize: vertical; border-radius: 28px; border: none; background-color: var(--superficie, #F3F0E8); color: var(--texto, #17171A); padding: 16px 20px; font-family: inherit; font-size: 15px; outline: none; }
+    /* Modo Texto */
+    .reg-caja-texto { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 18px; display: flex; flex-direction: column; gap: 10px; width: 100%; box-sizing: border-box; }
+    .reg-textarea { width: 100%; min-height: 88px; resize: vertical; border-radius: 28px; border: none; background-color: var(--superficie, #F3F0E8); color: var(--texto, #17171A); padding: 16px 20px; font-family: inherit; font-size: 15px; outline: none; box-sizing: border-box; }
     .reg-nota-privacidad-voz { font-size: 12px; line-height: 1.4; margin: 0; color: var(--tinta-suave, #5D5951); }
-    .reg-item-previa { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 18px; margin-bottom: 12px; }
+    .reg-item-previa { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 18px; margin-bottom: 12px; width: 100%; box-sizing: border-box; }
 
-    /* Lista de series (sin bordes de 1px BAJO-01 y botones >= 48px ALTO-03) */
-    .reg-tarjeta-ejercicio { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 18px; margin-bottom: 12px; }
-    .reg-item-serie { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; margin-bottom: 6px; border-radius: 28px; background-color: var(--superficie, #F3F0E8); }
+    /* Lista de series */
+    .reg-tarjeta-ejercicio { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 18px; margin-bottom: 12px; width: 100%; box-sizing: border-box; }
+    .reg-item-serie { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; margin-bottom: 6px; border-radius: 28px; background-color: var(--superficie, #F3F0E8); box-sizing: border-box; width: 100%; }
     .reg-item-serie:last-child { margin-bottom: 0; }
     .reg-acciones-serie { display: flex; gap: 6px; }
     .reg-btn-icono { min-width: 48px; min-height: 48px; width: 48px; height: 48px; padding: 12px; border-radius: 999px; border: none; background-color: var(--superficie2, #E9E4D8); color: var(--texto, #17171A); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -1801,6 +1847,7 @@ async function actualizarUI() {
 
 /**
  * Monta la pantalla Registrar en el contenedor provisto.
+ * Cumple con recuperar 'forja-registro-pendiente' de sessionStorage si existe.
  * @param {HTMLElement} contenedor
  * @param {Array<string>} [params=[]]
  */
@@ -1809,7 +1856,19 @@ export async function montar(contenedor, params = []) {
   inyectarEstilos();
   registrarListenersGlobalesTimer();
 
-  // A2-02 / B-04: Sincronizar fecha activa si viene de otra pantalla (Hoy o Comida)
+  // (1) Al montar, si hay sessionStorage 'forja-registro-pendiente', ponlo en la caja de Texto rápido e interprétalo (y bórralo)
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      const pendiente = sessionStorage.getItem('forja-registro-pendiente');
+      if (pendiente) {
+        sessionStorage.removeItem('forja-registro-pendiente');
+        modoActivo = 'texto';
+        textoModoTexto = pendiente;
+      }
+    }
+  } catch (_) {}
+
+  // Sincronizar fecha activa si viene de otra pantalla (Hoy o Comida)
   try {
     const guardada = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('forja_fecha_activa') : null;
     if (guardada && /^\d{4}-\d{2}-\d{2}$/.test(guardada)) {
@@ -1832,10 +1891,8 @@ export async function montar(contenedor, params = []) {
       debeRecargarEstado = true;
     }
     idElegido = params[0];
-    modoActivo = 'serie';
+    if (modoActivo !== 'texto') modoActivo = 'serie';
   } else {
-    // A2-01: Al volver a Registrar sin parámetro explícito (#registrar), comprobar si el ejercicio actual
-    // ya completó sus series prescritas hoy. Si ya está completado o no hay seleccionado, avanzar al primer pendiente de hoy.
     try {
       const { rutina } = await import('./datos.js');
       const r = await rutina();
@@ -1860,7 +1917,7 @@ export async function montar(contenedor, params = []) {
           debeRecargarEstado = true;
         }
       }
-    } catch (e) { /* si falla, queda el primero de la lista */ }
+    } catch (e) {}
 
     if (!idElegido && listaEjercicios.length > 0) {
       idElegido = listaEjercicios[0].id;

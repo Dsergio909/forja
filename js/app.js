@@ -14,6 +14,7 @@ const RUTAS = {
   hoy: { archivo: 'hoy.js', titulo: 'Hoy', nav: 'hoy' },
   registrar: { archivo: 'registro.js', titulo: 'Registrar', nav: 'registrar' },
   progreso: { archivo: 'progreso.js', titulo: 'Progreso', nav: 'progreso' },
+  logros: { archivo: 'logros.js', titulo: 'Logros', nav: 'progreso' },
   cuerpo: { archivo: 'cuerpo.js', titulo: 'Cuerpo', nav: 'cuerpo' },
   camara: { archivo: 'camara.js', titulo: 'Cámara', nav: null, anchoExtendido: true, oscuro: true },
   comida: { archivo: 'comida.js', titulo: 'Comida', nav: null },
