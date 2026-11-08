@@ -10,7 +10,7 @@
    - CACHÉ PRIMERO para: multimedia local (media/) y librerías del CDN permitido.
    ========================================================================== */
 
-const CACHE_NAME = 'forja-20261107-1916';
+const CACHE_NAME = 'forja-20261107-1937';
 const TIEMPO_LIMITE_RED_MS = 3000;
 
 // Lista completa de archivos de la app para precaché

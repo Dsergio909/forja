@@ -1335,9 +1335,44 @@ async function renderizarFichaEjercicio(id) {
 
   div.appendChild(chipsDiv);
 
+  // VIDEO REAL DE TÉCNICA (YouTube, canal confiable verificado por oEmbed; 7-nov). Se carga solo al tocarlo.
+  const ytId = ej.youtube && /^[\w-]{11}$/.test(ej.youtube.video || '') ? ej.youtube.video : null;
+  if (ytId) {
+    const tarjetaYt = document.createElement('button');
+    tarjetaYt.type = 'button';
+    tarjetaYt.className = 'guia-yt-tarjeta';
+    tarjetaYt.setAttribute('aria-label', 'Reproducir video de técnica');
+    tarjetaYt.style.cssText = 'position:relative;display:block;width:100%;aspect-ratio:16/9;border:0;padding:0;border-radius:28px;overflow:hidden;background:#17171A;cursor:pointer;margin:12px 0 4px;';
+    const mini = document.createElement('img');
+    mini.src = `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`;
+    mini.alt = '';
+    mini.loading = 'lazy';
+    mini.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+    const boton = document.createElement('span');
+    boton.style.cssText = 'position:absolute;inset:0;margin:auto;width:64px;height:64px;border-radius:999px;background:#C8F03C;display:flex;align-items:center;justify-content:center;';
+    boton.innerHTML = renderIcono('play', { tam: 26, color: '#17171A' });
+    tarjetaYt.append(mini, boton);
+    tarjetaYt.addEventListener('click', () => {
+      const ifr = document.createElement('iframe');
+      ifr.src = `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0&playsinline=1`;
+      ifr.title = 'Video de técnica';
+      ifr.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+      ifr.allowFullscreen = true;
+      ifr.style.cssText = 'width:100%;aspect-ratio:16/9;border:0;border-radius:28px;display:block;margin:12px 0 4px;';
+      tarjetaYt.replaceWith(ifr);
+    });
+    div.appendChild(tarjetaYt);
+    const credito = document.createElement('p');
+    credito.className = 'sutil';
+    credito.style.cssText = 'font-size:13px;margin:0 0 12px;';
+    credito.textContent = `Video de técnica: ${ej.youtube.canal || 'YouTube'} · necesita internet`;
+    div.appendChild(credito);
+  }
+
   // BOTÓN YOUTUBE ESTILO REVISTA
   const queryYt = ej.busqueda_video || `${ej.nombre} tecnica ejecucion`;
-  const urlYt = `https://www.youtube.com/results?search_query=${encodeURIComponent(queryYt)}`;
+  const urlYt = ytId ? `https://www.youtube.com/watch?v=${ytId}`
+    : `https://www.youtube.com/results?search_query=${encodeURIComponent(queryYt)}`;
   const btnYt = document.createElement('a');
   btnYt.href = urlYt;
   btnYt.target = '_blank';

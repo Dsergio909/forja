@@ -63,8 +63,11 @@
    "media/fotos/curl_bayesiano_polea_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Standing_Biceps_Cable_Curl (dominio público)",
-  "video": "media/videos/curl_bayesiano_polea.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "GNO4OtYoCYk",
+   "canal": "Jeff Nippard",
+   "titulo": "The Best And Worst Biceps Exercises"
+  }
  },
  {
   "id": "curl_inclinado_mancuernas",
@@ -127,8 +130,11 @@
    "media/fotos/curl_inclinado_mancuernas_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Incline_Dumbbell_Curl (dominio público)",
-  "video": "media/videos/curl_inclinado_mancuernas.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "DCe8f6vMe9A",
+   "canal": "ATHLEAN-X™",
+   "titulo": "Stop Screwing Up Incline Dumbbell Curls (PROPER FORM!)"
+  }
  },
  {
   "id": "curl_martillo_mancuernas",
@@ -194,8 +200,11 @@
    "media/fotos/curl_martillo_mancuernas_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Hammer_Curls (dominio público)",
-  "video": "media/videos/curl_martillo_mancuernas.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "7jqi2qWAUJk",
+   "canal": "Mind Pump TV",
+   "titulo": "How To Do Hammer Curls for HUGE Biceps (BICEP GROWTH!)"
+  }
  },
  {
   "id": "curl_muneca_mancuerna",
@@ -261,8 +270,11 @@
    "media/fotos/curl_muneca_mancuerna_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Seated_Dumbbell_Palms-Up_Wrist_Curl (dominio público)",
-  "video": "media/videos/curl_muneca_mancuerna.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "3VLTzIrnb5g",
+   "canal": "PureGym",
+   "titulo": "How To Do Wrist Curls"
+  }
  },
  {
   "id": "curl_predicador_maquina",
@@ -328,8 +340,11 @@
    "media/fotos/curl_predicador_maquina_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Machine_Preacher_Curls (dominio público)",
-  "video": "media/videos/curl_predicador_maquina.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "Ja6ZlIDONac",
+   "canal": "Renaissance Periodization",
+   "titulo": "Machine Preacher Curl"
+  }
  },
  {
   "id": "extension_muneca_mancuerna",
@@ -390,9 +405,7 @@
    "media/fotos/extension_muneca_mancuerna_0.jpg",
    "media/fotos/extension_muneca_mancuerna_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Seated_Dumbbell_Palms-Down_Wrist_Curl (dominio público)",
-  "video": "media/videos/extension_muneca_mancuerna.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "foto_fuente": "free-exercise-db: Seated_Dumbbell_Palms-Down_Wrist_Curl (dominio público)"
  },
  {
   "id": "extension_triceps_sobre_cabeza_polea",
@@ -457,7 +470,12 @@
    "media/fotos/extension_triceps_sobre_cabeza_polea_0.jpg",
    "media/fotos/extension_triceps_sobre_cabeza_polea_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Triceps_Overhead_Extension_with_Rope (dominio público)"
+  "foto_fuente": "free-exercise-db: Triceps_Overhead_Extension_with_Rope (dominio público)",
+  "youtube": {
+   "video": "1u18yJELsh0",
+   "canal": "Renaissance Periodization",
+   "titulo": "Cable Overhead Triceps Extension"
+  }
  },
  {
   "id": "fondos_paralelas_banco",
@@ -521,7 +539,11 @@
    "media/fotos/fondos_paralelas_banco_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Dips_-_Triceps_Version (dominio público)",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "Tw0axi-Jlqc",
+   "canal": "Renaissance Periodization",
+   "titulo": "Maximize Dip Technique FOR TRICEPS Growth | Targeting The Muscle Series"
+  }
  },
  {
   "id": "paseo_del_granjero",
@@ -586,9 +608,7 @@
    "media/fotos/paseo_del_granjero_0.jpg",
    "media/fotos/paseo_del_granjero_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Farmers_Walk (dominio público)",
-  "video": "media/videos/paseo_del_granjero.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "foto_fuente": "free-exercise-db: Farmers_Walk (dominio público)"
  },
  {
   "id": "press_frances_barra_z",
@@ -652,8 +672,11 @@
    "media/fotos/press_frances_barra_z_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: EZ-Bar_Skullcrusher (dominio público)",
-  "video": "media/videos/press_frances_barra_z.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "EyM5vs4-ZKk",
+   "canal": "Renaissance Periodization",
+   "titulo": "8 Skull Crusher Mistakes and How to Fix Them"
+  }
  },
  {
   "id": "pushdown_triceps_polea",
@@ -722,8 +745,11 @@
    "media/fotos/pushdown_triceps_polea_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Triceps_Pushdown (dominio público)",
-  "video": "media/videos/pushdown_triceps_polea.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "7R88yqmcGrw",
+   "canal": "ATHLEAN-X™",
+   "titulo": "Which Triceps Pushdown is Best for Your Triceps (IT MATTERS!!)"
+  }
  },
  {
   "id": "bird_dog_mcgill",
@@ -781,7 +807,12 @@
    "bird dog mcgill",
    "mcgill bird dog",
    "perro de caza de mcgill"
-  ]
+  ],
+  "youtube": {
+   "video": "Woz8RYQnbhU",
+   "canal": "Squat University",
+   "titulo": "I Was Doing the McGill Big 3 Wrong Until I Saw This"
+  }
  },
  {
   "id": "chin_tuck",
@@ -836,9 +867,7 @@
   "alias": [
    "chin tuck",
    "retraccion cervical en suelo o pared"
-  ],
-  "video": "media/videos/chin_tuck.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  ]
  },
  {
   "id": "curl_up_mcgill",
@@ -893,7 +922,12 @@
    "curl up mcgill",
    "curl-up modificado de mcgill",
    "mcgill modified curl-up"
-  ]
+  ],
+  "youtube": {
+   "video": "Woz8RYQnbhU",
+   "canal": "Squat University",
+   "titulo": "I Was Doing the McGill Big 3 Wrong Until I Saw This"
+  }
  },
  {
   "id": "estiramiento_pectoral_poste",
@@ -950,7 +984,12 @@
    "corner or doorway pectoral stretch",
    "estiramiento estatico de pectoral en poste o marco",
    "estiramiento pectoral poste"
-  ]
+  ],
+  "youtube": {
+   "video": "LB4CxC7Ckbw",
+   "canal": "ATHLEAN-X™",
+   "titulo": "The Best and Worst Stretches For Your Chest"
+  }
  },
  {
   "id": "extension_toracica_banco",
@@ -1007,7 +1046,12 @@
    "bench thoracic spine extension",
    "extension toracica banco",
    "extension toracica en banco plano con codos apoyados"
-  ]
+  ],
+  "youtube": {
+   "video": "hhvHpsxKjXw",
+   "canal": "E3 Rehab",
+   "titulo": "Improve Thoracic Spine Mobility (4 Best Exercises)"
+  }
  },
  {
   "id": "puente_lateral_mcgill",
@@ -1071,8 +1115,11 @@
    "media/fotos/puente_lateral_mcgill_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Side_Bridge (dominio público)",
-  "video": "media/videos/puente_lateral_mcgill.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "Woz8RYQnbhU",
+   "canal": "Squat University",
+   "titulo": "I Was Doing the McGill Big 3 Wrong Until I Saw This"
+  }
  },
  {
   "id": "crunch_en_polea",
@@ -1134,9 +1181,7 @@
    "media/fotos/crunch_en_polea_0.jpg",
    "media/fotos/crunch_en_polea_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Cable_Crunch (dominio público)",
-  "video": "media/videos/crunch_en_polea.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "foto_fuente": "free-exercise-db: Cable_Crunch (dominio público)"
  },
  {
   "id": "elevacion_de_piernas_colgado",
@@ -1202,7 +1247,12 @@
    "media/fotos/elevacion_de_piernas_colgado_0.jpg",
    "media/fotos/elevacion_de_piernas_colgado_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Hanging_Leg_Raise (dominio público)"
+  "foto_fuente": "free-exercise-db: Hanging_Leg_Raise (dominio público)",
+  "youtube": {
+   "video": "hdng3Nm1x_E",
+   "canal": "ScottHermanFitness",
+   "titulo": "How To: Hanging Leg-Lift"
+  }
  },
  {
   "id": "extension_de_cuello_con_arnes",
@@ -1267,9 +1317,7 @@
    "media/fotos/extension_de_cuello_con_arnes_0.jpg",
    "media/fotos/extension_de_cuello_con_arnes_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Seated_Head_Harness_Neck_Resistance (dominio público)",
-  "video": "media/videos/extension_de_cuello_con_arnes.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "foto_fuente": "free-exercise-db: Seated_Head_Harness_Neck_Resistance (dominio público)"
  },
  {
   "id": "extension_de_cuello_con_disco",
@@ -1511,8 +1559,11 @@
    "media/fotos/isometria_manual_de_cuello_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Isometric_Neck_Exercise_-_Sides (dominio público)",
-  "video": "media/videos/isometria_manual_de_cuello.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "jly4Mp1yLvE",
+   "canal": "Physiotutors",
+   "titulo": "Isometric Neck Pain Exercises for aspecific Neck Pain"
+  }
  },
  {
   "id": "plancha_abdominal_rkc",
@@ -1577,8 +1628,11 @@
    "media/fotos/plancha_abdominal_rkc_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Plank (dominio público)",
-  "video": "media/videos/plancha_abdominal_rkc.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "A2b2EmIg0dA",
+   "canal": "E3 Rehab",
+   "titulo": "How To Plank (Proper Form | Cues | Progressions)"
+  }
  },
  {
   "id": "press_pallof",
@@ -1643,7 +1697,12 @@
    "media/fotos/press_pallof_0.jpg",
    "media/fotos/press_pallof_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Pallof_Press (dominio público)"
+  "foto_fuente": "free-exercise-db: Pallof_Press (dominio público)",
+  "youtube": {
+   "video": "C2IPv5kxcNQ",
+   "canal": "Tom Morrison",
+   "titulo": "Pallof Press"
+  }
  },
  {
   "id": "rueda_abdominal",
@@ -1707,7 +1766,12 @@
    "media/fotos/rueda_abdominal_0.jpg",
    "media/fotos/rueda_abdominal_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Barbell_Ab_Rollout (dominio público)"
+  "foto_fuente": "free-exercise-db: Barbell_Ab_Rollout (dominio público)",
+  "youtube": {
+   "video": "rqiTPdK1c_I",
+   "canal": "Mind Pump TV",
+   "titulo": "Ab Wheel- How to PROPERLY Use an Ab Wheel | MIND PUMP"
+  }
  },
  {
   "id": "dominadas_neutras",
@@ -1768,7 +1832,12 @@
    "dominadas con agarre neutro",
    "dominadas neutras",
    "neutral-grip pull-up"
-  ]
+  ],
+  "youtube": {
+   "video": "sIvJTfGxdFo",
+   "canal": "ATHLEAN-X™",
+   "titulo": "The Official Pull-Up Checklist (AVOID MISTAKES!)"
+  }
  },
  {
   "id": "dominadas_pronadas",
@@ -1838,7 +1907,12 @@
    "media/fotos/dominadas_pronadas_0.jpg",
    "media/fotos/dominadas_pronadas_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Weighted_Pull_Ups (dominio público)"
+  "foto_fuente": "free-exercise-db: Weighted_Pull_Ups (dominio público)",
+  "youtube": {
+   "video": "wXA6HdugLlo",
+   "canal": "Renaissance Periodization",
+   "titulo": "How to Improve Your Pull-up Strength Quickly and Easily"
+  }
  },
  {
   "id": "encogimientos_mancuernas_inclinado",
@@ -1905,8 +1979,11 @@
    "media/fotos/encogimientos_mancuernas_inclinado_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Dumbbell_Shrug (dominio público)",
-  "video": "media/videos/encogimientos_mancuernas_inclinado.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "zfAHfyTB_Ao",
+   "canal": "Renaissance Periodization",
+   "titulo": "Barbell Shrug Technique For Growth | Targeting The Muscle"
+  }
  },
  {
   "id": "hiperextensiones_banco_45",
@@ -1968,7 +2045,12 @@
    "media/fotos/hiperextensiones_banco_45_0.jpg",
    "media/fotos/hiperextensiones_banco_45_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Hyperextensions_Back_Extensions (dominio público)"
+  "foto_fuente": "free-exercise-db: Hyperextensions_Back_Extensions (dominio público)",
+  "youtube": {
+   "video": "H8Swl1N-uis",
+   "canal": "Squat University",
+   "titulo": "STOP Doing Back Extensions Like This!"
+  }
  },
  {
   "id": "jalon_pecho_polea",
@@ -2039,8 +2121,11 @@
    "media/fotos/jalon_pecho_polea_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Wide-Grip_Lat_Pulldown (dominio público)",
-  "video": "media/videos/jalon_pecho_polea.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "3PmWIGn0dwU",
+   "canal": "Renaissance Periodization",
+   "titulo": "The Best Ways To Do Lat Pulldowns (you haven't tried!)"
+  }
  },
  {
   "id": "pullover_polea_alta",
@@ -2104,8 +2189,11 @@
    "media/fotos/pullover_polea_alta_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Straight-Arm_Pulldown (dominio público)",
-  "video": "media/videos/pullover_polea_alta.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "G9uNaXGTJ4w",
+   "canal": "Renaissance Periodization",
+   "titulo": "Straight Arm Pulldown"
+  }
  },
  {
   "id": "remo_pecho_apoyado_mancuernas",
@@ -2171,8 +2259,11 @@
    "media/fotos/remo_pecho_apoyado_mancuernas_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Dumbbell_Incline_Row (dominio público)",
-  "video": "media/videos/remo_pecho_apoyado_mancuernas.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "0UBRfiO4zDs",
+   "canal": "Renaissance Periodization",
+   "titulo": "Chest Supported Row"
+  }
  },
  {
   "id": "remo_soporte_pecho",
@@ -2248,8 +2339,11 @@
    "media/fotos/remo_soporte_pecho_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Lying_T-Bar_Row (dominio público)",
-  "video": "media/videos/remo_soporte_pecho.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "0UBRfiO4zDs",
+   "canal": "Renaissance Periodization",
+   "titulo": "Chest Supported Row"
+  }
  },
  {
   "id": "remo_unilateral_mancuerna",
@@ -2313,7 +2407,12 @@
    "media/fotos/remo_unilateral_mancuerna_0.jpg",
    "media/fotos/remo_unilateral_mancuerna_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: One-Arm_Dumbbell_Row (dominio público)"
+  "foto_fuente": "free-exercise-db: One-Arm_Dumbbell_Row (dominio público)",
+  "youtube": {
+   "video": "xl1YiqQY2vA",
+   "canal": "Marcus Filly",
+   "titulo": "Single Arm Dumbbell Row"
+  }
  },
  {
   "id": "remo_unilateral_polea",
@@ -2381,8 +2480,11 @@
    "media/fotos/remo_unilateral_polea_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Kneeling_Single-Arm_High_Pulley_Row (dominio público)",
-  "video": "media/videos/remo_unilateral_polea.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "UCXxvVItLoM",
+   "canal": "Renaissance Periodization",
+   "titulo": "Seated Cable Row"
+  }
  },
  {
   "id": "elevaciones_laterales_mancuerna_inclinado",
@@ -2445,7 +2547,12 @@
    "media/fotos/elevaciones_laterales_mancuerna_inclinado_0.jpg",
    "media/fotos/elevaciones_laterales_mancuerna_inclinado_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: One-Arm_Incline_Lateral_Raise (dominio público)"
+  "foto_fuente": "free-exercise-db: One-Arm_Incline_Lateral_Raise (dominio público)",
+  "youtube": {
+   "video": "n5dsI9qQXwY",
+   "canal": "Renaissance Periodization",
+   "titulo": "Lateral Raise Technique For Huge Delts | Targeting The Muscle Series"
+  }
  },
  {
   "id": "elevaciones_laterales_mancuerna_pie",
@@ -2512,8 +2619,11 @@
    "media/fotos/elevaciones_laterales_mancuerna_pie_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Side_Lateral_Raise (dominio público)",
-  "video": "media/videos/elevaciones_laterales_mancuerna_pie.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "n5dsI9qQXwY",
+   "canal": "Renaissance Periodization",
+   "titulo": "Lateral Raise Technique For Huge Delts | Targeting The Muscle Series"
+  }
  },
  {
   "id": "elevaciones_laterales_polea_cadera",
@@ -2579,8 +2689,11 @@
    "media/fotos/elevaciones_laterales_polea_cadera_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Cable_Seated_Lateral_Raise (dominio público)",
-  "video": "media/videos/elevaciones_laterales_polea_cadera.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "n5dsI9qQXwY",
+   "canal": "Renaissance Periodization",
+   "titulo": "Lateral Raise Technique For Huge Delts | Targeting The Muscle Series"
+  }
  },
  {
   "id": "face_pull_polea",
@@ -2655,8 +2768,11 @@
    "media/fotos/face_pull_polea_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Face_Pull (dominio público)",
-  "video": "media/videos/face_pull_polea.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "Q18p2QtQAes",
+   "canal": "Powerexplosive",
+   "titulo": "FACE PULL: TUTORIAL COMPLETO (TÉCNICA, BENEFICIOS, ERRORES, CONSEJOS...)"
+  }
  },
  {
   "id": "pajaros_pecho_apoyado_mancuernas",
@@ -2723,7 +2839,12 @@
    "media/fotos/pajaros_pecho_apoyado_mancuernas_0.jpg",
    "media/fotos/pajaros_pecho_apoyado_mancuernas_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Bent_Over_Dumbbell_Rear_Delt_Raise_With_Head_On_Bench (dominio público)"
+  "foto_fuente": "free-exercise-db: Bent_Over_Dumbbell_Rear_Delt_Raise_With_Head_On_Bench (dominio público)",
+  "youtube": {
+   "video": "lPt0GqwaqEw",
+   "canal": "Mind Pump TV",
+   "titulo": "How To Do A PROPER Dumbbell Rear Delt Fly"
+  }
  },
  {
   "id": "pajaros_polea_cruzada",
@@ -2786,7 +2907,12 @@
    "media/fotos/pajaros_polea_cruzada_0.jpg",
    "media/fotos/pajaros_polea_cruzada_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Cable_Rear_Delt_Fly (dominio público)"
+  "foto_fuente": "free-exercise-db: Cable_Rear_Delt_Fly (dominio público)",
+  "youtube": {
+   "video": "dKluhLck1Zs",
+   "canal": "ATHLEAN-X™",
+   "titulo": "The ONLY 2 Exercises You Need for Rear Delts (NO, SERIOUSLY!)"
+  }
  },
  {
   "id": "press_militar_mancuernas_sentado",
@@ -2854,8 +2980,11 @@
    "media/fotos/press_militar_mancuernas_sentado_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Dumbbell_Shoulder_Press (dominio público)",
-  "video": "media/videos/press_militar_mancuernas_sentado.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "Gu1t7X2yq4M",
+   "canal": "ATHLEAN-X™",
+   "titulo": "Overhead Shoulder Press (3 MISTAKES!)"
+  }
  },
  {
   "id": "remo_al_menton_polea_agarre_ancho",
@@ -2919,7 +3048,12 @@
    "media/fotos/remo_al_menton_polea_agarre_ancho_0.jpg",
    "media/fotos/remo_al_menton_polea_agarre_ancho_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Upright_Cable_Row (dominio público)"
+  "foto_fuente": "free-exercise-db: Upright_Cable_Row (dominio público)",
+  "youtube": {
+   "video": "V3h_1IUY-f0",
+   "canal": "Renaissance Periodization",
+   "titulo": "Master The Controversial Upright Row | Targeting The Muscle"
+  }
  },
  {
   "id": "rotacion_externa_mancuerna_costado",
@@ -3043,7 +3177,12 @@
    "media/fotos/rotacion_externa_polea_toalla_0.jpg",
    "media/fotos/rotacion_externa_polea_toalla_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: External_Rotation_with_Cable (dominio público)"
+  "foto_fuente": "free-exercise-db: External_Rotation_with_Cable (dominio público)",
+  "youtube": {
+   "video": "X46R4sDzm5E",
+   "canal": "E3 Rehab",
+   "titulo": "Do You NEED a Towel Roll? (Shoulder External Rotation | Rotator Cuff Exercises)"
+  }
  },
  {
   "id": "caminata_elefante_isquios",
@@ -3169,8 +3308,11 @@
    "media/fotos/colgado_pasivo_barra_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: One_Handed_Hang (dominio público)",
-  "video": "media/videos/colgado_pasivo_barra.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "no_ZdiJsLu4",
+   "canal": "Tom Morrison",
+   "titulo": "Build Hanging From Zero! Great for beginners!"
+  }
  },
  {
   "id": "curl_predicador_maquina_longitud",
@@ -3231,7 +3373,12 @@
    "media/fotos/curl_predicador_maquina_longitud_0.jpg",
    "media/fotos/curl_predicador_maquina_longitud_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Machine_Preacher_Curls (dominio público)"
+  "foto_fuente": "free-exercise-db: Machine_Preacher_Curls (dominio público)",
+  "youtube": {
+   "video": "sxA__DoLsgo",
+   "canal": "Renaissance Periodization",
+   "titulo": "EZ Bar Preacher Curl"
+  }
  },
  {
   "id": "dislocaciones_hombro_pica_banda",
@@ -3288,7 +3435,12 @@
    "dislocaciones de hombro con pica o banda elastica",
    "dislocaciones hombro pica banda",
    "shoulder pass-throughs dislocations"
-  ]
+  ],
+  "youtube": {
+   "video": "OLfp3uNhJI0",
+   "canal": "Tom Morrison",
+   "titulo": "Banded shoulder dislocates with activation"
+  }
  },
  {
   "id": "dorsiflexion_tobillo_pared",
@@ -3344,7 +3496,12 @@
    "dorsiflexion tobillo pared",
    "movilizacion de dorsiflexion de tobillo en pared",
    "wall ankle dorsiflexion mobilization"
-  ]
+  ],
+  "youtube": {
+   "video": "jGT_NmaQWo4",
+   "canal": "Tom Morrison",
+   "titulo": "Increase Dorsiflexion with Active Wall Ankles Stretch"
+  }
  },
  {
   "id": "estiramiento_flexores_extensores_antebrazo",
@@ -3461,7 +3618,12 @@
    "estiramiento pecho marco polea",
    "estiramiento unilateral de pectoral en polea o marco",
    "unilateral doorway cable post chest stretch"
-  ]
+  ],
+  "youtube": {
+   "video": "l5nMszaaJ28",
+   "canal": "Precision Movement",
+   "titulo": "The Doorway Pec Stretch UPGRADED"
+  }
  },
  {
   "id": "estiramiento_sofa_flexores_cadera",
@@ -3517,7 +3679,12 @@
    "couch stretch",
    "estiramiento de sofa para flexores de cadera",
    "estiramiento sofa flexores cadera"
-  ]
+  ],
+  "youtube": {
+   "video": "d9pOjXCKGN8",
+   "canal": "Tom Morrison",
+   "titulo": "The Couch Stretch Done Correctly"
+  }
  },
  {
   "id": "gato_camello_columna",
@@ -3639,7 +3806,12 @@
    "el mayor estiramiento del mundo",
    "mayor estiramiento mundo",
    "world's greatest stretch"
-  ]
+  ],
+  "youtube": {
+   "video": "sOuKeVuej9E",
+   "canal": "Jeremy Ethier",
+   "titulo": "How To Unlock Your Mobility in 5 Minutes (DAILY STRETCH)"
+  }
  },
  {
   "id": "rotacion_cadera_90_90",
@@ -3696,7 +3868,12 @@
    "90/90 hip switches",
    "rotacion cadera 90 90",
    "rotacion de cadera sentada 90/90"
-  ]
+  ],
+  "youtube": {
+   "video": "P4GfbdNvOT8",
+   "canal": "Tom Morrison",
+   "titulo": "90/90 Hip Stretch (Simple & Effective!)"
+  }
  },
  {
   "id": "aperturas_con_mancuernas_banco_plano",
@@ -3758,7 +3935,12 @@
    "media/fotos/aperturas_con_mancuernas_banco_plano_0.jpg",
    "media/fotos/aperturas_con_mancuernas_banco_plano_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Dumbbell_Flyes (dominio público)"
+  "foto_fuente": "free-exercise-db: Dumbbell_Flyes (dominio público)",
+  "youtube": {
+   "video": "_LwuS1PdbdM",
+   "canal": "Renaissance Periodization",
+   "titulo": "Feel The Dumbbell Fly MORE | Targeting The Muscle"
+  }
  },
  {
   "id": "aperturas_en_polea_baja_a_alta",
@@ -3819,7 +4001,12 @@
    "media/fotos/aperturas_en_polea_baja_a_alta_0.jpg",
    "media/fotos/aperturas_en_polea_baja_a_alta_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Low_Cable_Crossover (dominio público)"
+  "foto_fuente": "free-exercise-db: Low_Cable_Crossover (dominio público)",
+  "youtube": {
+   "video": "JUDTGZh4rhg",
+   "canal": "ATHLEAN-X™",
+   "titulo": "STOP F*cking Up Cable Flys (PROPER FORM!)"
+  }
  },
  {
   "id": "aperturas_en_polea_media",
@@ -3885,8 +4072,11 @@
    "media/fotos/aperturas_en_polea_media_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Incline_Cable_Flye (dominio público)",
-  "video": "media/videos/aperturas_en_polea_media.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "JUDTGZh4rhg",
+   "canal": "ATHLEAN-X™",
+   "titulo": "STOP F*cking Up Cable Flys (PROPER FORM!)"
+  }
  },
  {
   "id": "flexiones_con_deficit",
@@ -3944,7 +4134,12 @@
    "deficit push-ups",
    "flexiones con deficit",
    "flexiones con deficit para estiramiento profundo"
-  ]
+  ],
+  "youtube": {
+   "video": "gmNlqsE3Onc",
+   "canal": "Renaissance Periodization",
+   "titulo": "Deficit Pushup"
+  }
  },
  {
   "id": "flexiones_declinadas",
@@ -4069,7 +4264,12 @@
    "media/fotos/fondos_en_paralelas_pecho_0.jpg",
    "media/fotos/fondos_en_paralelas_pecho_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Dips_-_Chest_Version (dominio público)"
+  "foto_fuente": "free-exercise-db: Dips_-_Chest_Version (dominio público)",
+  "youtube": {
+   "video": "lt3Wtliiqus",
+   "canal": "Renaissance Periodization",
+   "titulo": "8 Dips Mistakes and How to Fix Them"
+  }
  },
  {
   "id": "press_inclinado_mancuernas_30",
@@ -4134,8 +4334,11 @@
    "media/fotos/press_inclinado_mancuernas_30_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Incline_Dumbbell_Press (dominio público)",
-  "video": "media/videos/press_inclinado_mancuernas_30.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "0f6-uCUKqgA",
+   "canal": "Renaissance Periodization",
+   "titulo": "Incline Dumbbell Press BETTER | Targeting The Muscle Series"
+  }
  },
  {
   "id": "press_pecho_en_polea",
@@ -4199,8 +4402,11 @@
    "media/fotos/press_pecho_en_polea_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Cable_Chest_Press (dominio público)",
-  "video": "media/videos/press_pecho_en_polea.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "sh92B-_2O48",
+   "canal": "PureGym",
+   "titulo": "How To Do A Cable Chest Press"
+  }
  },
  {
   "id": "press_plano_mancuernas",
@@ -4265,7 +4471,12 @@
    "media/fotos/press_plano_mancuernas_0.jpg",
    "media/fotos/press_plano_mancuernas_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Dumbbell_Bench_Press (dominio público)"
+  "foto_fuente": "free-exercise-db: Dumbbell_Bench_Press (dominio público)",
+  "youtube": {
+   "video": "QsYre__-aro",
+   "canal": "Jeremy Ethier",
+   "titulo": "STOP Doing Dumbbell Press Like This (5 Mistakes Slowing Your Chest Gains)"
+  }
  },
  {
   "id": "abduccion_cadera_maquina",
@@ -4334,8 +4545,11 @@
    "media/fotos/abduccion_cadera_maquina_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Thigh_Abductor (dominio público)",
-  "video": "media/videos/abduccion_cadera_maquina.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "G_8LItOiZ0Q",
+   "canal": "PureGym",
+   "titulo": "How To Use The Seated Hip Abductor (Outer Thigh)"
+  }
  },
  {
   "id": "aduccion_cadera_maquina",
@@ -4464,7 +4678,12 @@
    "media/fotos/curl_femoral_acostado_0.jpg",
    "media/fotos/curl_femoral_acostado_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Lying_Leg_Curls (dominio público)"
+  "foto_fuente": "free-exercise-db: Lying_Leg_Curls (dominio público)",
+  "youtube": {
+   "video": "jobEeklwrrs",
+   "canal": "Renaissance Periodization",
+   "titulo": "9 Leg Curl Mistakes and How to Fix Them"
+  }
  },
  {
   "id": "curl_femoral_sentado",
@@ -4531,8 +4750,11 @@
    "media/fotos/curl_femoral_sentado_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Seated_Leg_Curl (dominio público)",
-  "video": "media/videos/curl_femoral_sentado.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "N6FVnaasdq0",
+   "canal": "Renaissance Periodization",
+   "titulo": "Single Leg Leg Curl"
+  }
  },
  {
   "id": "elevacion_talones_prensa",
@@ -4599,8 +4821,11 @@
    "media/fotos/elevacion_talones_prensa_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Calf_Press_On_The_Leg_Press_Machine (dominio público)",
-  "video": "media/videos/elevacion_talones_prensa.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "Xa18jxyeSnM",
+   "canal": "Renaissance Periodization",
+   "titulo": "8 Calf Raise Mistakes and How to Fix Them"
+  }
  },
  {
   "id": "elevacion_talones_sentado_mancuerna",
@@ -4727,8 +4952,11 @@
    "media/fotos/extension_cuadriceps_maquina_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Leg_Extensions (dominio público)",
-  "video": "media/videos/extension_cuadriceps_maquina.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "xUZNOR6WP0A",
+   "canal": "Renaissance Periodization",
+   "titulo": "10 Leg Extension Mistakes and How to Fix Them"
+  }
  },
  {
   "id": "hip_thrust_banco_mancuerna",
@@ -4798,8 +5026,11 @@
    "media/fotos/hip_thrust_banco_mancuerna_1.jpg"
   ],
   "foto_fuente": "free-exercise-db: Barbell_Hip_Thrust (dominio público)",
-  "video": "media/videos/hip_thrust_banco_mancuerna.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
+  "youtube": {
+   "video": "ZSPmIyX9RZs",
+   "canal": "Renaissance Periodization",
+   "titulo": "Machine Hip Thrust"
+  }
  },
  {
   "id": "peso_muerto_rumano_mancuernas",
@@ -4865,7 +5096,12 @@
    "media/fotos/peso_muerto_rumano_mancuernas_0.jpg",
    "media/fotos/peso_muerto_rumano_mancuernas_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Stiff-Legged_Dumbbell_Deadlift (dominio público)"
+  "foto_fuente": "free-exercise-db: Stiff-Legged_Dumbbell_Deadlift (dominio público)",
+  "youtube": {
+   "video": "uhghy9pFIPY",
+   "canal": "E3 Rehab",
+   "titulo": "How To Perform PERFECT Romanian Deadlifts | RDLs (Everything You Need To Know)"
+  }
  },
  {
   "id": "prensa_piernas_45",
@@ -4929,7 +5165,12 @@
    "media/fotos/prensa_piernas_45_0.jpg",
    "media/fotos/prensa_piernas_45_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Leg_Press (dominio público)"
+  "foto_fuente": "free-exercise-db: Leg_Press (dominio público)",
+  "youtube": {
+   "video": "8vk6rWMSxOk",
+   "canal": "Renaissance Periodization",
+   "titulo": "7 Leg Press Mistakes and How to Fix Them"
+  }
  },
  {
   "id": "sentadilla_bulgara_mancuernas",
@@ -4995,7 +5236,12 @@
    "media/fotos/sentadilla_bulgara_mancuernas_0.jpg",
    "media/fotos/sentadilla_bulgara_mancuernas_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Split_Squat_with_Dumbbells (dominio público)"
+  "foto_fuente": "free-exercise-db: Split_Squat_with_Dumbbells (dominio público)",
+  "youtube": {
+   "video": "hiLF_pF3EJM",
+   "canal": "ATHLEAN-X™",
+   "titulo": "Stop F*cking Up Bulgarian Split Squats (PROPER FORM!)"
+  }
  },
  {
   "id": "sentadilla_hack",
@@ -5060,7 +5306,12 @@
    "media/fotos/sentadilla_hack_0.jpg",
    "media/fotos/sentadilla_hack_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Hack_Squat (dominio público)"
+  "foto_fuente": "free-exercise-db: Hack_Squat (dominio público)",
+  "youtube": {
+   "video": "rYgNArpwE7E",
+   "canal": "Renaissance Periodization",
+   "titulo": "Hack Squat"
+  }
  },
  {
   "id": "sentadilla_hack_inversa",
@@ -5187,7 +5438,12 @@
   "descripcion_visual": "Inicio: Sentado con la espalda apoyada, brazos abiertos a los lados a la altura del pecho con codos semiflexionados, sintiendo el estiramiento en los pectorales. Final: Manos y codos reunidos al frente en la línea media del esternón, pecho totalmente acortado y comprimido.",
   "busqueda_video": "pec deck fly machine proper form hypertrophy Renaissance Periodization",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/40266636/"
+  "fuente": "https://pubmed.ncbi.nlm.nih.gov/40266636/",
+  "youtube": {
+   "video": "O-OBCfyh9Fw",
+   "canal": "Renaissance Periodization",
+   "titulo": "Pec Deck Flye"
+  }
  },
  {
   "id": "press_pecho_maquina_discos",
@@ -5321,6 +5577,11 @@
   "descripcion_visual": "Inicio: Acostado en banco plano con escápulas retraídas y pies anclados al piso, sosteniendo la barra sobre los hombros con brazos extendidos. Final: Barra apoyada suavemente sobre la parte media-baja del esternón con codos a 45 grados y antebrazos verticales, lista para el empuje.",
   "busqueda_video": "barbell bench press proper form hypertrophy guide Jeff Nippard",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/34198674/"
+  "fuente": "https://pubmed.ncbi.nlm.nih.gov/34198674/",
+  "youtube": {
+   "video": "4Y2ZdHCOXok",
+   "canal": "Jeremy Ethier",
+   "titulo": "How to PROPERLY Bench Press for Growth (5 Easy Steps)"
+  }
  }
 ]
