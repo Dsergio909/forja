@@ -27,8 +27,8 @@ let contadorNavegacion = 0;
 
 /**
  * Sanitiza un segmento de ruta proveniente de window.location.hash
- * para prevenir ataques de XSS reflejado (Hallazgo Seguridad 1) en las pantallas
- * que interpolan parámetros de URL en plantillas HTML.
+ * mediante una lista blanca alfanumérica estricta (Hallazgo Seguridad 4)
+ * para neutralizar de raíz cualquier intento de inyección de código o XSS reflejado.
  * @param {string} segmento
  * @returns {string}
  */
@@ -39,12 +39,24 @@ function sanitizarParametroRuta(segmento) {
   } catch (_) {
     // Conservar cadena original si contiene secuencias % malformadas
   }
-  return texto
-    .replace(/[<>"'`]/g, '')
-    .replace(/javascript:/gi, '')
-    .replace(/data:/gi, '')
-    .replace(/on\w+\s*=/gi, '')
-    .trim();
+  // Lista blanca estricta: solo alfanuméricos, guiones bajos, guiones y puntos
+  return texto.replace(/[^a-zA-Z0-9._-]/g, '').trim();
+}
+
+/**
+ * Sincroniza el temporizador de descanso global si existe un descanso pendiente en localStorage
+ * tras una recarga de pestaña o al navegar a rutas distintas a #registrar (C2-01 pantallas_flujo).
+ */
+function sincronizarDescansoGlobal() {
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('forja_descanso_fin')) {
+      import('./registro.js').then((m) => {
+        if (typeof m.temporizadorActivo === 'function') {
+          m.temporizadorActivo();
+        }
+      }).catch(() => {});
+    }
+  } catch (_) {}
 }
 
 /**
@@ -90,6 +102,9 @@ function inicializarIconosUI() {
  */
 async function cargarRuta() {
   const renderId = ++contadorNavegacion;
+
+  // Sincronizar temporizador de descanso en segundo plano al cambiar de ruta
+  sincronizarDescansoGlobal();
 
   const hashCompleto = window.location.hash || '#hoy';
   const limpio = hashCompleto.replace(/^#\/?/, '');
@@ -176,7 +191,7 @@ async function cargarRuta() {
   }
 
   // Montar en el nuevo contenedor. Va DENTRO de la página (invisible) mientras monta, para que las pantallas que
-  // buscan sus elementos con document.getElementById (cámara, cuerpo…) los encuentren y midan bien (fix 7-nov).
+  // buscan sus elementos con document.getElementById (cámara, cuerpo…) los encuentren y midan bien.
   contenedorNuevo.style.cssText += 'visibility: hidden; position: absolute; inset: 0;';
   vista.appendChild(contenedorNuevo);
   try {
@@ -250,16 +265,18 @@ function mostrarErrorEnVista(vista, rutaConfig, error) {
 
 /**
  * Inicialización completa de la aplicación Forja:
- * 1. Inicializa iconos vectoriales de cabecera y barra de navegación.
- * 2. Abre IndexedDB ('forja' v1).
- * 3. Asistente inicial si primeraVez !== false.
- * 4. PIN opcional.
- * 5. Registro de sw.js.
- * 6. Router por hash.
+ * 1. Registra sw.js para modo sin conexión desde el primer segundo.
+ * 2. Inicializa iconos vectoriales de cabecera y barra de navegación.
+ * 3. Abre IndexedDB ('forja' v1).
+ * 4. Asistente inicial si primeraVez !== false.
+ * 5. PIN opcional: si está configurado y ocurre cualquier excepción o validación fallida,
+ *    FALLA CERRADO (Fail-Closed) bloqueando terminantemente el acceso.
+ * 6. Sincroniza temporizador de descanso pendiente si lo hay.
+ * 7. Configura escuchador de hash y carga vista.
  */
 async function iniciar() {
   try {
-    // 0. Modo sin internet desde el primer segundo (antes esperaba al asistente inicial; fix 7-nov)
+    // 0. Modo sin internet desde el primer segundo
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch((errSw) => {
         console.warn('[App] Advertencia al registrar sw.js:', errSw);
@@ -285,7 +302,7 @@ async function iniciar() {
       }
     }
 
-    // 4. Comprobar seguridad por PIN si existe
+    // 4. Comprobar seguridad por PIN si existe (Seguridad Nuevo 2: Fail-Closed)
     const pin = await db.ajuste('pin', null);
     if (pin) {
       try {
@@ -313,13 +330,36 @@ async function iniciar() {
             }
             return;
           }
+        } else {
+          // Si pedirPin no es una función, por seguridad bloquear acceso
+          throw new Error('Función pedirPin no disponible en el módulo de ajustes.');
         }
       } catch (e) {
-        console.warn('[App] No se pudo invocar pedirPin():', e);
+        // Principio de seguridad Fail-Closed: ante cualquier excepción, BLOQUEAR sin dejar pasar
+        console.error('[App] Error de seguridad al verificar PIN:', e);
+        ui.aviso('Error de seguridad al validar PIN', 'error');
+        const vista = document.getElementById('vista');
+        if (vista) {
+          vista.innerHTML = '';
+          vista.appendChild(ui.h('div', { class: 'pantalla' },
+            ui.h('div', { class: 'tarjeta error-pantalla' },
+              ui.h('div', { class: 'icono-error' }, icono('ajustes', 36)),
+              ui.h('h2', { class: 'titulo-seccion' }, 'Acceso bloqueado'),
+              ui.h('p', { class: 'sutil' }, 'No fue posible validar tu PIN de seguridad. Por protección, el acceso ha sido suspendido.'),
+              ui.h('button', {
+                class: 'btn primario',
+                type: 'button',
+                on: { click: () => location.reload() }
+              }, 'Reintentar')
+            )
+          ));
+        }
+        return;
       }
     }
 
-    // 5. (El service worker ya se registró en el paso 0)
+    // 5. Sincronizar temporizador de descanso si estaba activo
+    sincronizarDescansoGlobal();
 
     // 6. Configurar escuchador de hash y cargar vista
     window.addEventListener('hashchange', cargarRuta);

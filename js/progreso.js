@@ -217,12 +217,14 @@ export async function montar(contenedor, params = []) {
       align-items: center;
       justify-content: space-around;
       text-align: center;
+      gap: 16px;
     }
     .progreso-racha-item {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 4px;
+      flex: 1;
     }
     .progreso-racha-item .grande {
       font-family: 'Bricolage Grotesque', sans-serif;
@@ -341,7 +343,7 @@ export async function montar(contenedor, params = []) {
   let ejercicioSeleccionadoId = (params && params[0]) ? params[0] : null;
   let metricaSeleccionada = '1rm'; // '1rm' | 'peso' | 'volumen'
   let formulaActiva = (typeof FORMULA_1RM === 'string' ? FORMULA_1RM.toLowerCase() : 'epley');
-  let mesVisualizadoOffset = 0; // Navegación entre meses en calendario (M-05)
+  let mesVisualizadoOffset = 0; // Navegación entre meses en calendario
 
   // Si no hay ejercicio por parámetro, elegir el que tenga más series
   if (!ejercicioSeleccionadoId) {
@@ -524,7 +526,7 @@ export async function montar(contenedor, params = []) {
         .filter(s => s && s.ejercicioId === ejercicioSeleccionadoId)
         .sort((a, b) => (a.fecha > b.fecha ? 1 : a.fecha < b.fecha ? -1 : (a.hora || 0) - (b.hora || 0)));
 
-      // Detectar si el ejercicio es de peso corporal sin lastre (A-05 y MEDIO-05)
+      // Detectar si el ejercicio es de peso corporal sin lastre
       const esCorporalPuro = (seriesEsteEj.length > 0 && seriesEsteEj.every(s => s.kg == null || Number(s.kg) === 0)) ||
         (seriesEsteEj.length === 0 && ((ejActual?.equipo || '').toLowerCase().includes('peso corporal') || (ejActual?.equipo || '').toLowerCase().includes('barra de dominadas')));
 
@@ -560,7 +562,7 @@ export async function montar(contenedor, params = []) {
       );
       cuerpoSeccion.appendChild(selectorEj);
 
-      // Subtabs de métricas en píldoras (adaptadas si es peso corporal: A-05)
+      // Subtabs de métricas en píldoras (adaptadas si es peso corporal)
       const etiquetaTab1 = esCorporalPuro
         ? 'Reps máximas'
         : `1RM (${formulaActiva === 'brzycki' ? 'Brzycki' : 'Epley'})`;
@@ -583,18 +585,18 @@ export async function montar(contenedor, params = []) {
       );
       cuerpoSeccion.appendChild(subtabsMetrica);
 
-      // Si es 1RM con peso externo, alternador de fórmula en píldoras táctiles
+      // Si es 1RM con peso externo: alternador de fórmula con altura accesible >= 48px (MEDIO-05)
       if (metricaSeleccionada === '1rm' && !esCorporalPuro) {
         const toggleFormula = h('div', { class: 'fila', style: 'justify-content: flex-end; align-items: center; gap: 8px;' },
           h('span', { style: 'font-size: 12px; color: var(--sutil, #5D5951); font-weight: 500;' }, 'Fórmula:'),
           h('button', {
             class: `progreso-subtab-chip ${formulaActiva === 'epley' ? 'activo' : ''}`,
-            style: 'min-height: 40px; height: 40px; padding: 0 14px; font-size: 12px;',
+            style: 'min-height: 48px; height: 48px; padding: 0 18px; font-size: 13px; font-weight: 600;',
             on: { click: () => { formulaActiva = 'epley'; renderizar(); } }
           }, 'Epley'),
           h('button', {
             class: `progreso-subtab-chip ${formulaActiva === 'brzycki' ? 'activo' : ''}`,
-            style: 'min-height: 40px; height: 40px; padding: 0 14px; font-size: 12px;',
+            style: 'min-height: 48px; height: 48px; padding: 0 18px; font-size: 13px; font-weight: 600;',
             on: { click: () => { formulaActiva = 'brzycki'; renderizar(); } }
           }, 'Brzycki')
         );
@@ -602,7 +604,6 @@ export async function montar(contenedor, params = []) {
       }
 
       // TARJETA HÉROE DE RÉCORD PERSONAL: titular serif cursivo y números grandes en .grande
-      // Corrección A-05: en ejercicios de peso corporal no mostrar «1RM estimado: 0 kg»
       const nombreEjSel = ejActual?.nombre || ejercicioSeleccionadoId;
       const esRecordCorporal = prActual && (prActual.kg == null || Number(prActual.kg) === 0);
 
@@ -661,7 +662,6 @@ export async function montar(contenedor, params = []) {
 
         if (metricaSeleccionada === '1rm') {
           if (esCorporalPuro || sesionCorporal) {
-            // Corrección A-05: en peso corporal graficar las repeticiones máximas de la sesión en vez de 0
             for (const s of arrSeries) {
               const r = Number(s.reps || 0);
               if (r > valorCalculado) valorCalculado = r;
@@ -696,7 +696,6 @@ export async function montar(contenedor, params = []) {
             }
           }
         } else if (metricaSeleccionada === 'volumen') {
-          // Corrección M-04 (porLado * 2) y MEDIO-05 (volumen de reps en peso corporal)
           for (const s of arrSeries) {
             const reps = Number(s.reps || 0);
             if (esCorporalPuro || sesionCorporal) {
@@ -775,7 +774,7 @@ export async function montar(contenedor, params = []) {
     }
 
     // ==========================================
-    // TAB 3: RACHA Y CALENDARIO (con navegación mensual: M-05)
+    // TAB 3: RACHA Y CALENDARIO
     // ==========================================
     else if (tabActiva === 'calendario') {
       const hoyStr = hoyISO();
@@ -831,7 +830,7 @@ export async function montar(contenedor, params = []) {
         }
       }
 
-      // Caja de racha con números grandes en .grande
+      // Caja de racha (BAJO-02: sin divisores rígidos de 1px, separación limpia por flex gap)
       const cardRacha = h('div', { class: 'progreso-racha-card' },
         h('div', { class: 'progreso-racha-item' },
           h('span', { class: 'grande' }, String(rachaSemanas)),
@@ -840,7 +839,6 @@ export async function montar(contenedor, params = []) {
             'Semanas de racha'
           )
         ),
-        h('div', { style: 'width: 1px; height: 50px; background: rgba(23, 23, 26, 0.12);' }),
         h('div', { class: 'progreso-racha-item' },
           h('span', { class: 'grande' }, String(entrenosDelMes)),
           h('span', { class: 'progreso-racha-caption' },
@@ -851,7 +849,7 @@ export async function montar(contenedor, params = []) {
       );
       cuerpoSeccion.appendChild(cardRacha);
 
-      // Calendario mensual en tarjeta Papel 2 con navegación entre meses (M-05)
+      // Calendario mensual en tarjeta Papel 2 con navegación entre meses
       const primerDiaMes = new Date(anioVista, mesVista, 1);
       const ultimoDiaMes = new Date(anioVista, mesVista + 1, 0);
       const diasEnMes = ultimoDiaMes.getDate();

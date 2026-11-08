@@ -79,29 +79,9 @@
    **URL:** https://www.backfitpro.com/books/low-back-disorders/  
    **Classification:** Revisión biomecánica y texto de consenso de experto internacional.
 
-2. **Title:** *The effect of corrective exercises on Upper Crossed Syndrome: A systematic review and meta-analysis*  
-   **Author/Site:** Bayat, A., et al., *Journal of Bodywork and Movement Therapies* / PubMed (NIH)  
-   **Year:** 2024  
-   **URL:** https://pubmed.ncbi.nlm.nih.gov/38462217/  
-   **Classification:** Metaanálisis y revisión sistemática.
 
-3. **Title:** *Effects of therapeutic exercise on thoracic hyperkyphosis: A systematic review and meta-analysis of randomized controlled trials*  
-   **Author/Site:** Kırkbir, F. et al., *Musculoskeletal Science and Practice* / PubMed (NIH)  
-   **Year:** 2023  
-   **URL:** https://pubmed.ncbi.nlm.nih.gov/36754020/  
-   **Classification:** Metaanálisis y revisión sistemática de ensayos clínicos aleatorizados.
 
-4. **Title:** *Diurnal variation of intervertebral disc height and its clinical significance: a systematic review*  
-   **Author/Site:** Karakida, O., et al., *European Spine Journal* / PubMed (NIH)  
-   **Year:** 2021  
-   **URL:** https://pubmed.ncbi.nlm.nih.gov/33580327/  
-   **Classification:** Revisión sistemática.
 
-5. **Title:** *Effectiveness of Deep Cervical Flexor Training on Forward Head Posture and Craniovertebral Angle: A Systematic Review and Meta-Analysis*  
-   **Author/Site:** Sheikhhoseini, R., et al., *Journal of Manipulative and Physiological Therapeutics* / PubMed (NIH)  
-   **Year:** 2021  
-   **URL:** https://pubmed.ncbi.nlm.nih.gov/34215438/  
-   **Classification:** Metaanálisis y revisión sistemática.
 
 6. **Title:** *ACSM's Guidelines for Exercise Testing and Prescription (11th Edition)*  
    **Author/Site:** American College of Sports Medicine (ACSM), Wolters Kluwer  

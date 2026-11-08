@@ -489,6 +489,21 @@ function parsearBloque(linea, listaEjercicios = []) {
       for (const r of repsArr) {
         series.push({ kg, reps: r, unidad });
       }
+    } else if (/^(?:(\d+(?:[.,]\d+)?)\s+)?(\d+)\s*x\s*(\d+)$/i.test(restoDatos.trim())) {
+      const matchNxM = restoDatos.trim().match(/^(?:(\d+(?:[.,]\d+)?)\s+)?(\d+)\s*x\s*(\d+)$/i);
+      if (matchNxM[1]) kg = parseFloat(matchNxM[1].replace(',', '.'));
+      const sets = parseInt(matchNxM[2], 10);
+      const repsVal = parseInt(matchNxM[3], 10);
+      for (let i = 0; i < sets; i++) {
+        series.push({ kg, reps: repsVal, unidad });
+      }
+    } else if (/^(\d+(?:[.,]\d+)?)\s+(?:x\s*\d+[\s,]*)+$/i.test(restoDatos.trim())) {
+      const matchPeso = restoDatos.trim().match(/^(\d+(?:[.,]\d+)?)\s+(.*)$/i);
+      kg = parseFloat(matchPeso[1].replace(',', '.'));
+      const repsArr = extraerReps(matchPeso[2]);
+      for (const r of repsArr) {
+        series.push({ kg, reps: r, unidad });
+      }
     } else {
       const tokens = restoDatos.split(/\s+/).filter(Boolean);
       const numeros = [];
@@ -540,8 +555,25 @@ function parsearBloque(linea, listaEjercicios = []) {
     for (const r of repsArr) {
       series.push({ kg, reps: r, unidad });
     }
-  } else if (/x\s*\d+/i.test(restoDatos)) {
-    // Formato "x6 x6 x4"
+  } else if (/^(?:(\d+(?:[.,]\d+)?)\s+)?(\d+)\s*x\s*(\d+)$/i.test(restoDatos.trim())) {
+    // CRÍTICO-01: Formato "3x8" o "45 3x8" evaluado antes para no perder el peso antecedente
+    const matchNxM = restoDatos.trim().match(/^(?:(\d+(?:[.,]\d+)?)\s+)?(\d+)\s*x\s*(\d+)$/i);
+    if (matchNxM[1]) kg = parseFloat(matchNxM[1].replace(',', '.'));
+    const sets = parseInt(matchNxM[2], 10);
+    const repsVal = parseInt(matchNxM[3], 10);
+    for (let i = 0; i < sets; i++) {
+      series.push({ kg, reps: repsVal, unidad });
+    }
+  } else if (/^(\d+(?:[.,]\d+)?)\s+(?:x\s*\d+[\s,]*)+$/i.test(restoDatos.trim())) {
+    // CRÍTICO-01: Formato con peso seguido de xN: "80 x5 x5 x5" o "40 x6 x6 x4"
+    const matchPeso = restoDatos.trim().match(/^(\d+(?:[.,]\d+)?)\s+(.*)$/i);
+    kg = parseFloat(matchPeso[1].replace(',', '.'));
+    const repsArr = extraerReps(matchPeso[2]);
+    for (const r of repsArr) {
+      series.push({ kg, reps: r, unidad });
+    }
+  } else if (/^\s*(?:x\s*\d+[\s,]*)+$/i.test(restoDatos.trim()) || (esCorporal && /x\s*\d+/i.test(restoDatos))) {
+    // Formato exclusivo de peso corporal con x: "dominadas x6 x6 x4" o "x6 x6 x4"
     const repsArr = extraerReps(restoDatos);
     for (const r of repsArr) {
       series.push({ kg: null, reps: r, unidad });
@@ -551,17 +583,6 @@ function parsearBloque(linea, listaEjercicios = []) {
     const repsArr = extraerReps(restoDatos);
     for (const r of repsArr) {
       series.push({ kg: null, reps: r, unidad });
-    }
-  } else if (/(\d+)\s*x\s*(\d+)/i.test(restoDatos)) {
-    // Formato "3x8" o "45 3x8"
-    const matchNxM = restoDatos.match(/(?:(\d+(?:[.,]\d+)?)\s+)?(\d+)\s*x\s*(\d+)/i);
-    if (matchNxM) {
-      if (matchNxM[1]) kg = parseFloat(matchNxM[1].replace(',', '.'));
-      const sets = parseInt(matchNxM[2], 10);
-      const repsVal = parseInt(matchNxM[3], 10);
-      for (let i = 0; i < sets; i++) {
-        series.push({ kg, reps: repsVal, unidad });
-      }
     }
   } else {
     // Números separados por espacios: "45 6 6 5", "7,5 8 8", "40 9", "dominadas 8 8" o "dominadas 7 6 5"
@@ -586,7 +607,7 @@ function parsearBloque(linea, listaEjercicios = []) {
         series.push({ kg: null, reps: numeros[0], unidad });
       }
     } else if (numeros.length === 2) {
-      // ALTO-03: En ejercicios corporales, 2 números ("dominadas 8 8") son 2 series de peso corporal
+      // En ejercicios corporales, 2 números ("dominadas 8 8") son 2 series de peso corporal
       if (esCorporal && numeros[0] <= 40 && numeros[1] <= 40 && Number.isInteger(numeros[0])) {
         series.push({ kg: null, reps: numeros[0], unidad });
         series.push({ kg: null, reps: numeros[1], unidad });
@@ -595,7 +616,22 @@ function parsearBloque(linea, listaEjercicios = []) {
         series.push({ kg, reps: numeros[1], unidad });
       }
     } else if (numeros.length >= 3) {
-      if (esCorporal && numeros[0] <= 30 && Number.isInteger(numeros[0])) {
+      // ALTO-03: Diferenciar lastre claro (dominadas 10 6 6 6, fondos 15 8 8) de fatiga corporal (dominadas 7 6 5)
+      const repsSubsiguientes = numeros.slice(1);
+      const difSubsiguientes = Math.max(...repsSubsiguientes) - Math.min(...repsSubsiguientes);
+      const sonSubsiguientesConsistentes = repsSubsiguientes.every(n => n <= 30) && difSubsiguientes <= 2;
+      const saltoInicial = numeros[0] - repsSubsiguientes[0];
+
+      const esSecuenciaFatigaCorporal = numeros.length >= 3 &&
+        numeros.every((val, idx) => idx === 0 || (numeros[idx - 1] >= val && numeros[idx - 1] - val <= 2)) &&
+        numeros[0] <= 25;
+
+      const esLastreClaro = esCorporal && !esSecuenciaFatigaCorporal && (
+        (sonSubsiguientesConsistentes && (saltoInicial >= 3 || saltoInicial <= -2)) ||
+        (numeros[0] % 2.5 === 0 && numeros[0] >= 5 && sonSubsiguientesConsistentes)
+      );
+
+      if (esCorporal && !esLastreClaro && numeros[0] <= 30 && Number.isInteger(numeros[0])) {
         for (const n of numeros) series.push({ kg: null, reps: n, unidad });
       } else {
         kg = numeros[0];

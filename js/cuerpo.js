@@ -96,7 +96,8 @@ async function cargarDatos() {
   }
 
   try {
-    datosFotos = await todos('fotos');
+    const todasFotos = await todos('fotos');
+    datosFotos = (todasFotos || []).filter((f) => f && f.blob instanceof Blob);
     datosFotos.sort((a, b) => (b.fecha > a.fecha ? 1 : b.fecha < a.fecha ? -1 : 0));
   } catch (e) {
     datosFotos = [];
@@ -246,16 +247,16 @@ const ESTILOS_CUERPO = `
     color: #17171A;
   }
   .cuerpo-chip-alerta {
-    background-color: #E2553A;
-    color: #F3F0E8;
+    background-color: #B83218;
+    color: #FFFFFF;
   }
   .cuerpo-fila-resumen {
     display: flex;
     justify-content: space-between;
     align-items: center;
     background-color: #F3F0E8;
-    border-radius: 999px;
-    padding: 12px 20px;
+    border-radius: 28px;
+    padding: 14px 18px;
     font-size: 13px;
     flex-wrap: wrap;
     gap: 8px;
@@ -769,6 +770,11 @@ function renderizarComparador() {
   const fotoAntes = datosFotos.find((f) => f.id === fotoIdAntes) || datosFotos[datosFotos.length - 1];
   const fotoDespues = datosFotos.find((f) => f.id === fotoIdDespues) || datosFotos[0];
 
+  if (!fotoAntes || !(fotoAntes.blob instanceof Blob) || !fotoDespues || !(fotoDespues.blob instanceof Blob)) {
+    cont.replaceChildren(estadoVacio);
+    return;
+  }
+
   const urlAntes = URL.createObjectURL(fotoAntes.blob);
   const urlDespues = URL.createObjectURL(fotoDespues.blob);
   urlsFotosCreadas.push(urlAntes, urlDespues);
@@ -887,6 +893,7 @@ function renderizarGaleriaFotos() {
 
   const nodosTarjetas = [];
   for (const foto of fotosFiltradas) {
+    if (!foto || !(foto.blob instanceof Blob)) continue;
     const url = URL.createObjectURL(foto.blob);
     urlsFotosCreadas.push(url);
     const vistaSegura = ['frente', 'lado', 'espalda'].includes(foto.vista) ? foto.vista : 'frente';

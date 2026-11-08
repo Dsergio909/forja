@@ -1,6 +1,6 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    FORJA - Service Worker (sw.js)
-   Versión de caché: forja-v4
+   Versión de caché: forja-20261107-v5
    Garantiza funcionamiento 100% offline y actualizaciones sin fricción.
    Estrategia:
    - EXCLUIR (dejar pasar sin interceptar ni clonar): modelos de WebLLM/HuggingFace/GitHub
@@ -8,9 +8,10 @@
    - RED PRIMERO (con tiempo límite de 3 s y respaldo en caché) para: index.html, js/*.js,
      styles.css, fonts/* y data/*.json (SW-02).
    - CACHÉ PRIMERO para: multimedia local (media/) y librerías del CDN permitido.
+   - NOTIFICACIONES: maneja notificationclick para enfocar la app y navegar a #registrar (C2-02).
    ========================================================================== */
 
-const CACHE_NAME = 'forja-20261107-2042';
+const CACHE_NAME = 'forja-20261107-2139';
 const TIEMPO_LIMITE_RED_MS = 3000;
 
 // Lista completa de archivos de la app para precaché
@@ -99,7 +100,7 @@ self.addEventListener('install', (evento) => {
   );
 });
 
-// --- Activación: limpiar versiones anteriores de caché (ej. forja-v1, forja-v2) ---
+// --- Activación: limpiar versiones anteriores de caché (ej. forja-v1...v4) ---
 self.addEventListener('activate', (evento) => {
   evento.waitUntil(
     caches.keys().then((claves) => {
@@ -157,6 +158,27 @@ self.addEventListener('fetch', (evento) => {
   // 2. RED PRIMERO (con tope de 3 s) para archivos de la app: index.html, js/*.js,
   // styles.css, fonts/*, data/*.json, manifest, iconos y artículos de la guía
   evento.respondWith(manejarRedPrimero(request));
+});
+
+// --- Notificación interactiva en Android (C2-02 pantallas_flujo) ---
+self.addEventListener('notificationclick', (evento) => {
+  evento.notification.close();
+  evento.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientes) => {
+      for (const cliente of clientes) {
+        if ('focus' in cliente) {
+          cliente.focus();
+          if ('navigate' in cliente) {
+            cliente.navigate('./#registrar');
+          }
+          return;
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow('./#registrar');
+      }
+    })
+  );
 });
 
 /**

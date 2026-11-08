@@ -1,7 +1,7 @@
 // js/hoy.js - Pantalla «Hoy» de Forja (Dirección de Arte v2 «Revista de Sala»)
 // Portada editorial: saludo con día y rutina, titular Instrument Serif enorme,
-// chips del día (proteína, agua, pasos, sueño) con barra fina lima, tarjeta-video de 420px
-// del primer ejercicio que falta, carrusel horizontal de ejercicios y botón lima canónico.
+// chips del día (proteína, agua, pasos, sueño) con barra fina lima, tarjeta de ejercicio hero de 420px,
+// carrusel horizontal de ejercicios y botón lima canónico adaptativo.
 
 import { todos, filtrar, ajuste, ponerAjuste } from './db.js';
 import { h, aviso, dialogo, hoyISO, fechaBonita, formatoKg } from './ui.js';
@@ -54,11 +54,28 @@ export async function montar(contenedor, params = []) {
   contenedor.innerHTML = '';
 
   const hoyReal = hoyISO();
+
+  // Sincronización de fecha activa con sessionStorage (B-04 y A2-02 de pantallas_flujo)
   if (params && params[0] && /^\d{4}-\d{2}-\d{2}$/.test(params[0])) {
     fechaVista = params[0];
-  } else if (!fechaVista) {
-    fechaVista = hoyReal;
+  } else {
+    try {
+      const guardada = sessionStorage.getItem('forja_fecha_activa');
+      if (guardada && /^\d{4}-\d{2}-\d{2}$/.test(guardada)) {
+        fechaVista = guardada;
+      } else if (!fechaVista) {
+        fechaVista = hoyReal;
+      }
+    } catch (_) {
+      if (!fechaVista) fechaVista = hoyReal;
+    }
   }
+
+  // Persistir la fecha actual en sessionStorage para sincronizar con Registrar y Comida
+  try {
+    sessionStorage.setItem('forja_fecha_activa', fechaVista);
+  } catch (_) {}
+
   const hoyStr = fechaVista;
 
   const pantalla = h('div', { class: 'pantalla hoy-pantalla' });
@@ -80,21 +97,29 @@ export async function montar(contenedor, params = []) {
       gap: 4px;
       margin-top: 4px;
     }
+    /* MEDIO-01: Evitar colisión en 360 px con flex-wrap y elipsis */
     .hoy-saludo-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
+      flex-wrap: wrap;
     }
     .hoy-saludo {
       font-size: 14px;
       color: var(--sutil, #5D5951);
       font-weight: 500;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1 1 140px;
     }
     .hoy-fecha-controles {
       display: flex;
       align-items: center;
       gap: 4px;
+      flex-shrink: 0;
     }
     .hoy-btn-dia {
       min-width: 48px;
@@ -144,10 +169,10 @@ export async function montar(contenedor, params = []) {
     }
     .chip-nutricion {
       flex: 1;
-      min-height: 52px;
+      min-height: 60px;
       background-color: var(--superficie2, #E9E4D8);
-      border-radius: 999px;
-      padding: 10px 16px;
+      border-radius: 28px;
+      padding: 10px 14px;
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -162,31 +187,81 @@ export async function montar(contenedor, params = []) {
     .chip-nutricion-info {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      font-weight: 600;
+      align-items: baseline;
+      font-size: 13px;
+      font-weight: 700;
       color: var(--texto, #17171A);
       gap: 4px;
     }
     .chip-nutricion-info span.meta-sutil {
       color: var(--sutil, #5D5951);
       font-weight: 500;
+      font-size: 11px;
     }
-    .chip-agua-menos {
-      min-width: 28px;
-      height: 22px;
+    /* ALTO-01 y MEDIO-02: Botones de agua independientes con touch target >= 48px */
+    .chip-agua-contenedor {
+      flex: 1;
+      min-height: 60px;
+      background-color: var(--superficie2, #E9E4D8);
+      border-radius: 28px;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .chip-agua-fila-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .chip-agua-texto {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .chip-agua-cantidad {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--texto, #17171A);
+      line-height: 1.1;
+    }
+    .chip-agua-meta-sub {
+      font-size: 11px;
+      color: var(--sutil, #5D5951);
+      font-weight: 500;
+    }
+    .chip-agua-botones {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .chip-agua-btn-touch {
+      min-width: 44px;
+      min-height: 44px;
+      width: 44px;
+      height: 44px;
       border-radius: 999px;
       border: none;
       background-color: var(--fondo, #F3F0E8);
       color: var(--texto, #17171A);
       font-family: inherit;
-      font-size: 12px;
+      font-size: 15px;
       font-weight: 800;
-      cursor: pointer;
-      padding: 0 6px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: transform 120ms ease, background-color 120ms ease;
+    }
+    .chip-agua-btn-touch:active {
+      transform: scale(0.92);
+      background-color: var(--lima, #C8F03C);
+    }
+    .chip-agua-btn-touch.sumar {
+      background-color: var(--lima, #C8F03C);
+      color: #17171A;
     }
     .progress-bar-track {
       width: 100%;
@@ -275,6 +350,11 @@ export async function montar(contenedor, params = []) {
       font-weight: 700;
       line-height: 1;
       color: var(--lima, #C8F03C);
+    }
+    /* CRÍTICO-02: Contraste legible de micro-label sobre fondo beige de la tarjeta de descanso */
+    .hoy-descanso-card .micro-label {
+      color: var(--sutil, #5D5951);
+      letter-spacing: 0.14em;
     }
     .hero-exercise-title {
       font-family: 'Instrument Serif', Georgia, serif;
@@ -425,7 +505,7 @@ export async function montar(contenedor, params = []) {
   `);
   pantalla.appendChild(estilo);
 
-  // Cargar datos en paralelo incluyendo diario-AAAA-MM-DD para pasos y sueño (M-03)
+  // Cargar datos en paralelo incluyendo diario-AAAA-MM-DD para pasos y sueño
   const [
     datosPerfil,
     datosRutina,
@@ -476,7 +556,6 @@ export async function montar(contenedor, params = []) {
       textoMetaEm = '¡Hoy es el día';
       textoMetaResto = `de ${nombreMeta}!`;
     } else {
-      // Corrección B-03: evitar texto negativo cuando la meta ya se alcanzó
       textoMetaEm = '¡Meta alcanzada!';
       textoMetaResto = nombreMeta;
     }
@@ -485,6 +564,7 @@ export async function montar(contenedor, params = []) {
     textoMetaResto = datosPerfil.metaNombre;
   }
 
+  // Controles de navegación de fecha con sincronización en sessionStorage (A2-02)
   const controlesFecha = h('div', { class: 'hoy-fecha-controles' },
     h('button', {
       class: 'hoy-btn-dia',
@@ -493,6 +573,7 @@ export async function montar(contenedor, params = []) {
       on: {
         click: async () => {
           fechaVista = desplazarFechaISO(hoyStr, -1);
+          try { sessionStorage.setItem('forja_fecha_activa', fechaVista); } catch (_) {}
           await montar(contenedor, [fechaVista]);
         }
       }
@@ -503,6 +584,7 @@ export async function montar(contenedor, params = []) {
       on: {
         click: async () => {
           fechaVista = hoyReal;
+          try { sessionStorage.setItem('forja_fecha_activa', fechaVista); } catch (_) {}
           await montar(contenedor, []);
         }
       }
@@ -514,6 +596,7 @@ export async function montar(contenedor, params = []) {
       on: {
         click: async () => {
           fechaVista = desplazarFechaISO(hoyStr, 1);
+          try { sessionStorage.setItem('forja_fecha_activa', fechaVista); } catch (_) {}
           await montar(contenedor, [fechaVista]);
         }
       }
@@ -534,7 +617,7 @@ export async function montar(contenedor, params = []) {
   pantalla.appendChild(headerHoy);
 
   // ==========================================
-  // 2. CHIPS DEL DÍA: PROTEÍNA, AGUA, PASOS Y SUEÑO (M-03 y B-01)
+  // 2. CHIPS DEL DÍA: PROTEÍNA, AGUA, PASOS Y SUEÑO
   // ==========================================
   const proteinaMeta = Number(datosPerfil?.proteina || 128);
   const proteinaTotalHoy = comidasHoy.reduce((acc, c) => acc + (Number(c.proteina) || 0), 0);
@@ -546,38 +629,37 @@ export async function montar(contenedor, params = []) {
   const aguaLitros = (vasosActuales * 0.25).toFixed(1);
   const metaAguaLitros = (aguaMetaVasos * 0.25).toFixed(1);
 
+  // Fila de Nutrición: Proteína y Agua (ALTO-01 y MEDIO-02 resueltos con controles accesibles)
   const filaNutricion = h('div', { class: 'chips-nutricion-row' },
-    // Chip Proteína (tocar navega a #comida)
+    // Chip Proteína (tocar navega a #comida sincronizando fecha)
     h('div', {
       class: 'chip-nutricion',
-      on: { click: () => ir('#comida') }
+      on: {
+        click: () => {
+          try { sessionStorage.setItem('forja_fecha_activa', hoyStr); } catch (_) {}
+          ir('#comida');
+        }
+      }
     },
       h('div', { class: 'chip-nutricion-info' },
-        h('span', {}, `${Math.round(proteinaTotalHoy)} g proteína`),
-        h('span', { class: 'meta-sutil' }, `/ ${proteinaMeta} g`)
+        h('span', {}, `${Math.round(proteinaTotalHoy)} g`),
+        h('span', { class: 'meta-sutil' }, `/ ${proteinaMeta} g prote`)
       ),
       h('div', { class: 'progress-bar-track' },
         h('div', { class: 'progress-bar-fill', style: `width: ${pctProteina}%;` })
       )
     ),
-    // Chip Agua (tocar suma +1 vaso, botón − permite restar si se tocó por error: B-01)
-    h('div', {
-      class: 'chip-nutricion',
-      on: {
-        click: async () => {
-          const nuevoTotal = vasosActuales + 1;
-          await ponerAjuste('agua-' + hoyStr, nuevoTotal);
-          aviso(`+1 vaso de agua (${nuevoTotal}/${aguaMetaVasos})`, 'ok');
-          await montar(contenedor, params);
-        }
-      }
-    },
-      h('div', { class: 'chip-nutricion-info' },
-        h('span', {}, `${aguaLitros} L agua`),
-        h('div', { style: 'display: flex; align-items: center; gap: 6px;' },
+    // Tarjeta Agua con botones dedicados de 44-48 px
+    h('div', { class: 'chip-agua-contenedor' },
+      h('div', { class: 'chip-agua-fila-top' },
+        h('div', { class: 'chip-agua-texto' },
+          h('span', { class: 'chip-agua-cantidad' }, `${aguaLitros} L agua`),
+          h('span', { class: 'chip-agua-meta-sub' }, `meta: ${metaAguaLitros} L`)
+        ),
+        h('div', { class: 'chip-agua-botones' },
           vasosActuales > 0 ? h('button', {
             type: 'button',
-            class: 'chip-agua-menos',
+            class: 'chip-agua-btn-touch',
             'aria-label': 'Restar 1 vaso de agua',
             on: {
               click: async (e) => {
@@ -588,8 +670,21 @@ export async function montar(contenedor, params = []) {
                 await montar(contenedor, params);
               }
             }
-          }, '−1') : null,
-          h('span', { class: 'meta-sutil' }, `/ ${metaAguaLitros} L`)
+          }, '−') : null,
+          h('button', {
+            type: 'button',
+            class: 'chip-agua-btn-touch sumar',
+            'aria-label': 'Sumar 1 vaso de agua',
+            on: {
+              click: async (e) => {
+                e.stopPropagation();
+                const nuevoTotal = vasosActuales + 1;
+                await ponerAjuste('agua-' + hoyStr, nuevoTotal);
+                aviso(`+1 vaso de agua (${nuevoTotal}/${aguaMetaVasos})`, 'ok');
+                await montar(contenedor, params);
+              }
+            }
+          }, '+')
         )
       ),
       h('div', { class: 'progress-bar-track' },
@@ -599,7 +694,7 @@ export async function montar(contenedor, params = []) {
   );
   pantalla.appendChild(filaNutricion);
 
-  // Segunda fila de chips del día: Pasos (manual) y Sueño (manual) en diario-AAAA-MM-DD (M-03)
+  // Segunda fila de chips del día: Pasos (manual) y Sueño (manual) en diario-AAAA-MM-DD
   const pasosMeta = Number(datosPerfil?.pasos || 9000);
   const pasosHoy = Number(diarioHoy?.pasos || 0);
   const pctPasos = Math.min(100, Math.round((pasosHoy / pasosMeta) * 100));
@@ -643,8 +738,8 @@ export async function montar(contenedor, params = []) {
       }
     },
       h('div', { class: 'chip-nutricion-info' },
-        h('span', {}, `${pasosHoy} pasos`),
-        h('span', { class: 'meta-sutil' }, `/ ${pasosMeta}`)
+        h('span', {}, `${pasosHoy}`),
+        h('span', { class: 'meta-sutil' }, `/ ${pasosMeta} pasos`)
       ),
       h('div', { class: 'progress-bar-track' },
         h('div', { class: 'progress-bar-fill', style: `width: ${pctPasos}%;` })
@@ -686,8 +781,8 @@ export async function montar(contenedor, params = []) {
       }
     },
       h('div', { class: 'chip-nutricion-info' },
-        h('span', {}, `${suenoHoy != null ? suenoHoy + ' h' : '— h'} sueño`),
-        h('span', { class: 'meta-sutil' }, `/ ${suenoMeta} h`)
+        h('span', {}, `${suenoHoy != null ? suenoHoy + ' h' : '— h'}`),
+        h('span', { class: 'meta-sutil' }, `/ ${suenoMeta} h sueño`)
       ),
       h('div', { class: 'progress-bar-track' },
         h('div', { class: 'progress-bar-fill', style: `width: ${pctSueno}%;` })
@@ -702,7 +797,12 @@ export async function montar(contenedor, params = []) {
   const accesosSecundarios = h('div', { class: 'hoy-acciones-secundarias' },
     h('button', {
       class: 'hoy-pildora-link',
-      on: { click: () => ir('#comida') }
+      on: {
+        click: () => {
+          try { sessionStorage.setItem('forja_fecha_activa', hoyStr); } catch (_) {}
+          ir('#comida');
+        }
+      }
     },
       icono('comida'),
       h('span', {}, 'Registrar comida')
@@ -723,6 +823,7 @@ export async function montar(contenedor, params = []) {
   // ==========================================
   const ejerciciosHoy = Array.isArray(rutinaHoy?.ejercicios) ? rutinaHoy.ejercicios : [];
   let primerPendiente = null;
+  let todosCompletados = false;
 
   if (ejerciciosHoy.length > 0) {
     // Clasificar ejercicios: completados vs pendientes hoy
@@ -760,9 +861,9 @@ export async function montar(contenedor, params = []) {
         resumenUltima = `${cargaTxt} · ${repsLista}`;
       }
 
-      // Resumen de peso sugerido con doble progresión
+      // Resumen de peso sugerido con doble progresión (+1 rep cuando no llegó al tope)
       const textoSugerido = sugerencia.kg != null
-        ? `Hoy: ${formatearCargaSerie(sugerencia)} × ${sugerencia.reps}`
+        ? `Sugerido: ${formatearCargaSerie(sugerencia)} × ${sugerencia.reps}`
         : `Objetivo: ${sugerencia.reps} reps`;
 
       return {
@@ -778,20 +879,27 @@ export async function montar(contenedor, params = []) {
       };
     });
 
-    // Encontrar el primer ejercicio que aún falta hoy
+    todosCompletados = datosEjerciciosHoy.every(d => d.completadoHoy);
+
+    // Encontrar el primer ejercicio que aún falta hoy, o el primero si todos están listos
     primerPendiente = datosEjerciciosHoy.find(d => !d.completadoHoy) || datosEjerciciosHoy[0];
 
     const restantes = datosEjerciciosHoy.filter(d => d.item.id !== primerPendiente.item.id);
 
-    // TARJETA-VIDEO grande (alto 420px, radio 28, degradado oscuro abajo, nombre en serif blanco, píldora con última vez)
-    // Corrección A-01: ir directamente a #registrar/<ejercicioId>
+    // TARJETA HÉROE grande (alto 420px, radio 28, degradado oscuro abajo, nombre en serif blanco, píldora con última vez)
+    // Sincroniza fecha activa con sessionStorage antes de navegar
     const ejHeroId = primerPendiente.item.id;
     const rutaVideo = primerPendiente.ejInfo.video || null;
     const rutaFotoHero = primerPendiente.ejInfo.imagen || null;
 
     const tarjetaVideoHero = h('div', {
       class: 'hero-exercise-card',
-      on: { click: () => ir('#registrar/' + ejHeroId) }
+      on: {
+        click: () => {
+          try { sessionStorage.setItem('forja_fecha_activa', hoyStr); } catch (_) {}
+          ir('#registrar/' + ejHeroId);
+        }
+      }
     },
       rutaVideo
         ? h('video', Object.assign({
@@ -804,10 +912,12 @@ export async function montar(contenedor, params = []) {
           }, rutaFotoHero ? { poster: rutaFotoHero } : {}))
         : (rutaFotoHero
           ? h('img', { src: rutaFotoHero, class: 'media-treated', alt: primerPendiente.ejInfo.nombre, style: 'object-fit: cover;' })
-          : h('div')),
+          : h('div', { style: 'width: 100%; height: 100%; background: linear-gradient(135deg, #232328 0%, #17171A 100%);' })),
       h('div', { class: 'hero-exercise-gradient' }),
       h('div', { class: 'hero-exercise-content' },
-        h('span', { class: 'micro-label' }, primerPendiente.completadoHoy ? 'COMPLETADO HOY' : 'PRIMER EJERCICIO'),
+        h('span', { class: 'micro-label' },
+          todosCompletados ? '¡SESIÓN COMPLETADA!' : (primerPendiente.completadoHoy ? 'COMPLETADO HOY' : 'PRIMER EJERCICIO')
+        ),
         h('h3', { class: 'hero-exercise-title' }, primerPendiente.ejInfo.nombre || ejHeroId),
         h('div', { class: 'hero-exercise-pills' },
           h('div', { class: 'hero-exercise-pill' }, primerPendiente.resumenUltima),
@@ -818,7 +928,6 @@ export async function montar(contenedor, params = []) {
     pantalla.appendChild(tarjetaVideoHero);
 
     // CARRUSEL HORIZONTAL de los demás ejercicios del día como fotos verticales
-    // Corrección A-01: cada tarjeta abre su propio ejercicio en #registrar/<id>
     if (restantes.length > 0) {
       pantalla.appendChild(h('h4', { class: 'section-headline' }, 'A continuación'));
 
@@ -830,7 +939,12 @@ export async function montar(contenedor, params = []) {
 
         const miniCard = h('div', {
           class: 'mini-exercise-card',
-          on: { click: () => ir('#registrar/' + otroId) }
+          on: {
+            click: () => {
+              try { sessionStorage.setItem('forja_fecha_activa', hoyStr); } catch (_) {}
+              ir('#registrar/' + otroId);
+            }
+          }
         },
           fotoOtro ? h('img', { src: fotoOtro, alt: otro.ejInfo.nombre, class: 'media-treated' }) : h('div'),
           h('div', { class: 'mini-exercise-gradient' }),
@@ -848,6 +962,7 @@ export async function montar(contenedor, params = []) {
     }
   } else {
     // Tarjeta editorial de descanso si no hay rutina programada hoy
+    // CRÍTICO-02: micro-label con contraste >= 4.5:1 en CSS (.hoy-descanso-card .micro-label)
     const tarjetaDescanso = h('div', { class: 'hoy-descanso-card' },
       h('div', {},
         h('span', { class: 'micro-label' }, 'RECUPERACIÓN ACTIVA'),
@@ -864,14 +979,26 @@ export async function montar(contenedor, params = []) {
   }
 
   // ==========================================
-  // 5. BOTÓN LIMA «EMPEZAR A REGISTRAR» (A-01)
+  // 5. BOTÓN PRINCIPAL LIMA CANÓNICO
+  //    (M2-03: si la rutina está 100% completada hoy, felicita e invita a ver Progreso)
   // ==========================================
-  const rutaRegistrar = primerPendiente ? `#registrar/${primerPendiente.item.id}` : '#registrar';
+  let textoBtn = 'Empezar a registrar';
+  let accionBtn = () => {
+    try { sessionStorage.setItem('forja_fecha_activa', hoyStr); } catch (_) {}
+    const ruta = primerPendiente ? `#registrar/${primerPendiente.item.id}` : '#registrar';
+    ir(ruta);
+  };
+
+  if (todosCompletados) {
+    textoBtn = '¡Entrenamiento completado! · Ver progreso';
+    accionBtn = () => ir('#progreso');
+  }
+
   const btnRegistrar = h('button', {
     class: 'btn-primary-lima',
-    on: { click: () => ir(rutaRegistrar) }
+    on: { click: accionBtn }
   },
-    h('span', {}, 'Empezar a registrar'),
+    h('span', {}, textoBtn),
     h('div', { class: 'btn-icon-bubble' },
       icono('flecha-derecha')
     )

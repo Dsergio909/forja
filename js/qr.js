@@ -24,15 +24,15 @@ function gfMul(a, b) {
   return EXP[LOG[a] + LOG[b]];
 }
 
-// Generador de polinomios Reed-Solomon
+// Generador de polinomios Reed-Solomon en potencias decrecientes de x
 function getRsGeneratorPoly(ecCount) {
   let poly = [1];
   for (let i = 0; i < ecCount; i++) {
     const root = EXP[i];
     const next = new Array(poly.length + 1).fill(0);
     for (let j = 0; j < poly.length; j++) {
-      next[j] ^= gfMul(poly[j], root);
-      next[j + 1] ^= poly[j];
+      next[j] ^= poly[j];
+      next[j + 1] ^= gfMul(poly[j], root);
     }
     poly = next;
   }

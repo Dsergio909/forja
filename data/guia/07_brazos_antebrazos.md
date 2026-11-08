@@ -62,7 +62,7 @@
 1. **Triceps brachii hypertrophy is substantially greater after elbow extension training performed in the overhead versus neutral arm position**
    * *Autores:* Maeo, S., Wu, Y., Huang, M., Sakurai, H., Kusagawa, Y., Sugiyama, T., Kanehisa, H., & Isaka, T.
    * *Año:* 2022
-   * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/35802081/
+   * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/35819335/
    * *Tipo:* Estudio experimental controlado aleatorizado (medición por resonancia magnética MRI).
 2. **Hypertrophic Effects of Single- Versus Multi-Joint Exercise of the Limb Muscles: A Systematic Review and Meta-analysis**
    * *Autores:* Rosa, A., Vazquez, G., Grgic, J., Balachandran, A. T., Orazem, J., & Schoenfeld, B. J.
@@ -72,13 +72,8 @@
 3. **Calculating Set-Volume for the Limb Muscles with the Performance of Multi-Joint Exercises: Implications for Resistance Training Prescription**
    * *Autores:* Schoenfeld, B. J., Contreras, B., Krieger, J., Grgic, J., Delcastillo, K., Belliard, R., & Alto, A.
    * *Año:* 2019
-   * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/31342424/
+   * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/31336594/
    * *Tipo:* Revisión sistemática y consenso de expertos.
-4. **Partial range of motion training in the early or late phase of elbow flexion to induce hypertrophy**
-   * *Autores:* Pedrosa, G. F., Simões, M. G., Figueiredo, M. O. C., Lacerda, L. T., Schoenfeld, B. J., Perez, N., Chagas, M. H., & Diniz, R. C. R.
-   * *Año:* 2023
-   * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/37021571/
-   * *Tipo:* Estudio experimental controlado aleatorizado.
 5. **Longer Interset Rest Periods Enhance Muscle Strength and Hypertrophy in Resistance-Trained Men**
    * *Autores:* Schoenfeld, B. J., Pope, Z. K., Benik, F. M., Hester, G. M., Sellers, J., Nooner, J. L., Schnaiter, J. A., Bond-Williams, K. E., Carter, A. S., Ross, C. L., Just, B. L., Henselmans, M., & Krieger, J. W.
    * *Año:* 2016
@@ -89,11 +84,6 @@
    * *Año:* 2017
    * *Enlace:* https://jissn.biomedcentral.com/articles/10.1186/s12970-017-0177-8
    * *Tipo:* Posicionamiento oficial de consenso institucional (ISSN).
-7. **The effect of range of motion on muscle hypertrophy and maximal strength: A systematic review and meta-analysis**
-   * *Autores:* Wolf, M., Androulakis-Korakakis, P., Fisher, J. P., Gentil, P., & Steele, J.
-   * *Año:* 2023
-   * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/37610619/
-   * *Tipo:* Metaanálisis y revisión sistemática.
 8. **The Bayesian Curl: Biomechanics and Technique**
    * *Autor:* Henselmans, Menno
    * *Año:* 2021

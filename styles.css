@@ -444,13 +444,14 @@ html, body {
   transform: scale(0.97);
 }
 
+/* ALTO-04 (diseno Ronda 2): Terracota profundo #B83218 para contraste > 5.8:1 sobre texto blanco */
 .btn.peligro {
-  background-color: var(--alerta);
+  background-color: #B83218;
   color: #FFFFFF;
 }
 
 .btn.peligro:active {
-  background-color: #cf4930;
+  background-color: #992610;
   transform: scale(0.97);
 }
 

@@ -246,24 +246,46 @@ export function clasificarPregunta(texto) {
     return { tipo: 'QUE_TOCA_HOY' };
   }
 
-  // 4. «¿qué peso uso en X?» y variantes
+  // 4. Preguntas de peso corporal y medidas (COA-NEW-02: interceptar antes de PESO_USO)
+  if (
+    /^(mi peso|peso|peso actual|peso corporal|cintura|mi cintura|mis medidas|medidas|grasa|mi grasa)\b/.test(n) ||
+    /\b(mi peso|peso actual|peso corporal|cuanto peso|cuanto estoy pesando|pesando actualmente|que peso tengo|cuanto peso tengo)\b/.test(n) ||
+    /\b(cuanto he (bajado|subido|perdido)|cuanto (baje|subi|perdi)|he (bajado|subido|perdido)|kilos (menos|mas|bajados|perdidos)|peso (perdido|ganado|bajado|subido))\b/.test(n) ||
+    /\b(mi cintura|cintura actual|medida de cintura|cuanto mide mi cintura|cuanto tengo de cintura)\b/.test(n) ||
+    /\b(mis medidas|medidas corporales|mis medidas actuales|como van mis medidas|registro de medidas)\b/.test(n) ||
+    /\b(mi grasa|grasa corporal|porcentaje de grasa|grasa navy)\b/.test(n)
+  ) {
+    if (/\b(cintura)\b/.test(n)) return { tipo: 'MEDIDAS_CORPORALES', subtipo: 'cintura' };
+    if (/\b(grasa)\b/.test(n)) return { tipo: 'MEDIDAS_CORPORALES', subtipo: 'grasa' };
+    if (/\b(medidas)\b/.test(n)) return { tipo: 'MEDIDAS_CORPORALES', subtipo: 'general' };
+    return { tipo: 'MEDIDAS_CORPORALES', subtipo: 'peso' };
+  }
+
+  // 5. «¿qué peso uso en X?» y variantes
   let m = n.match(/(?:que|cuanto|cual)\s+peso\s+(?:uso|pongo|meto|toca|hago|debo\s+usar)?\s*(?:en|para|a|de)?\s*(.+)/) ||
           n.match(/(?:cuanto\s+le\s+(?:meto|pongo|tiro|subo)\s+(?:a|en)?\s*|peso\s+sugerido\s+(?:en|para|de)?\s*|con\s+cuanto\s+(?:peso\s+)?hago\s*|peso\s+(?:en|para|de)\s*)(.+)/) ||
           n.match(/(?:que\s+peso\s+(?:le\s+)?(?:pongo|meto|uso|tiro)\s*(?:a|en|para)?\s*)(.+)/);
-  if (m) return { tipo: 'PESO_USO', termino: m[1].trim() };
+  if (m) {
+    const term = m[1].trim();
+    if (!/\b(actual|corporal|corporales|hoy|ayer|semana|meta|perdi|subi|baje|bajado|subido|perdido|cuerpo|cintura|grasa|tengo)\b/.test(term)) {
+      return { tipo: 'PESO_USO', termino: term };
+    }
+  }
 
-  // 5. «¿cuándo fue la última vez que hice X?» y variantes
+  // 6. «¿cuándo fue la última vez que hice X?» y variantes
   m = n.match(/(?:cuando\s+fue\s+(?:la\s+)?ultima\s+vez\s+(?:que\s+hice|que\s+entrene|que\s+hago|de)?\s*|ultima\s+vez\s+(?:que\s+hice|que\s+entrene|de)?\s*|cuando\s+(?:hice|entrene)\s*|ultimo\s+entreno\s+de\s*)(.+)/);
   if (m) return { tipo: 'ULTIMA_VEZ', termino: m[1].trim() };
 
-  // 6. «¿cómo se hace X?» y variantes
+  // 7. «¿cómo se hace X?» y variantes
   m = n.match(/(?:como\s+(?:se\s+hace|hago|hacer|ejecuto|ejecutar|realizar|se\s+realiza|es\s+la\s+tecnica|es)|tecnica\s+de|pasos\s+de|claves\s+de|instrucciones\s+(?:para|de)|guia\s+de)\s*(.+)/);
   if (m) return { tipo: 'COMO_SE_HACE', termino: m[1].trim() };
 
-  // Reconocimiento flexible por palabras clave
+  // Reconocimiento flexible por palabras clave (COA-NEW-02: solo para ejercicios si no se refieren a medidas corporales)
   if (/\b(peso|kilos|kg)\b/.test(n)) {
     const term = n.replace(/\b(que|cual|cuanto|le|debo|usar|uso|pongo|meto|hago|peso|kilos|kg|en|para|a|de|con)\b/g, ' ').replace(/\s+/g, ' ').trim();
-    if (term) return { tipo: 'PESO_USO', termino: term };
+    if (term && term.length >= 3 && !/\b(actual|corporal|corporales|hoy|ayer|semana|meta|perdi|subi|baje|bajado|subido|perdido|cuerpo|cintura|grasa|tengo)\b/.test(term)) {
+      return { tipo: 'PESO_USO', termino: term };
+    }
   }
   if (/\b(tecnica|forma|ejecucion|pasos|claves)\b/.test(n)) {
     const term = n.replace(/\b(tecnica|forma|ejecucion|pasos|claves|como|se|hace|hacer|de|del|en|para|la|el|los|las)\b/g, ' ').replace(/\s+/g, ' ').trim();
@@ -420,14 +442,52 @@ async function responderQueTocaHoy() {
   return txt;
 }
 
+/**
+ * COA-NEW-01: Búsqueda de última vez por grupo muscular (pecho, espalda, pierna, etc.)
+ * Mapea nombres coloquiales a la terminología anatómica utilizada en data/ejercicios.json
+ * y compara mediante inclusión sobre musculos_principales, musculos_secundarios y temas.
+ */
 async function responderUltimaVez(termino) {
   const ejs = await datos.ejercicios();
-  const musculos = ['pecho', 'espalda', 'pierna', 'piernas', 'hombro', 'hombros', 'biceps', 'triceps', 'cuadriceps', 'isquios', 'femoral', 'gluteo', 'gemelos', 'abdomen'];
+  const musculos = [
+    'piernas', 'pierna', 'cuadriceps', 'isquios', 'femoral', 'gluteo', 'gemelos',
+    'hombros', 'hombro', 'espalda', 'pecho', 'biceps', 'triceps', 'abdomen',
+    'brazos', 'brazo', 'torso'
+  ];
   const norm = normalizar(termino);
   const esMusc = musculos.find(m => norm.includes(m));
 
   if (esMusc) {
-    const ejsM = ejs.filter(e => (e.musculos_principales || []).map(normalizar).includes(esMusc) || (e.musculos_secundarios || []).map(normalizar).includes(esMusc));
+    const MAPA_GRUPOS = {
+      pecho: ['pectoral', 'pecho'],
+      espalda: ['dorsal', 'dorsal ancho', 'romboides', 'trapecio', 'espalda'],
+      pierna: ['cuadriceps', 'femoral', 'isquio', 'gluteo', 'gemelo', 'pantorrilla', 'pierna'],
+      piernas: ['cuadriceps', 'femoral', 'isquio', 'gluteo', 'gemelo', 'pantorrilla', 'pierna'],
+      hombro: ['deltoides', 'hombro'],
+      hombros: ['deltoides', 'hombro'],
+      biceps: ['biceps', 'braquial'],
+      triceps: ['triceps'],
+      cuadriceps: ['cuadriceps'],
+      isquios: ['isquio', 'femoral'],
+      femoral: ['femoral', 'isquio'],
+      gluteo: ['gluteo'],
+      gemelos: ['gemelo', 'pantorrilla', 'gastrocnemio', 'soleo'],
+      abdomen: ['abdomen', 'core', 'abdominal'],
+      brazo: ['biceps', 'triceps', 'braquial', 'antebrazo'],
+      brazos: ['biceps', 'triceps', 'braquial', 'antebrazo'],
+      torso: ['pectoral', 'pecho', 'dorsal', 'romboides', 'trapecio', 'deltoides']
+    };
+
+    const terminosBusqueda = MAPA_GRUPOS[esMusc] || [esMusc];
+    const ejsM = ejs.filter(e => {
+      const muscList = [
+        ...(e.musculos_principales || []),
+        ...(e.musculos_secundarios || []),
+        ...(e.temas || [])
+      ].map(normalizar);
+      return muscList.some(m => terminosBusqueda.some(t => m.includes(t)));
+    });
+
     const ids = new Set(ejsM.map(e => e.id));
     const series = await db.filtrar('series', s => ids.has(s.ejercicioId));
     if (!series.length) return `Aún no tienes entrenamientos registrados para **${esMusc}**.`;
@@ -478,6 +538,112 @@ async function responderComoSeHace(termino) {
   return txt;
 }
 
+/**
+ * COA-NEW-02: Responde consultas de peso corporal, baja/subida de peso y medidas
+ * evitando que sean tratadas erróneamente como pedidos de peso para ejercicios.
+ */
+async function responderMedidas(subtipo = 'peso') {
+  const [medidas, perfil] = await Promise.all([
+    db.todos('medidas'),
+    datos.perfil()
+  ]);
+
+  if (!medidas?.length) {
+    return 'Aún no has registrado medidas corporales en la pestaña **Cuerpo**.\n\nPuedes anotar allí tu peso en ayunas, cintura, cuello y otras medidas para ver tu evolución y tendencias.';
+  }
+
+  const medidasOrdenadas = [...medidas].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+  const vPeso = medidasOrdenadas.filter(m => m.peso != null).map(m => ({ fecha: m.fecha, valor: Number(m.peso) }));
+  const vCint = medidasOrdenadas.filter(m => m.cintura != null).map(m => ({ fecha: m.fecha, valor: Number(m.cintura) }));
+  const ultMedida = medidasOrdenadas[medidasOrdenadas.length - 1];
+  const ultP = vPeso[vPeso.length - 1];
+  const primP = vPeso[0];
+  const ultC = vCint[vCint.length - 1];
+  const primC = vCint[0];
+  const tPeso = calculos.tendenciaSemanal(vPeso);
+  const tCint = calculos.tendenciaSemanal(vCint);
+
+  if (subtipo === 'cintura') {
+    if (!ultC) {
+      return 'Aún no tienes registros de **cintura** en la pestaña **Cuerpo**.\n\nMide tu cintura a la altura del ombligo en ayunas para estimar tu progreso y % de grasa.';
+    }
+    let txt = `**Medida de cintura**:\n\n• **Cintura actual**: **${ultC.valor} cm** (${ui.fechaBonita(ultC.fecha)})\n`;
+    if (vCint.length > 1 && primC) {
+      const diffCint = ultC.valor - primC.valor;
+      if (Math.abs(diffCint) < 0.1) {
+        txt += `• **Cambio total**: Mantienes tu cintura inicial de **${primC.valor} cm** (${ui.fechaBonita(primC.fecha)}).\n`;
+      } else if (diffCint < 0) {
+        txt += `• **Cambio total**: Has reducido **${Math.abs(diffCint).toFixed(1)} cm** de cintura desde tu primer registro (${primC.valor} cm el ${ui.fechaBonita(primC.fecha)}).\n`;
+      } else {
+        txt += `• **Cambio total**: Tu cintura aumentó **${diffCint.toFixed(1)} cm** desde tu primer registro (${primC.valor} cm el ${ui.fechaBonita(primC.fecha)}).\n`;
+      }
+    }
+    if (tCint !== null) {
+      txt += `• **Tendencia reciente**: **${tCint > 0 ? '+' : ''}${tCint.toFixed(2)} cm/semana**.\n`;
+    }
+    if (ultP) {
+      txt += `\n*Peso corporal actual: **${ultP.valor} kg** (${ui.fechaBonita(ultP.fecha)})*`;
+    }
+    return txt;
+  }
+
+  if (subtipo === 'general') {
+    let txt = `**Tus medidas corporales (${ui.fechaBonita(ultMedida.fecha)})**:\n\n`;
+    txt += ultP ? `• **Peso**: **${ultP.valor} kg**\n` : '';
+    txt += ultC ? `• **Cintura**: **${ultC.valor} cm**\n` : '';
+    if (ultMedida.cuello) txt += `• **Cuello**: **${ultMedida.cuello} cm**\n`;
+    if (ultMedida.pecho) txt += `• **Pecho**: **${ultMedida.pecho} cm**\n`;
+    if (ultMedida.brazo) txt += `• **Brazo**: **${ultMedida.brazo} cm**\n`;
+    if (ultMedida.hombros) txt += `• **Hombros**: **${ultMedida.hombros} cm**\n`;
+    if (ultMedida.cadera) txt += `• **Cadera**: **${ultMedida.cadera} cm**\n`;
+    if (ultMedida.grasaNavy) txt += `• **% Grasa (Navy)**: **${ultMedida.grasaNavy}%**\n`;
+
+    if (vPeso.length > 1 && primP && ultP) {
+      const diffP = ultP.valor - primP.valor;
+      txt += `\n**Evolución de peso**: ${diffP < 0 ? `Has bajado **${Math.abs(diffP).toFixed(1)} kg**` : diffP > 0 ? `Has subido **${diffP.toFixed(1)} kg**` : 'Peso estable'} (${primP.valor} kg → ${ultP.valor} kg).`;
+      if (tPeso !== null) txt += `\nTendencia: **${tPeso > 0 ? '+' : ''}${tPeso.toFixed(2)} kg/semana**.`;
+    }
+    return txt;
+  }
+
+  if (subtipo === 'grasa') {
+    let grasa = ultMedida.grasaNavy;
+    if (!grasa && ultC && ultMedida.cuello && perfil?.estaturaCm) {
+      grasa = calculos.grasaNavy(ultC.valor, Number(ultMedida.cuello), Number(perfil.estaturaCm));
+    }
+    if (grasa) {
+      return `**Grasa corporal estimada (Fórmula de la Marina)**:\n\n• **% de grasa**: **${typeof grasa === 'number' ? grasa.toFixed(1) : grasa}%**\n• **Cintura**: ${ultC ? `${ultC.valor} cm` : 'N/D'}\n• **Cuello**: ${ultMedida.cuello ? `${ultMedida.cuello} cm` : 'N/D'}\n• **Estatura**: ${perfil?.estaturaCm ? `${perfil.estaturaCm} cm` : 'N/D'}\n\n*Nota: La fórmula de la Marina de EE. UU. es una estimación aproximada con un margen de error típico de ±3-4%.*`;
+    }
+    return `Para calcular tu % de grasa con la fórmula de la Marina se necesita registrar **cintura** y **cuello** en la pestaña **Cuerpo**, y tu **estatura** en Ajustes.`;
+  }
+
+  // subtipo === 'peso' (por defecto)
+  if (!ultP) {
+    return 'Aún no has registrado tu **peso corporal** en la pestaña **Cuerpo**.\n\nPuedes pesarte en ayunas y anotarlo allí para seguir tu evolución.';
+  }
+
+  let txt = `**Tu peso corporal**:\n\n• **Peso actual**: **${ultP.valor} kg** (${ui.fechaBonita(ultP.fecha)})\n`;
+  if (vPeso.length > 1 && primP) {
+    const diffP = ultP.valor - primP.valor;
+    const dias = Math.round((new Date(ultP.fecha + 'T00:00:00') - new Date(primP.fecha + 'T00:00:00')) / 86400000);
+    const tiempoTxt = dias > 0 ? ` (en ${dias} días, desde el ${ui.fechaBonita(primP.fecha)})` : '';
+    if (Math.abs(diffP) < 0.1) {
+      txt += `• **Cambio total**: Mantienes tu peso inicial de **${primP.valor} kg**${tiempoTxt}.\n`;
+    } else if (diffP < 0) {
+      txt += `• **Cambio total**: Has bajado **${Math.abs(diffP).toFixed(1)} kg**${tiempoTxt} (inicio: ${primP.valor} kg).\n`;
+    } else {
+      txt += `• **Cambio total**: Has subido **${diffP.toFixed(1)} kg**${tiempoTxt} (inicio: ${primP.valor} kg).\n`;
+    }
+  }
+  if (tPeso !== null) {
+    txt += `• **Tendencia semanal**: **${tPeso > 0 ? '+' : ''}${tPeso.toFixed(2)} kg/semana** (últimos 14 días).\n`;
+  }
+  if (ultC) {
+    txt += `• **Cintura**: **${ultC.valor} cm** (${ui.fechaBonita(ultC.fecha)})\n`;
+  }
+  return txt;
+}
+
 // ============================================================================
 // 4. IA LOCAL CON WEBLLM
 // ============================================================================
@@ -496,6 +662,7 @@ async function armarResumenParaIA() {
   const diffMeta = perfil?.metaFecha ? Math.ceil((new Date(perfil.metaFecha + 'T00:00:00') - new Date(hoyISO + 'T00:00:00')) / 86400000) : 'N/D';
 
   const prs = Object.entries(calculos.prs(series)).slice(0, 12).map(([id, p]) => `${ejs.find(e => e.id === id)?.nombre || id}: ${ui.formatoKg(p.kg, p.porLado, p.unidad)} x ${p.reps}`).join('; ');
+  // COA-NEW-03: ordenar cronológicamente de forma ascendente tanto por fecha como por hora ((a.hora || 0) - (b.hora || 0))
   const s14 = series
     .filter(s => s.fecha >= iso14 && s.fecha <= hoyISO)
     .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '') || ((a.hora || 0) - (b.hora || 0)));
@@ -686,7 +853,7 @@ async function responderConIA(pregunta, onChunk, onProgreso) {
 }
 
 function mensajeSugerencias() {
-  return `No encontré una regla directa para esa pregunta.\n\nPuedes preguntarme:\n• **«¿Cómo voy?»** (resumen semanal, PRs, tendencias y proteína)\n• **«¿Qué me toca hoy?»** (rutina programada y pesos sugeridos)\n• **«¿Cuánta proteína llevo?»** (total de hoy vs tu meta)\n• **«¿Qué peso uso en [ejercicio]?»** (doble progresión)\n• **«¿Cuándo fue la última vez que hice [ejercicio]?»**\n• **«¿Cómo se hace [ejercicio]?»** (técnica y claves)\n\n*Para preguntas libres sobre tus datos, activa y descarga la **IA Local** en Ajustes.*`;
+  return `No encontré una regla directa para esa pregunta.\n\nPuedes preguntarme:\n• **«¿Cómo voy?»** (resumen semanal, PRs, tendencias y proteína)\n• **«¿Qué me toca hoy?»** (rutina programada y pesos sugeridos)\n• **«¿Cuánta proteína llevo?»** (total de hoy vs tu meta)\n• **«Mi peso»** o **«¿Cuánto he bajado?»** (peso, cintura y medidas)\n• **«¿Qué peso uso en [ejercicio]?»** (doble progresión)\n• **«¿Cuándo fue la última vez que hice [ejercicio o músculo]?»**\n• **«¿Cómo se hace [ejercicio]?»** (técnica y claves)\n\n*Para preguntas libres sobre tus datos, activa y descarga la **IA Local** en Ajustes.*`;
 }
 
 export async function responder(texto, { onChunk, onProgreso } = {}) {
@@ -695,6 +862,7 @@ export async function responder(texto, { onChunk, onProgreso } = {}) {
     if (c.tipo === 'COMO_VOY') return await responderComoVoy();
     if (c.tipo === 'PROTEINA_LLEVO') return await responderProteinaLlevo();
     if (c.tipo === 'QUE_TOCA_HOY') return await responderQueTocaHoy();
+    if (c.tipo === 'MEDIDAS_CORPORALES') return await responderMedidas(c.subtipo);
     if (c.tipo === 'PESO_USO') return await responderPesoUso(c.termino);
     if (c.tipo === 'ULTIMA_VEZ') return await responderUltimaVez(c.termino);
     if (c.tipo === 'COMO_SE_HACE') return await responderComoSeHace(c.termino);
@@ -789,6 +957,7 @@ export async function montar(contenedor, params = []) {
       chip('¿Cómo voy?', '¿Cómo voy?'),
       chip('¿Qué me toca hoy?', '¿Qué me toca hoy?'),
       chip('¿Cuánta proteína llevo?', '¿Cuánta proteína llevo?'),
+      chip('Mi peso y medidas', 'Mi peso'),
       chip('¿Qué peso uso en...?', '¿Qué peso uso en '),
       chip('¿Cuándo fue la última vez...?', '¿Cuándo fue la última vez que hice '),
       chip('¿Cómo se hace...?', '¿Cómo se hace ')
@@ -868,7 +1037,7 @@ export async function montar(contenedor, params = []) {
     burbuja({
       rol: 'coach',
       hora: Date.now(),
-      texto: '¡Hola! Soy tu coach personal en **Forja**.\n\nPuedes preguntarme cómo vas, qué peso usar hoy con doble progresión, cuánta proteína llevas o la técnica de cualquier ejercicio. Toca una sugerencia arriba o escribe lo que necesites.'
+      texto: '¡Hola! Soy tu coach personal en **Forja**.\n\nPuedes preguntarme cómo vas, tu peso y evolución de medidas, qué peso usar hoy con doble progresión, cuánta proteína llevas o la técnica de cualquier ejercicio. Toca una sugerencia arriba o escribe lo que necesites.'
     });
   }
 

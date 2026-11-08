@@ -23,9 +23,28 @@ import { entenderTexto } from './parser.js';
 import { icono } from './iconos.js';
 
 let contenedorRaiz = null;
-let fechaSeleccionada = hoyISO();
+let fechaSeleccionada = (() => {
+  try {
+    const g = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('forja_fecha_activa') : null;
+    if (g && /^\d{4}-\d{2}-\d{2}$/.test(g)) return g;
+  } catch (_) {}
+  return hoyISO();
+})();
 let listaEjercicios = [];
 let modoActivo = 'serie'; // 'serie' | 'texto' (por defecto serie por serie según v2)
+
+/**
+ * Actualiza la fecha activa en memoria y sincroniza en sessionStorage (A2-02, B-04)
+ * @param {string} nuevaFecha
+ */
+function fijarFechaSeleccionada(nuevaFecha) {
+  fechaSeleccionada = nuevaFecha;
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('forja_fecha_activa', nuevaFecha);
+    }
+  } catch (_) {}
+}
 
 let reconocimientoVoz = null;
 let escuchandoVoz = false;
@@ -154,7 +173,7 @@ async function cargarEstadoParaEjercicio(ejercicioId, fecha) {
       if (ultimaFecha === fecha) {
         const refHoy = seriesUltima[seriesUltima.length - 1];
         estadoSerie.esPesoCorporal = (refHoy.kg === null || refHoy.kg === undefined);
-        estadoSerie.kg = !estadoSerie.esPesoCorporal ? Number(refHoy.kg) : 20;
+        estadoSerie.kg = !estadoSerie.esPesoCorporal ? Number(refHoy.kg) : 0;
         estadoSerie.reps = Number(refHoy.reps) || 8;
         estadoSerie.unidad = refHoy.unidad === 'placa' ? 'placa' : 'kg';
         estadoSerie.porLado = Boolean(refHoy.porLado);
@@ -165,7 +184,7 @@ async function cargarEstadoParaEjercicio(ejercicioId, fecha) {
       const sug = pesoSugerido(seriesUltima, ej || {});
       if (sug) {
         estadoSerie.esPesoCorporal = (sug.kg === null);
-        estadoSerie.kg = sug.kg !== null && !isNaN(Number(sug.kg)) ? Number(sug.kg) : 20;
+        estadoSerie.kg = !estadoSerie.esPesoCorporal && sug.kg !== null && !isNaN(Number(sug.kg)) ? Number(sug.kg) : 0;
         estadoSerie.reps = Number(sug.reps) || 8;
         estadoSerie.unidad = sug.unidad === 'placa' ? 'placa' : 'kg';
         estadoSerie.porLado = Boolean(sug.porLado);
@@ -176,14 +195,14 @@ async function cargarEstadoParaEjercicio(ejercicioId, fecha) {
     // Fallback limpio si falla la lectura de historial
   }
 
-  // Sin historial previo para este ejercicio: inicializar valores limpios según el ejercicio
+  // Sin historial previo para este ejercicio: inicializar valores limpios según el ejercicio (A2-03)
   let sugVacia = null;
   try {
     sugVacia = pesoSugerido([], ej || {});
   } catch (e) {}
 
   estadoSerie.esPesoCorporal = esCorporalPorDefecto(ej);
-  estadoSerie.kg = 20;
+  estadoSerie.kg = estadoSerie.esPesoCorporal ? 0 : 20;
   estadoSerie.reps = Number(sugVacia?.reps) || 8;
   estadoSerie.unidad = 'kg';
   estadoSerie.porLado = Boolean(ej?.equipo && /mancuerna/i.test(ej.equipo));
@@ -675,7 +694,8 @@ function renderBarraFecha() {
     const [y, m, d] = fechaSeleccionada.split('-').map(Number);
     const fechaObj = new Date(y, m - 1, d);
     fechaObj.setDate(fechaObj.getDate() + delta);
-    fechaSeleccionada = `${fechaObj.getFullYear()}-${String(fechaObj.getMonth() + 1).padStart(2, '0')}-${String(fechaObj.getDate()).padStart(2, '0')}`;
+    const nueva = `${fechaObj.getFullYear()}-${String(fechaObj.getMonth() + 1).padStart(2, '0')}-${String(fechaObj.getDate()).padStart(2, '0')}`;
+    fijarFechaSeleccionada(nueva);
     await actualizarUI();
   };
 
@@ -690,12 +710,12 @@ function renderBarraFecha() {
         h('span', { class: 'reg-texto-fecha' }, fechaBonita(fechaSeleccionada)),
         h('input', {
           type: 'date', class: 'reg-input-fecha-oculto', value: fechaSeleccionada,
-          on: { change: async (e) => { if (e.target.value) { fechaSeleccionada = e.target.value; await actualizarUI(); } } }
+          on: { change: async (e) => { if (e.target.value) { fijarFechaSeleccionada(e.target.value); await actualizarUI(); } } }
         })
       ),
       fechaSeleccionada !== hoyISO() ? h('button', {
         class: 'chip alerta reg-btn-hoy',
-        on: { click: async () => { fechaSeleccionada = hoyISO(); await actualizarUI(); } }
+        on: { click: async () => { fijarFechaSeleccionada(hoyISO()); await actualizarUI(); } }
       }, 'Volver a hoy') : null
     ),
     h('button', {
@@ -820,23 +840,68 @@ async function renderModoSerie() {
   const { n, m } = await obtenerNumerosSerie(estadoSerie.ejercicioId, fechaSeleccionada);
   const textoPrevio = (await obtenerTextoUltimaSesion(estadoSerie.ejercicioId, fechaSeleccionada)) || 'Primera vez registrando este ejercicio';
 
-  // 1. Barra superior con selector de ejercicio y chip con badge de serie
+  // 1. Barra superior con selector de ejercicio agrupado (M2-02) y sincronización de hash (B2-02)
   const topBar = h('div', { class: 'registro-top-bar' });
   const select = h('select', {
     class: 'reg-select-ejercicio',
     on: {
       change: async (e) => {
-        await cargarEstadoParaEjercicio(e.target.value, fechaSeleccionada);
+        const nuevoId = e.target.value;
+        try {
+          window.history.replaceState(null, '', `#registrar/${nuevoId}`);
+        } catch (_) {}
+        await cargarEstadoParaEjercicio(nuevoId, fechaSeleccionada);
         await actualizarUI();
       }
     }
   });
 
+  let ejerciciosHoyIds = [];
+  try {
+    const { rutina } = await import('./datos.js');
+    const r = await rutina();
+    const dias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+    const diaSem = dias[new Date().getDay()];
+    const delDia = r?.dias?.[diaSem]?.ejercicios || [];
+    ejerciciosHoyIds = delDia.map(x => x.id);
+  } catch (_) {}
+
+  const setHoy = new Set(ejerciciosHoyIds);
+  const ejerciciosDeHoy = [];
+  const ejerciciosOtros = [];
+
+  for (const idH of ejerciciosHoyIds) {
+    const ej = listaEjercicios.find(e => e.id === idH);
+    if (ej) ejerciciosDeHoy.push(ej);
+  }
+
   for (const ej of listaEjercicios) {
-    select.appendChild(h('option', {
+    if (!setHoy.has(ej.id)) {
+      ejerciciosOtros.push(ej);
+    }
+  }
+  ejerciciosOtros.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+
+  if (ejerciciosDeHoy.length > 0) {
+    const optHoy = document.createElement('optgroup');
+    optHoy.label = 'Rutina de hoy';
+    for (const ej of ejerciciosDeHoy) {
+      optHoy.appendChild(h('option', {
+        value: ej.id, selected: ej.id === estadoSerie.ejercicioId ? 'selected' : undefined
+      }, `${ej.nombre} (${ej.musculos_principales?.[0] || 'General'})`));
+    }
+    select.appendChild(optHoy);
+  }
+
+  const optOtros = document.createElement('optgroup');
+  optOtros.label = ejerciciosDeHoy.length > 0 ? 'Otros ejercicios' : 'Ejercicios';
+  for (const ej of ejerciciosOtros) {
+    optOtros.appendChild(h('option', {
       value: ej.id, selected: ej.id === estadoSerie.ejercicioId ? 'selected' : undefined
     }, `${ej.nombre} (${ej.musculos_principales?.[0] || 'General'})`));
   }
+  select.appendChild(optOtros);
+
   topBar.appendChild(select);
   topBar.appendChild(h('span', { class: 'chip-serie-badge' }, `SERIE ${n} DE ${m}`));
   contenedor.appendChild(topBar);
@@ -864,24 +929,70 @@ async function renderModoSerie() {
     id: 'kgValue'
   }, valorKgTexto));
 
-  const modKg = async (delta) => {
-    if (estadoSerie.esPesoCorporal) estadoSerie.esPesoCorporal = false;
-    const paso = estadoSerie.unidad === 'placa' ? 1 : 2.5;
-    const cambio = delta * paso;
-    estadoSerie.kg = Math.max(0, Math.round((estadoSerie.kg + cambio) * 10) / 10);
-    await actualizarUI();
+  // M2-01: Actualización DOM quirúrgica en steppers y chips sin innerHTML = '' ni recargar video
+  const refrescarDOMKg = () => {
+    const elKgVal = document.getElementById('kgValue');
+    const elKgLabel = cardKg.querySelector('.counter-label');
+    if (elKgVal) {
+      if (estadoSerie.esPesoCorporal) {
+        elKgVal.textContent = 'Corporal';
+        elKgVal.classList.add('texto-corporal');
+      } else {
+        elKgVal.textContent = estadoSerie.kg % 1 === 0 ? String(estadoSerie.kg) : estadoSerie.kg.toFixed(1);
+        elKgVal.classList.remove('texto-corporal');
+      }
+    }
+    if (elKgLabel) {
+      if (estadoSerie.esPesoCorporal) elKgLabel.textContent = 'peso corporal';
+      else if (estadoSerie.unidad === 'placa') elKgLabel.textContent = 'placas';
+      else if (estadoSerie.porLado) elKgLabel.textContent = 'kg / lado';
+      else elKgLabel.textContent = 'kg';
+    }
+    const chipPC = cardKg.querySelector('.chip-pc-toggle');
+    if (chipPC) {
+      if (estadoSerie.esPesoCorporal) chipPC.classList.add('activo');
+      else chipPC.classList.remove('activo');
+    }
+    const chipPlaca = cardKg.querySelector('.chip-placa-toggle');
+    if (chipPlaca) {
+      if (estadoSerie.unidad === 'placa') chipPlaca.classList.add('activo');
+      else chipPlaca.classList.remove('activo');
+    }
+    const chipLado = cardKg.querySelector('.chip-lado-toggle');
+    if (chipLado) {
+      if (estadoSerie.porLado) chipLado.classList.add('activo');
+      else chipLado.classList.remove('activo');
+    }
+  };
+
+  // A2-03: Lastre progresivo gradual desde 2.5 kg en corporales al tocar +
+  const modKg = (delta) => {
+    if (estadoSerie.esPesoCorporal) {
+      estadoSerie.esPesoCorporal = false;
+      estadoSerie.kg = delta > 0 ? (estadoSerie.unidad === 'placa' ? 1 : 2.5) : 0;
+    } else {
+      const paso = estadoSerie.unidad === 'placa' ? 1 : 2.5;
+      const cambio = delta * paso;
+      estadoSerie.kg = Math.max(0, Math.round((estadoSerie.kg + cambio) * 10) / 10);
+      if (estadoSerie.kg === 0 && esCorporalPorDefecto(ejAct)) {
+        estadoSerie.esPesoCorporal = true;
+      }
+    }
+    refrescarDOMKg();
   };
 
   const steppersKg = h('div', { class: 'stepper-controls' },
     h('button', {
+      type: 'button',
       class: 'btn-stepper btn redondo',
       'aria-label': 'Restar carga',
-      on: { click: async () => { await modKg(-1); } }
+      on: { click: () => { modKg(-1); } }
     }, ico('menos')),
     h('button', {
+      type: 'button',
       class: 'btn-stepper btn redondo',
       'aria-label': 'Sumar carga',
-      on: { click: async () => { await modKg(1); } }
+      on: { click: () => { modKg(1); } }
     }, ico('mas'))
   );
   cardKg.appendChild(steppersKg);
@@ -889,31 +1000,39 @@ async function renderModoSerie() {
   // Chips sutiles para tipo de peso
   const chipsPeso = h('div', { class: 'reg-chips-row' },
     h('button', {
-      class: `reg-chip-toggle ${estadoSerie.esPesoCorporal ? 'activo' : ''}`,
+      type: 'button',
+      class: `reg-chip-toggle chip-pc-toggle ${estadoSerie.esPesoCorporal ? 'activo' : ''}`,
       on: {
-        click: async () => {
+        click: () => {
           estadoSerie.esPesoCorporal = !estadoSerie.esPesoCorporal;
-          if (estadoSerie.esPesoCorporal) estadoSerie.unidad = 'kg';
-          await actualizarUI();
+          if (estadoSerie.esPesoCorporal) {
+            estadoSerie.unidad = 'kg';
+            estadoSerie.kg = 0;
+          } else {
+            estadoSerie.kg = 2.5;
+          }
+          refrescarDOMKg();
         }
       }
     }, 'Peso corporal'),
     h('button', {
-      class: `reg-chip-toggle ${estadoSerie.unidad === 'placa' ? 'activo' : ''}`,
+      type: 'button',
+      class: `reg-chip-toggle chip-placa-toggle ${estadoSerie.unidad === 'placa' ? 'activo' : ''}`,
       on: {
-        click: async () => {
+        click: () => {
           estadoSerie.unidad = estadoSerie.unidad === 'placa' ? 'kg' : 'placa';
           if (estadoSerie.unidad === 'placa') estadoSerie.esPesoCorporal = false;
-          await actualizarUI();
+          refrescarDOMKg();
         }
       }
     }, 'Placa'),
     h('button', {
-      class: `reg-chip-toggle ${estadoSerie.porLado ? 'activo' : ''}`,
+      type: 'button',
+      class: `reg-chip-toggle chip-lado-toggle ${estadoSerie.porLado ? 'activo' : ''}`,
       on: {
-        click: async () => {
+        click: () => {
           estadoSerie.porLado = !estadoSerie.porLado;
-          await actualizarUI();
+          refrescarDOMKg();
         }
       }
     }, 'Por lado')
@@ -926,21 +1045,25 @@ async function renderModoSerie() {
   cardReps.appendChild(h('span', { class: 'counter-label' }, 'repeticiones'));
   cardReps.appendChild(h('span', { class: 'counter-number grande', id: 'repsValue' }, String(estadoSerie.reps)));
 
-  const modReps = async (delta) => {
+  // M2-01: Actualización DOM quirúrgica en steppers de reps
+  const modReps = (delta) => {
     estadoSerie.reps = Math.max(1, estadoSerie.reps + delta);
-    await actualizarUI();
+    const elReps = document.getElementById('repsValue');
+    if (elReps) elReps.textContent = String(estadoSerie.reps);
   };
 
   const steppersReps = h('div', { class: 'stepper-controls' },
     h('button', {
+      type: 'button',
       class: 'btn-stepper btn redondo',
       'aria-label': 'Restar repetición',
-      on: { click: async () => { await modReps(-1); } }
+      on: { click: () => { modReps(-1); } }
     }, ico('menos')),
     h('button', {
+      type: 'button',
       class: 'btn-stepper btn redondo',
       'aria-label': 'Sumar repetición',
-      on: { click: async () => { await modReps(1); } }
+      on: { click: () => { modReps(1); } }
     }, ico('mas'))
   );
   cardReps.appendChild(steppersReps);
@@ -1254,6 +1377,7 @@ function renderModoTexto() {
         click: async () => {
           let n = 0, ultimoId = null;
           const sesion = await obtenerOCrearSesion(fechaSeleccionada);
+          const baseHora = Date.now();
 
           for (const item of vistaPreviaItems) {
             if (!item.ejercicioId) continue;
@@ -1265,7 +1389,7 @@ function renderModoTexto() {
               await guardar('series', {
                 id: nuevoId(),
                 fecha: fechaSeleccionada,
-                hora: Date.now(),
+                hora: baseHora + n * 1000,
                 ejercicioId: item.ejercicioId,
                 kg: s.kg !== undefined && s.kg !== null ? Number(s.kg) : item.kg,
                 unidad: uSerie,
@@ -1575,7 +1699,7 @@ function inyectarEstilos() {
     .effort-pill:active { transform: scale(0.95); }
     .effort-pill.selected { background-color: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }
     .effort-pill.fallo-pill { color: #A02B14; }
-    .effort-pill.fallo-pill.selected { background-color: #E2553A; color: var(--papel, #F3F0E8); }
+    .effort-pill.fallo-pill.selected { background-color: #B83218; color: var(--papel, #F3F0E8); }
 
     /* Comparativa previa */
     .previous-record-text { text-align: center; font-size: 14px; color: var(--tinta-suave, #5D5951); margin: 6px 0 10px; font-weight: 400; }
@@ -1612,12 +1736,12 @@ function inyectarEstilos() {
     .reg-timer-flotante-tiempo { font-family: 'Bricolage Grotesque', sans-serif; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--lima, #C8F03C); flex-shrink: 0; }
     .reg-timer-flotante-ej { font-size: 13px; font-weight: 500; color: var(--papel, #F3F0E8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .reg-timer-flotante-acciones { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-    .reg-timer-flotante-btn { min-height: 40px; padding: 0 14px; border-radius: 999px; border: none; background-color: var(--tinta-tarjeta, #232328); color: var(--papel, #F3F0E8); font-family: 'Bricolage Grotesque', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .reg-timer-flotante-btn { min-height: 48px; padding: 0 16px; border-radius: 999px; border: none; background-color: var(--tinta-tarjeta, #232328); color: var(--papel, #F3F0E8); font-family: 'Bricolage Grotesque', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
     .reg-timer-flotante-btn.lima { background-color: var(--lima, #C8F03C); color: var(--tinta, #17171A); }
 
-    /* Chips y ajustes de Modo Serie */
+    /* Chips y ajustes de Modo Serie (ALTO-03: min-height 48px para accesibilidad táctil) */
     .reg-chips-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
-    .reg-chip-toggle { border-radius: 999px; border: none; padding: 8px 14px; min-height: 36px; font-size: 12px; font-weight: 600; background-color: var(--superficie, #F3F0E8); color: var(--texto, #17171A); cursor: pointer; }
+    .reg-chip-toggle { border-radius: 999px; border: none; padding: 0 16px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; background-color: var(--superficie, #F3F0E8); color: var(--texto, #17171A); cursor: pointer; }
     .reg-chip-toggle.activo { background-color: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }
     .reg-campos-extra { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 14px 18px; margin-bottom: 6px; }
 
@@ -1685,6 +1809,14 @@ export async function montar(contenedor, params = []) {
   inyectarEstilos();
   registrarListenersGlobalesTimer();
 
+  // A2-02 / B-04: Sincronizar fecha activa si viene de otra pantalla (Hoy o Comida)
+  try {
+    const guardada = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('forja_fecha_activa') : null;
+    if (guardada && /^\d{4}-\d{2}-\d{2}$/.test(guardada)) {
+      fechaSeleccionada = guardada;
+    }
+  } catch (_) {}
+
   try {
     listaEjercicios = await ejercicios();
     if (!Array.isArray(listaEjercicios)) listaEjercicios = [];
@@ -1701,23 +1833,38 @@ export async function montar(contenedor, params = []) {
     }
     idElegido = params[0];
     modoActivo = 'serie';
-  } else if (!idElegido) {
-    debeRecargarEstado = true;
-    // Sin ejercicio elegido: el primero de la rutina de hoy al que le falten series (fix 7-nov).
+  } else {
+    // A2-01: Al volver a Registrar sin parámetro explícito (#registrar), comprobar si el ejercicio actual
+    // ya completó sus series prescritas hoy. Si ya está completado o no hay seleccionado, avanzar al primer pendiente de hoy.
     try {
       const { rutina } = await import('./datos.js');
       const r = await rutina();
       const dias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
       const delDia = r?.dias?.[dias[new Date().getDay()]]?.ejercicios || [];
-      const hoy = await filtrar('series', s => s.fecha === hoyISO());
-      const pendiente = delDia.find(x => hoy.filter(s => s.ejercicioId === x.id).length < (x.series || 3)) || delDia[0];
-      if (pendiente && listaEjercicios.some(e => e.id === pendiente.id)) {
-        idElegido = pendiente.id;
+      const seriesHoy = await filtrar('series', s => s.fecha === fechaSeleccionada);
+
+      const ejActualObj = delDia.find(x => x.id === idElegido);
+      const seriesHechasActual = ejActualObj ? seriesHoy.filter(s => s.ejercicioId === idElegido).length : 0;
+      const metaActual = ejActualObj?.series || 3;
+
+      if (!idElegido || seriesHechasActual >= metaActual) {
+        const siguientePendiente = delDia.find(x => {
+          const hechas = seriesHoy.filter(s => s.ejercicioId === x.id).length;
+          return hechas < (x.series || 3);
+        });
+        if (siguientePendiente && siguientePendiente.id !== idElegido && listaEjercicios.some(e => e.id === siguientePendiente.id)) {
+          idElegido = siguientePendiente.id;
+          debeRecargarEstado = true;
+        } else if (!idElegido && delDia[0] && listaEjercicios.some(e => e.id === delDia[0].id)) {
+          idElegido = delDia[0].id;
+          debeRecargarEstado = true;
+        }
       }
     } catch (e) { /* si falla, queda el primero de la lista */ }
 
     if (!idElegido && listaEjercicios.length > 0) {
       idElegido = listaEjercicios[0].id;
+      debeRecargarEstado = true;
     }
   }
 

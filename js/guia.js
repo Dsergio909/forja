@@ -4,9 +4,10 @@
  * Dirección de arte Forja v2 («Revista de sala»):
  * - Cuadrícula de fotos/videos con radio 28 y nombre debajo.
  * - Ficha con video grande arriba (o animación de 2 fotos), titular en Instrument Serif,
- *   pasos numerados con números grandes en lima, chips de músculos en papel2.
- * - Metadatos adaptables a 360 px sin deformación elíptica (radio 28 en textos largos a ancho completo,
+ *   pasos numerados con números legibles en tinta sobre lima (contraste >= 13:1), chips de músculos en papel2.
+ * - Metadatos adaptables a 360 px sin deformación elíptica (radio 28 en textos largos / compuestos a ancho completo,
  *   radio 999 en píldoras cortas de una línea).
+ * - Reproductor seguro de YouTube con sandbox e interactividad al toque.
  * - Botón a YouTube para ver técnica.
  * - Sección Aprender estilo revista con titulares serif y tipografía editorial.
  * - Cero emojis: íconos SVG vectoriales vía icono() de ./iconos.js.
@@ -512,7 +513,7 @@ function asegurarEstilos() {
       flex-shrink: 0;
     }
 
-    /* PASOS NUMERADOS CON NÚMEROS GRANDES EN LIMA */
+    /* PASOS NUMERADOS CON NÚMEROS EN TINTA SOBRE LIMA (Contraste 13.5:1, diseno CRÍTICO-01) */
     .guia-card-v2 {
       background: var(--papel2, #E9E4D8);
       border-radius: 28px;
@@ -544,14 +545,22 @@ function asegurarEstilos() {
     }
     .guia-paso-numero-lima {
       font-family: 'Bricolage Grotesque', sans-serif;
-      font-size: 44px;
+      font-size: 20px;
       font-weight: 800;
-      line-height: 0.95;
-      color: var(--lima, #C8F03C);
+      line-height: 1;
+      background: var(--lima, #C8F03C);
+      color: var(--tinta, #17171A);
+      min-width: 44px;
+      height: 44px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       font-variant-numeric: tabular-nums;
       flex-shrink: 0;
-      min-width: 44px;
-      text-shadow: 0 1px 2px rgba(23, 23, 26, 0.15);
+      box-sizing: border-box;
+      padding: 0 8px;
+      box-shadow: 0 1px 3px rgba(23, 23, 26, 0.08);
     }
     .guia-paso-texto {
       font-size: 15px;
@@ -1101,8 +1110,8 @@ async function renderizarListaEjercicios() {
 /**
  * Renderiza la ficha técnica completa de un ejercicio.
  * Con video grande arriba (o animación de 2 fotos), titular en Instrument Serif,
- * pasos numerados con números grandes en lima, chips de músculos en papel2 y metadatos
- * que no se deforman a 360 px.
+ * pasos numerados con números legibles en tinta sobre lima (contraste 13.5:1),
+ * chips de músculos en papel2 y metadatos adaptados a 360 px sin deformación elíptica.
  * @param {string} id - ID del ejercicio
  */
 async function renderizarFichaEjercicio(id) {
@@ -1160,7 +1169,12 @@ async function renderizarFichaEjercicio(id) {
 
   // Crédito de la foto si existe 'foto_fuente'
   let credito = null;
-  if (ej.foto_fuente) {
+  if (ej.video && ej.video_fuente) {
+    // Video corto real de wger (CC BY-SA 4.0): la licencia exige mostrar el autor
+    credito = document.createElement('div');
+    credito.className = 'guia-credito-foto';
+    credito.textContent = ej.video_fuente;
+  } else if (ej.foto_fuente) {
     credito = document.createElement('div');
     credito.className = 'guia-credito-foto';
     credito.textContent = `Foto: ${ej.foto_fuente}`;
@@ -1336,8 +1350,11 @@ async function renderizarFichaEjercicio(id) {
   div.appendChild(chipsDiv);
 
   // VIDEO REAL DE TÉCNICA (YouTube, canal confiable verificado por oEmbed; 7-nov). Se carga solo al tocarlo.
+  // Protegido con atributo sandbox restrictivo (seguridad Hallazgo Nuevo 5)
   const ytId = ej.youtube && /^[\w-]{11}$/.test(ej.youtube.video || '') ? ej.youtube.video : null;
-  if (ytId) {
+  // 7-nov (Sergio): los videos de YouTube insertados traen publicidad y son largos → ya NO se insertan.
+  // Queda solo el botón «Ver en YouTube» (enlace externo al video verificado). Arriba va el video corto o las fotos.
+  if (false && ytId) {
     const tarjetaYt = document.createElement('button');
     tarjetaYt.type = 'button';
     tarjetaYt.className = 'guia-yt-tarjeta';
@@ -1356,17 +1373,20 @@ async function renderizarFichaEjercicio(id) {
       const ifr = document.createElement('iframe');
       ifr.src = `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0&playsinline=1`;
       ifr.title = 'Video de técnica';
+      ifr.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
       ifr.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
       ifr.allowFullscreen = true;
+      // YouTube pide saber desde qué página se inserta el video; sin esto algunos celulares muestran «Error 153».
+      ifr.referrerPolicy = 'strict-origin-when-cross-origin';
       ifr.style.cssText = 'width:100%;aspect-ratio:16/9;border:0;border-radius:28px;display:block;margin:12px 0 4px;';
       tarjetaYt.replaceWith(ifr);
     });
     div.appendChild(tarjetaYt);
-    const credito = document.createElement('p');
-    credito.className = 'sutil';
-    credito.style.cssText = 'font-size:13px;margin:0 0 12px;';
-    credito.textContent = `Video de técnica: ${ej.youtube.canal || 'YouTube'} · necesita internet`;
-    div.appendChild(credito);
+    const creditoYt = document.createElement('p');
+    creditoYt.className = 'sutil';
+    creditoYt.style.cssText = 'font-size:13px;margin:0 0 12px;';
+    creditoYt.textContent = `Video de técnica: ${ej.youtube.canal || 'YouTube'} · necesita internet`;
+    div.appendChild(creditoYt);
   }
 
   // BOTÓN YOUTUBE ESTILO REVISTA
@@ -1400,8 +1420,8 @@ async function renderizarFichaEjercicio(id) {
   div.appendChild(bloqueMapa);
 
   // METADATOS TÉCNICOS: Equipo, Tipo, Series/Reps, Descanso, Tempo, Respiración
-  // (Adaptados a 360 px sin deformación elíptica: radio 999px para píldoras cortas <= 25 chars y
-  // radio 28px ocupando ancho completo para textos largos como Respiración — diseno ALTO-07)
+  // Adaptados a 360 px sin deformación elíptica: radio 999px para píldoras cortas de una sola palabra,
+  // y radio 28px ocupando ancho completo para textos largos o compuestos (diseno ALTO-07 / MEDIO-04)
   const bloqueMeta = document.createElement('div');
   bloqueMeta.className = 'guia-card-v2';
 
@@ -1413,7 +1433,7 @@ async function renderizarFichaEjercicio(id) {
   function agregarDato(etiqueta, valor) {
     if (!valor) return;
     const textoValor = String(valor);
-    const esTextoLargo = textoValor.length > 25 || etiqueta === 'Respiración';
+    const esTextoLargo = textoValor.length > 16 || textoValor.includes(' ') || etiqueta === 'Respiración';
     const item = document.createElement('div');
     item.style.gridColumn = esTextoLargo ? '1 / -1' : 'auto';
     item.style.background = 'var(--papel, #F3F0E8)';
@@ -1443,7 +1463,7 @@ async function renderizarFichaEjercicio(id) {
   bloqueMeta.appendChild(gridMeta);
   div.appendChild(bloqueMeta);
 
-  // PASOS NUMERADOS CON NÚMEROS GRANDES EN LIMA
+  // PASOS NUMERADOS CON NÚMEROS EN TINTA SOBRE LIMA (Contraste 13.5:1, diseno CRÍTICO-01)
   if (Array.isArray(ej.pasos) && ej.pasos.length > 0) {
     const bloquePasos = document.createElement('div');
     bloquePasos.className = 'guia-pasos-col';

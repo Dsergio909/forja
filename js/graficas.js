@@ -123,7 +123,7 @@ export function lineas(datos, opciones = {}) {
     return padding.top + (1 - proporcion) * altoGrafica;
   };
 
-  // Sin cuadrículas pesadas: solo 2 líneas guía muy sutiles (fondo translúcido papel 2)
+  // Sin cuadrículas pesadas: solo 2 líneas guía muy sutiles
   const nivelesGuia = [minY + (maxY - minY) * 0.33, minY + (maxY - minY) * 0.67];
   for (const valY of nivelesGuia) {
     const yPos = coordY(valY);
@@ -249,7 +249,7 @@ export function lineas(datos, opciones = {}) {
           'stroke-width': '2'
         }));
 
-        // Etiqueta flotante 'Récord' en serif cursivo (español latino: MEDIO-05)
+        // Etiqueta flotante 'Récord' en serif cursivo
         gPunto.appendChild(crearNodoSVG('text', {
           x: pt.x,
           y: pt.y - 9,
@@ -276,7 +276,7 @@ export function lineas(datos, opciones = {}) {
     });
   }
 
-  // Etiquetas del eje X (primer punto, medio y último para celular)
+  // Etiquetas del eje X
   if (coordenadas.length > 0) {
     const indicesAMostrar = [];
     indicesAMostrar.push(0);
@@ -322,7 +322,7 @@ export function lineas(datos, opciones = {}) {
  * Genera una gráfica de barras horizontales responsive en SVG.
  * Optimizada para mostrar series duras por músculo vs meta semanal (10-20 series).
  * Paleta editorial v2: fondo en Papel 2 (#E9E4D8), barras en Tinta (#17171A) y Lima (#C8F03C),
- * números tabulares en .grande o destacados, radios píldora 999px.
+ * números tabulares destacados, radios píldora 999px.
  *
  * @param {Array<object>} datos - Lista de items [{label: string, valor: number, metaMin?: number, metaMax?: number, color?: string}]
  * @param {object} [opciones={}]
@@ -383,7 +383,7 @@ export function barras(datos, opciones = {}) {
   const yInicioZona = padding.top - 4;
   const altoZona = items.length * altoFila + 8;
 
-  // Fondo sutil de zona meta con radio canónico 999px (MEDIO-02)
+  // Fondo sutil de zona meta con radio canónico 999px
   svg.appendChild(crearNodoSVG('rect', {
     x: xMetaMin,
     y: yInicioZona,
@@ -416,9 +416,9 @@ export function barras(datos, opciones = {}) {
     let colorBarra = item.color;
     if (!colorBarra) {
       if (valor >= metaMin) {
-        colorBarra = 'var(--lima, var(--ok, #C8F03C))'; // Lima de tiza
+        colorBarra = 'var(--lima, var(--ok, #C8F03C))';
       } else if (valor > 0) {
-        colorBarra = 'var(--texto, var(--tinta, #17171A))'; // Tinta
+        colorBarra = 'var(--texto, var(--tinta, #17171A))';
       } else {
         colorBarra = 'transparent';
       }

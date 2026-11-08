@@ -271,14 +271,15 @@ export function fechaBonita(iso) {
 
 /**
  * Formatea un valor de peso y modo por lado o por placas.
+ * Resuelve el caso [BAJO-01] de logica_datos: si unidad === 'placa' y kg es nulo/vacío, devuelve 'placa'.
  * @param {number|null|undefined} kg Peso levantado o número de placa (null o 0 = peso corporal si no es placa)
  * @param {boolean} [porLado=false] Si es peso por cada lado
- * @param {string} [unidad] Opcional: si unidad === 'placa' devuelve 'placa N'
- * @returns {string} '40 kg/lado' · 'peso corporal' · '80 kg' · 'placa N'
+ * @param {string} [unidad] Opcional: si unidad === 'placa' devuelve 'placa N' o 'placa'
+ * @returns {string} '40 kg/lado' · 'peso corporal' · '80 kg' · 'placa N' · 'placa'
  */
 export function formatoKg(kg, porLado = false, unidad) {
   if (unidad === 'placa') {
-    return `placa ${kg}`;
+    return (kg != null && kg !== '') ? `placa ${kg}` : 'placa';
   }
   if (kg === null || kg === undefined || kg === '' || Number(kg) === 0) {
     return 'peso corporal';

@@ -113,10 +113,5 @@ Estar 6 a 8 horas sentado genera: flexores de cadera acortados (psoas mayor y re
    *Año:* 2011 (Reafirmado en Guías 11.ª edición, 2021).  
    *Enlace:* https://doi.org/10.1249/MSS.0b013e318213fefb  
    *Tipo:* Posición oficial de consenso científico (ACSM).
-7. **Loaded Inter-set Stretching for Muscle Hypertrophy and Strength: A Systematic Evaluation**  
-   *Autores:* Tanuj Wadhi, Christopher Barakat et al.  
-   *Año:* 2021.  
-   *Enlace:* https://doi.org/10.1519/JSC.0000000000004128  
-   *Tipo:* Estudio controlado aleatorizado y revisión temática.
 
 ---

@@ -30,12 +30,27 @@ export function normalizarMusculo(nombre) {
 
   // 1. Mapeo directo de casos específicos y sinónimos frecuentes
   // Dorsal ancho
-  if (limpio === 'dorsales' || limpio === 'dorsal' || limpio === 'dorsal ancho' || limpio === 'lat' || limpio === 'lats' || limpio === 'latissimus' || limpio === 'espalda') {
+  if (
+    limpio === 'dorsales' ||
+    limpio === 'dorsal' ||
+    limpio === 'dorsal ancho' ||
+    limpio === 'lat' ||
+    limpio === 'lats' ||
+    limpio === 'latissimus' ||
+    limpio === 'espalda'
+  ) {
     return 'dorsal ancho';
   }
 
   // Pectoral / Pecho
-  if (limpio === 'pecho' || limpio === 'pectorales' || limpio === 'pectoral' || limpio === 'pectoral mayor' || limpio === 'pectoral menor' || limpio === 'chest') {
+  if (
+    limpio === 'pecho' ||
+    limpio === 'pectorales' ||
+    limpio === 'pectoral' ||
+    limpio === 'pectoral mayor' ||
+    limpio === 'pectoral menor' ||
+    limpio === 'chest'
+  ) {
     return 'pectoral';
   }
 
@@ -357,10 +372,13 @@ export function rangoReps(texto) {
  * Calcula el peso y repeticiones sugeridas para la próxima sesión mediante doble progresión:
  * - Sin historial: kg: null y motivo 'Elige un peso con el que llegues a X reps dejando 1-2 en reserva'.
  * - Si en la última sesión NO llegó al tope del rango de reps en TODAS las series prescritas:
- *     El kg sugerido es el MISMO de la última sesión y el motivo dice 'Mismo peso: busca +1 rep'.
- * - Solo sube si se completaron todas las series prescritas y todas llegaron al tope:
+ *     El kg sugerido es el MISMO de la última sesión.
+ *     CORRECCIÓN (logica ALTO-02): Debe sugerir +1 repetición sobre la base alcanzada,
+ *     NO saltar de golpe al tope del rango (rango.max), con límite superior en rango.max.
+ *     Motivo: 'Mismo peso: busca +1 rep'.
+ * - Solo sube peso si se completaron todas las series prescritas y todas llegaron al tope:
  *     En placas sube de a 1 placa.
- *     En kg sube 2.5 kg (o 1-2 kg en mancuernas) y reinicia al piso de reps.
+ *     En kg sube 2.5 kg (o 1-2 kg en mancuernas) y reinicia al piso de reps (rango.min).
  * - Respeta el campo unidad ('kg'|'placa') y nunca mezcla series de distinta unidad o distinta máquina.
  *
  * @param {Array<object>} seriesUltimaSesion - Series de la última sesión [{kg, reps, porLado, unidad, maquina, ...}]
@@ -406,23 +424,29 @@ export function pesoSugerido(seriesUltimaSesion, ejercicio = {}) {
   const porLado = !!serieRef.porLado;
   const unidad = unidadReferencia;
 
-  // Exigir que se hayan completado todas las series prescritas (ALTO-06) y que TODAS llegaran al tope
+  // Exigir que se hayan completado todas las series prescritas y que TODAS llegaran al tope
   const seriesPrescritas = Number(ejercicio?.series) || 3;
   const tieneVolumenCompleto = seriesAEvaluar.length >= seriesPrescritas;
   const todasAlTope = tieneVolumenCompleto && seriesAEvaluar.every(s => Number(s.reps || 0) >= rango.max);
 
   // Si NO llegó al tope en TODAS las series prescritas: mantener el mismo peso y buscar +1 rep
+  // CORRECCIÓN (logica ALTO-02): Sugerir +1 rep sobre lo logrado en la sesión, NO saltar al tope del rango.
   if (!todasAlTope) {
+    const repsUltima = Number(serieRef.reps || 0);
+    const baseReps = repsUltima > 0 ? repsUltima : rango.min;
+    // Sugiere +1 rep, asegurando que esté en el intervalo [rango.min, rango.max]
+    const repsSugeridas = Math.min(rango.max, Math.max(rango.min, baseReps + 1));
+
     return {
       kg: kgActual,
-      reps: rango.max,
+      reps: repsSugeridas,
       porLado,
       unidad,
       motivo: 'Mismo peso: busca +1 rep'
     };
   }
 
-  // Si todas llegaron al tope, solo aquí sube:
+  // Si todas llegaron al tope de repeticiones en todas las series prescritas:
   // Caso 1: En placas sube de a 1 placa
   if (unidad === 'placa') {
     const placaActual = kgActual != null ? kgActual : 1;
@@ -498,7 +522,7 @@ export function seriesPorMusculo(series, ejercicios, desdeISO) {
 
   for (const s of series) {
     if (!s || !s.ejercicioId) continue;
-    // Filtro por fecha si se especificó (descarta también series sin fecha: BAJO-02)
+    // Filtro por fecha si se especificó (descarta también series sin fecha)
     if (desdeISO && (!s.fecha || s.fecha < desdeISO)) continue;
 
     // Filtro de serie dura: rir <= 3 o fallo === true o rir null/indefinido
@@ -680,7 +704,7 @@ export function grasaNavy(cinturaCm, cuelloCm, estaturaCm) {
 /**
  * Obtiene los récords personales (PR) históricos de cada ejercicio a partir de las series.
  * Determina el PR en base al mayor 1RM estimado, mayor peso si el 1RM es igual,
- * o mayor número de repeticiones cuando el peso es igual o nulo (peso corporal: CRÍTICO-02).
+ * o mayor número de repeticiones cuando el peso es igual o nulo (peso corporal).
  *
  * @param {Array<object>} series - Lista de series de la base de datos
  * @returns {Record<string, {kg: number|null, porLado?: boolean, unidad?: string, reps: number, unoRM: number, fecha: string}>}

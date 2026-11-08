@@ -5,9 +5,11 @@
  * - Totales del día con número grande héroe (Bricolage Grotesque 64px, tabular-nums) y barra lima (#C8F03C).
  * - Lista limpia sin bordes toscos, paleta papel (#F3F0E8) y papel 2 (#E9E4D8), texto tinta (#17171A) y tinta suave accesible (#5D5951).
  * - Titulares en Instrument Serif cursivo, radios estrictos de 28px (tarjetas) y 999px (píldoras).
- * - Sin emojis ni backdrop-filter: iconos vectoriales limpios vía icono() de ./iconos.js y botones >= 48px.
+ * - Sin emojis ni backdrop-filter: iconos vectoriales limpios vía icono() de ./iconos.js.
+ * - Corrección ALTO-02 (diseno.md): botón de eliminar alimento del plato borrador con área táctil accesible de 44×44 px sin anidar dentro de otro botón.
+ * - Corrección ALTO-01 (diseno.md): botones táctiles de agua independientes con dimensiones mínimas de 48×48 px.
  * - Catálogo de alimentos y Método de la mano (M-01): permite elegir porción, agregar múltiples alimentos al borrador y guardarlos juntos como un solo plato.
- * - Sincronización de fecha activa en sessionStorage (B-04) y soporte de coma decimal en cantidades.
+ * - Sincronización de fecha activa en sessionStorage con clave 'forja_fecha_activa' (B-04 / A2-02) y soporte de coma decimal en cantidades.
  */
 
 import { guardar, borrar, todos, filtrar, ajuste, ponerAjuste, nuevoId } from './db.js';
@@ -117,7 +119,7 @@ const ICONOS_SVGS = {
   menos: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>',
   cerrar: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
   basura: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
-  ojo: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+  ojo: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="3"/></svg>',
   alerta: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
   check: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
 };
@@ -398,7 +400,7 @@ async function renderizar() {
       transition: width 240ms cubic-bezier(.2,.8,.2,1);
     }
     .v2-barra-alerta {
-      background-color: #E2553A;
+      background-color: #B83218;
     }
     .v2-chips-row {
       display: grid;
@@ -564,7 +566,7 @@ async function renderizar() {
     )
   );
 
-  // 3. Tarjeta de Agua (Hidratación sin emojis)
+  // 3. Tarjeta de Agua (Hidratación sin emojis, botones táctiles independientes >= 48px - ALTO-01)
   const tarjetaAgua = h('div', { class: 'v2-tarjeta' },
     h('div', { style: 'display: flex; justify-content: space-between; align-items: center;' },
       h('div', { style: 'display: flex; align-items: center; gap: 10px;' },
@@ -577,13 +579,13 @@ async function renderizar() {
       h('div', { style: 'display: flex; gap: 8px;' },
         h('button', {
           class: 'v2-btn-pildora',
-          style: 'min-width: 48px; padding: 0 14px;',
+          style: 'min-width: 48px; min-height: 48px; width: 48px; height: 48px; padding: 0;',
           title: 'Restar vaso',
           on: { click: async () => { await modificarAgua(-1); } }
         }, iconoNodo('menos', ICONOS_SVGS.menos)),
         h('button', {
           class: 'v2-btn-pildora',
-          style: 'background-color: #C8F03C; font-weight: 700;',
+          style: 'min-height: 48px; height: 48px; background-color: #C8F03C; font-weight: 700; padding: 0 16px;',
           on: { click: async () => { await modificarAgua(1); } }
         }, iconoNodo('mas', ICONOS_SVGS.mas), '+1 vaso')
       )
@@ -683,7 +685,7 @@ function renderizarFilaComida(comida) {
       }, iconoNodo('ojo', ICONOS_SVGS.ojo), 'Ver'),
       h('button', {
         class: 'v2-btn-pildora',
-        style: 'min-height: 48px; min-width: 48px; height: 48px; width: 48px; padding: 0; background-color: #E9E4D8; color: #E2553A;',
+        style: 'min-height: 48px; min-width: 48px; height: 48px; width: 48px; padding: 0; background-color: #E9E4D8; color: #B83218;',
         title: 'Eliminar comida',
         on: { click: async () => { await eliminarComida(comida.id); } }
       }, iconoNodo('basura', ICONOS_SVGS.basura))
@@ -692,7 +694,7 @@ function renderizarFilaComida(comida) {
 }
 
 /**
- * Cambia la fecha activa por desplazamiento de días y sincroniza en sessionStorage (B-04)
+ * Cambia la fecha activa por desplazamiento de días y sincroniza en sessionStorage (B-04 / A2-02)
  */
 async function cambiarFecha(deltaDias) {
   const d = parsearFechaLocal(fechaSeleccionada);
@@ -718,6 +720,7 @@ async function modificarAgua(delta) {
 
 /**
  * Renderiza el contenedor de borrador combinando ítems del catálogo/mano y del texto libre
+ * Corrección ALTO-02: botón táctil de eliminar alimento (×) de mínimo 44×44 px sin anidar dentro de otro botón
  */
 function renderizarContenedorBorrador() {
   const contenedor = document.getElementById('contenedor-borrador');
@@ -743,7 +746,7 @@ function renderizarContenedorBorrador() {
         ? h('button', {
             type: 'button',
             title: 'Quitar alimento del plato',
-            style: 'border: none; background: rgba(23,23,26,0.12); color: #17171A; border-radius: 999px; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; font-size: 12px; font-weight: 700;',
+            style: 'border: none; background: rgba(23,23,26,0.12); color: #17171A; border-radius: 999px; min-width: 44px; min-height: 44px; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; font-size: 18px; font-weight: 700; margin: -6px -8px -6px 4px;',
             on: {
               click: () => {
                 itemsModalBorrador.splice(idx, 1);

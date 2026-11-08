@@ -79,20 +79,15 @@
 3. **A Systematic Review of the Effects of Different Resistance Training Volumes on Muscle Hypertrophy**  
    *Autor:* Baz-Valle, E., Balsalobre-Fernández, C., Alix-Fages, C., & Santos-Concejero, J.  
    *Año:* 2022  
-   *Enlace:* https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8884325/  
+   *Enlace:* https://pubmed.ncbi.nlm.nih.gov/41343037/  
    *Tipo:* Revisión sistemática y metaanálisis.
 
 4. **The Resistance Training Dose-Response: Meta-Regressions Exploring the Effects of Weekly Volume and Frequency on Muscle Hypertrophy and Strength**  
    *Autor:* Pelland, J. C., Robinson, Z. P., Remmert, J. F., et al. / Zourdos, M. C.  
    *Año:* 2025/2026  
-   *Enlace:* https://pubmed.ncbi.nlm.nih.gov/40781498/  
+   *Enlace:* https://pubmed.ncbi.nlm.nih.gov/41343037/  
    *Tipo:* Metaanálisis y meta-regresión con modelos dosis-respuesta.
 
-5. **Dose-response relationship between weekly resistance training volume and increases in muscle mass: A systematic review and meta-analysis**  
-   *Autor:* Schoenfeld, B. J., Ogborn, D., & Krieger, J. W.  
-   *Año:* 2017  
-   *Enlace:* https://pubmed.ncbi.nlm.nih.gov/27433987/  
-   *Tipo:* Metaanálisis.
 
 6. **Longer Interset Rest Periods Enhance Muscle Strength and Hypertrophy in Resistance-Trained Men**  
    *Autor:* Schoenfeld, B. J., Pope, Z. K., Benik, F. M., et al.  

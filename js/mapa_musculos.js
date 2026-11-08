@@ -608,11 +608,11 @@ export function mapaSVG(musculosPrincipales = [], musculosSecundarios = [], alTo
 
       <!-- Gemelos (espalda) -->
       <g data-musculo="gemelos" class="${obtenerClase('gemelos')}">
-        <!-- Izq -->
+        <!-- Gemelo Izq -->
         <path d="M238 194 C234 206, 235 224, 239 246 L246 246 C249 230, 249 210, 247 194 Z" fill="${obtenerColor('gemelos')}" stroke="${COLOR_BORDE}" stroke-width="1">
           <title>Gemelos</title>
         </path>
-        <!-- Der -->
+        <!-- Gemelo Der -->
         <path d="M272 194 C276 206, 275 224, 271 246 L264 246 C261 230, 261 210, 263 194 Z" fill="${obtenerColor('gemelos')}" stroke="${COLOR_BORDE}" stroke-width="1">
           <title>Gemelos</title>
         </path>

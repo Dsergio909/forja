@@ -115,7 +115,7 @@ Aprovechando tu memoria muscular con 2.200 kcal y ~130 g de proteína (~2,0 g/kg
 1. **Resistance training prescription for muscle strength and hypertrophy in healthy adults: a systematic review and Bayesian network meta-analysis**
    * *Autor/Sitio:* Brad S. Currier, Jonathan C. Mcleod, Stuart M. Phillips, Brad J. Schoenfeld, et al. / British Journal of Sports Medicine (BJSM)
    * *Año:* 2023
-   * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/37419538/
+   * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/41951916/
    * *Tipo de fuente:* Revisión sistemática y metaanálisis en red bayesiano.
 
 2. **Resistance Training Load Effects on Muscle Hypertrophy and Strength Gain: Systematic Review and Network Meta-Analysis**
@@ -124,11 +124,6 @@ Aprovechando tu memoria muscular con 2.200 kcal y ~130 g de proteína (~2,0 g/kg
    * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/33433148/
    * *Tipo de fuente:* Revisión sistemática y metaanálisis en red.
 
-3. **Effects of resistance training performed to repetition failure or non-failure on muscular strength and hypertrophy: A systematic review and meta-analysis**
-   * *Autor/Sitio:* Jozo Grgic, Brad J. Schoenfeld, John Orazem, Filip Sabol / Journal of Sport and Health Science (JSHS)
-   * *Año:* 2022
-   * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/33529384/
-   * *Tipo de fuente:* Revisión sistemática y metaanálisis.
 
 4. **Effects of Resistance Training Performed to Failure or Not to Failure on Muscle Strength, Hypertrophy, and Power Output: A Systematic Review with Meta-Analysis**
    * *Autor/Sitio:* Antonio F. Vieira, Daniel Umpierre, Juliana L. Teodoro, Eduardo L. Cadore, et al. / Journal of Strength and Conditioning Research (JSCR)
@@ -139,7 +134,7 @@ Aprovechando tu memoria muscular con 2.200 kcal y ~130 g de proteína (~2,0 g/kg
 5. **Effects of Rest Interval Duration in Resistance Training on Measures of Muscular Strength: A Systematic Review**
    * *Autor/Sitio:* Jozo Grgic, Brad J. Schoenfeld, Timothy B. Davies, Bruno L. R. Lacio / Sports Medicine
    * *Año:* 2018
-   * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/28642677/
+   * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/28933024/
    * *Tipo de fuente:* Revisión sistemática.
 
 6. **Longer Interset Rest Periods Enhance Muscle Strength and Hypertrophy in Resistance-Trained Men**
@@ -157,13 +152,13 @@ Aprovechando tu memoria muscular con 2.200 kcal y ~130 g de proteína (~2,0 g/kg
 8. **Effects of Periodization on Strength and Muscle Hypertrophy in Volume-Equated Resistance Training Programs: A Systematic Review and Meta-Analysis**
    * *Autor/Sitio:* Lukas Moesgaard, Mikkel R. Beck, Lars Christiansen, Per Aagaard, Jesper L. Andersen / Sports Medicine
    * *Año:* 2022
-   * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/35478385/
+   * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/35044672/
    * *Tipo de fuente:* Revisión sistemática y metaanálisis.
 
 9. **Weekly Training Frequency Effects on Strength Gain: A Meta-Analysis**
    * *Autor/Sitio:* Grant W. Ralston, Lon Kilgore, Frank B. Wyatt, Julien S. Baker / Sports Medicine - Open
    * *Año:* 2018
-   * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/30039498/
+   * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/30076500/
    * *Tipo de fuente:* Metaanálisis.
 
 10. **American College of Sports Medicine Position Stand: Progression Models in Resistance Training for Healthy Adults**
@@ -175,7 +170,7 @@ Aprovechando tu memoria muscular con 2.200 kcal y ~130 g de proteína (~2,0 g/kg
 11. **Novel Resistance Training-Specific Rating of Perceived Exertion Scale Measuring Repetitions in Reserve**
     * *Autor/Sitio:* Michael C. Zourdos, Daniel L. Klemp, Christopher Dolan, Justin M. Quiles, Eric R. Helms, et al. / Journal of Strength and Conditioning Research (JSCR)
     * *Año:* 2016
-    * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/26049323/
+    * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/26049792/
     * *Tipo de fuente:* Estudio de validación científica y metodológica.
 
 12. **Prediction of One Repetition Maximum Strength from Multiple Repetition Maximum Testing and Anthropometry**
@@ -202,8 +197,3 @@ Aprovechando tu memoria muscular con 2.200 kcal y ~130 g de proteína (~2,0 g/kg
     * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/28615996/
     * *Tipo de fuente:* Posición oficial de consenso científico institucional (ISSN).
 
-16. **Deloading Practices in Strength and Physique Sports: A Cross-sectional Survey & International Delphi Consensus**
-    * *Autor/Sitio:* Lee Bell, Max Coleman, David Rogerson, David Nolan / Sports Medicine - Open
-    * *Año:* 2023 / 2024
-    * *Enlace:* https://pubmed.ncbi.nlm.nih.gov/38319488/
-    * *Tipo de fuente:* Panel de consenso internacional Delphi y estudio observacional de expertos.

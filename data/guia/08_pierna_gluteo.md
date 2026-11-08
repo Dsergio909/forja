@@ -55,10 +55,6 @@
 
 ## Fuentes
 
-1. **Greater Hamstrings Muscle Hypertrophy but Similar Damage Protection after Training at Long versus Short Muscle Lengths**  
-   *Autor / Revista:* Maeo, S., Meng, H., Yuhang, Z., et al. (*Medicine & Science in Sports & Exercise*), 2021.  
-   *Enlace:* https://pubmed.ncbi.nlm.nih.gov/33009373/  
-   *Tipo:* Estudio controlado aleatorizado con MRI (*within-subject design*).
 2. **Hip thrust and back squat training elicit similar gluteus muscle hypertrophy and transfer similarly to the deadlift**  
    *Autor / Revista:* Plotkin, D. L., Rodas, M. A., Vigotsky, A. D., Schoenfeld, B. J., et al. (*Frontiers in Physiology*), 2023.  
    *Tipo:* Estudio experimental controlado longitudinal (9 semanas, evaluación con MRI y EMG).
@@ -68,7 +64,7 @@
    *Tipo:* Estudio experimental controlado (longitud muscular y rango de movimiento).
 4. **Triceps surae muscle hypertrophy is greater after standing versus seated calf-raise training**  
    *Autor / Revista:* Kassiano, W., Costa, B., Kunevaliki, G., et al. (*Journal of Sports Sciences* / *Frontiers in Physiology*), 2023.  
-   *Enlace:* https://pubmed.ncbi.nlm.nih.gov/37098448/  
+   *Enlace:* https://pubmed.ncbi.nlm.nih.gov/38156065/  
    *Tipo:* Estudio experimental controlado longitudinal (MRI y ultrasonido en tríceps sural).
 5. **Effects of squat training with different depths on lower limb muscle volumes**  
    *Autor / Revista:* Kubo, K., Ikebukuro, T., Yata, H. (*European Journal of Applied Physiology*), 2019.  

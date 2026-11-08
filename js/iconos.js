@@ -107,13 +107,6 @@ const DICCIONARIO_ICONOS = {
 
 const SVG_CIRCULO_DEFECTO = '<circle cx="12" cy="12" r="9"/>';
 
-/**
- * Devuelve un elemento DOM <svg> con trazo 1.75 y extremos redondeados.
- * Si el nombre no existe en el catálogo, devuelve un círculo.
- * @param {string} nombre Nombre del icono solicitado
- * @param {number} [tam=22] Tamaño en píxeles (ancho y alto)
- * @returns {SVGElement} Elemento SVG listo para insertar en el DOM
- */
 // Sinónimos que usan las pantallas (7-nov) → ícono existente.
 const ALIAS_ICONOS = {
   basura: 'borrar', 'flecha-der': 'flecha', 'flecha-derecha': 'flecha', 'flecha-izq': 'atras',
@@ -123,6 +116,7 @@ const ALIAS_ICONOS = {
   cruz: 'cerrar', gota: 'agua', plato: 'comida', perfil: 'cuerpo', mano: 'pesa', ia: 'chispa',
   disco: 'descargar', ojo: 'info', candado: 'escudo',
 };
+
 // Íconos agregados (mismo estilo: trazo 1,75, redondeado, rejilla 24).
 const EXTRA_ICONOS = {
   alerta: '<path d="M12 4 3 20h18L12 4Z"/><path d="M12 10v4"/><path d="M12 17h.01"/>',
@@ -137,8 +131,14 @@ const EXTRA_ICONOS = {
   escudo: '<path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z"/><path d="m9 12 2 2 4-4"/>',
 };
 
+/**
+ * Devuelve un elemento DOM <svg> con trazo 1.75 y extremos redondeados.
+ * Si el nombre no existe en el catálogo, devuelve un círculo.
+ * @param {string} nombre Nombre del icono solicitado
+ * @param {number|Object} [tam=22] Tamaño en píxeles (ancho y alto) u objeto {tam, class, color, trazo}
+ * @returns {SVGElement} Elemento SVG listo para insertar en el DOM
+ */
 export function icono(nombre, tam = 22) {
-  // Acepta un número (tamaño) o un objeto {tam, class|clase, color, trazo} (algunas pantallas lo llaman así).
   const op = (tam && typeof tam === 'object') ? tam : { tam };
   const lado = Number(op.tam) > 0 ? Number(op.tam) : 22;
   let clave = String(nombre || '').trim().toLowerCase().replace(/_/g, '-');

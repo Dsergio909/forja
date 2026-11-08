@@ -91,6 +91,44 @@ export function nuevoId() {
 }
 
 /**
+ * Función hash determinística y rápida (cyrb53/fnv) para derivar IDs estables
+ * a partir del contenido de registros importados que carecen de clave 'id'.
+ * @param {string} str Cadena a hashear
+ * @returns {string} Cadena hash en base 36
+ */
+function hashCadena(str) {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0, ch; i < str.length; i++) {
+    ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+/**
+ * Serializa de forma canónica el contenido de un objeto para generar su hash estable,
+ * omitiendo 'id' y 'actualizado' y ordenando las claves alfabéticamente.
+ * @param {Object} item
+ * @returns {string}
+ */
+function serializarContenidoParaHash(item) {
+  const copia = { ...item };
+  delete copia.id;
+  delete copia.actualizado;
+  const claves = Object.keys(copia).sort();
+  const partes = [];
+  for (const k of claves) {
+    const val = copia[k];
+    const valStr = (val !== null && typeof val === 'object') ? JSON.stringify(val) : String(val);
+    partes.push(`${k}:${valStr}`);
+  }
+  return partes.join('|');
+}
+
+/**
  * Guarda o actualiza un objeto en el store indicado.
  * Si no trae 'id', le genera uno con nuevoId().
  * Asigna obj.actualizado = Date.now().
@@ -252,7 +290,9 @@ export async function exportarTodo({ conFotos = false } = {}) {
  * - En caso de conflicto de id, gana el registro con 'actualizado' mayor (no pisa datos más nuevos).
  * - Preserva el Blob local en 'fotos' si la copia importada se generó con conFotos: false.
  * - Preserva la marca temporal original 'actualizado' del respaldo sin destruirla.
- * - No duplica sesiones ni series al reintentar importar historiales.
+ * - Asigna IDs estables con hash del contenido a TODOS los registros sin id (logica ALTO-01).
+ * - Mantiene un contador ordinal de ocurrencias en el lote para que series idénticas (ej. 3x8 al mismo peso)
+ *   reciban IDs estables diferenciados y NO colapsen entre sí al importar o reimportar (CRÍTICO-02).
  * @param {Object} obj Objeto exportado previamente con estructura {datos: {...}} o listas por store
  * @returns {Promise<{agregados: number, actualizados: number}>}
  */
@@ -278,6 +318,7 @@ export async function importarTodo(obj) {
     const existentes = await todos(store);
     const mapaExistentes = new Map(existentes.map((item) => [item.id, item]));
     const colaEscritura = [];
+    const mapaConteoContenido = new Map();
 
     for (const rawItem of listaImportar) {
       if (!rawItem || typeof rawItem !== 'object') continue;
@@ -287,25 +328,36 @@ export async function importarTodo(obj) {
 
       const item = { ...rawItem };
 
-      // Deduplicación de historiales sin id (ALTO-05)
+      // Deduplicación y asignación de ID estable para registros sin id (ALTO-01 y CRÍTICO-02)
       if (!item.id) {
         if (store === 'sesiones' && item.fecha) {
           const dupSesion = Array.from(mapaExistentes.values()).find((e) => e.fecha === item.fecha);
-          if (dupSesion) continue;
-          item.id = nuevoId();
-        } else if (store === 'series' && item.fecha && item.ejercicioId) {
-          const dupSerie = Array.from(mapaExistentes.values()).find(
-            (e) =>
-              e.fecha === item.fecha &&
-              e.ejercicioId === item.ejercicioId &&
-              Number(e.reps) === Number(item.reps) &&
-              Number(e.kg || 0) === Number(item.kg || 0) &&
-              Math.abs((e.hora || 0) - (item.hora || 0)) < 2000
+          if (dupSesion) {
+            item.id = dupSesion.id;
+          }
+        } else if (store === 'medidas' && item.fecha) {
+          const dupMedida = Array.from(mapaExistentes.values()).find(
+            (e) => e.fecha === item.fecha && (e.origen || 'manual') === (item.origen || 'manual')
           );
-          if (dupSerie) continue;
-          item.id = nuevoId();
-        } else {
-          continue;
+          if (dupMedida) {
+            item.id = dupMedida.id;
+          }
+        }
+
+        // Si aún no tiene id (series, comidas, chat, camara, o sesiones/medidas nuevas sin ID previo):
+        // Asignar ID estable basado en hash del contenido + ordinal de repetición en el lote
+        // para que series idénticas (ej. 3x8 con mismo peso) no colapsen entre sí
+        if (!item.id) {
+          const contenidoBase = serializarContenidoParaHash(item);
+          const ocurrencia = (mapaConteoContenido.get(contenidoBase) || 0) + 1;
+          mapaConteoContenido.set(contenidoBase, ocurrencia);
+          const hashId = hashCadena(`${store}:${contenidoBase}#${ocurrencia}`);
+          item.id = `${store}-${hashId}`;
+
+          // Si es una serie y no trae hora, asignar una hora correlativa para ordenación limpia
+          if (store === 'series' && !item.hora) {
+            item.hora = (item.actualizado || Date.now()) + ocurrencia * 1000;
+          }
         }
       }
 

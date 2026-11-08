@@ -45,7 +45,7 @@
   "descripcion_visual": "Inicio: de pie de espaldas a la polea, torso recto, brazo extendido hacia abajo y ligeramente por detrás del cuerpo con el cable tenso desde el suelo. Final: codo flexionado a 90-110 grados, mano cerca del hombro sin que el codo haya avanzado respecto a la espalda.",
   "busqueda_video": "Bayesian cable curl technique form Menno Henselmans",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/37610619/",
+  "fuente": "",
   "temas": [
    "brazos_antebrazos"
   ],
@@ -115,7 +115,7 @@
   "descripcion_visual": "Inicio: recostado en banco a 45-60 grados, brazos colgando hacia el suelo detrás de la línea del pecho con mancuernas en supinación. Final: antebrazos plegados hacia los bíceps con los codos fijos en el espacio perpendiculares al suelo.",
   "busqueda_video": "Incline dumbbell curl form hypertrophy",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/37610619/",
+  "fuente": "",
   "temas": [
    "brazos_antebrazos"
   ],
@@ -182,7 +182,7 @@
   "descripcion_visual": "Inicio: de pie con mancuernas a los lados del muslo, palmas enfrentadas, brazos rectos. Final: codos doblados en ángulo agudo a los lados de las costillas, cabezas superiores de las mancuernas apuntando hacia los hombros.",
   "busqueda_video": "Standing dumbbell hammer curl proper form guide",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/31342424/",
+  "fuente": "",
   "temas": [
    "brazos_antebrazos"
   ],
@@ -204,7 +204,9 @@
    "video": "7jqi2qWAUJk",
    "canal": "Mind Pump TV",
    "titulo": "How To Do Hammer Curls for HUGE Biceps (BICEP GROWTH!)"
-  }
+  },
+  "video": "media/videos/curl_martillo_mancuernas.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "curl_muneca_mancuerna",
@@ -251,7 +253,7 @@
   "descripcion_visual": "Inicio: antebrazo plano sobre el muslo o banco, muñeca colgando hacia abajo con la mancuerna en la punta de los dedos. Final: muñeca totalmente curvada hacia arriba, apretando la masa interna del antebrazo.",
   "busqueda_video": "Dumbbell wrist curl proper form forearms",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/37610619/",
+  "fuente": "",
   "temas": [
    "brazos_antebrazos"
   ],
@@ -264,17 +266,17 @@
    "muneca",
    "muñeca"
   ],
+  "youtube": {
+   "video": "3VLTzIrnb5g",
+   "canal": "PureGym",
+   "titulo": "How To Do Wrist Curls"
+  },
   "imagen": "media/fotos/curl_muneca_mancuerna_0.jpg",
   "imagenes": [
    "media/fotos/curl_muneca_mancuerna_0.jpg",
    "media/fotos/curl_muneca_mancuerna_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Seated_Dumbbell_Palms-Up_Wrist_Curl (dominio público)",
-  "youtube": {
-   "video": "3VLTzIrnb5g",
-   "canal": "PureGym",
-   "titulo": "How To Do Wrist Curls"
-  }
+  "foto_fuente": "free-exercise-db: Seated_Dumbbell_Palms-Up_Wrist_Curl (dominio público)"
  },
  {
   "id": "curl_predicador_maquina",
@@ -311,7 +313,7 @@
   "tempo": "2-0-1-1",
   "series_reps_hipertrofia": "3 x 6-8",
   "series_reps_fuerza": "3 x 5-6",
-  "descanso_seg": 120,
+  "descanso_seg": 75,
   "rir_recomendado": "0-1",
   "progresion": "Incrementar primero repeticiones dentro del rango 6-8; cuando completes 3 series de 8 reps con 2 segundos de bajada, subir al siguiente nivel de placas de la máquina.",
   "alternativas": [
@@ -322,7 +324,7 @@
   "descripcion_visual": "Inicio: sentado con el pecho pegado al soporte, brazos extendidos apoyados sobre el plano inclinado sujetando los manerales. Final: codos completamente flexionados, manerales arriba cerca del rostro mientras los tríceps permanecen 100% pegados a la almohadilla.",
   "busqueda_video": "Machine preacher curl proper form execution",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/37021571/",
+  "fuente": "",
   "temas": [
    "brazos_antebrazos"
   ],
@@ -344,7 +346,9 @@
    "video": "Ja6ZlIDONac",
    "canal": "Renaissance Periodization",
    "titulo": "Machine Preacher Curl"
-  }
+  },
+  "video": "media/videos/curl_predicador_maquina.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "extension_muneca_mancuerna",
@@ -391,7 +395,7 @@
   "descripcion_visual": "Inicio: antebrazo fijo sobre el banco con la palma hacia abajo, muñeca doblada hacia el piso con los nudillos apuntando hacia abajo. Final: nudillos levantados hacia el techo, antebrazo superior endurecido en contracción.",
   "busqueda_video": "Dumbbell reverse wrist curl form execution",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/37610619/",
+  "fuente": "",
   "temas": [
    "brazos_antebrazos"
   ],
@@ -453,7 +457,7 @@
   "descripcion_visual": "Inicio: torso inclinado 30 grados, brazos flexionados por encima y detrás de la cabeza con la soga en tensión. Final: brazos completamente extendidos en diagonal ascendente al frente, manos separadas abriendo la soga.",
   "busqueda_video": "Overhead cable triceps extension rope execution",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/35802081/",
+  "fuente": "",
   "temas": [
    "brazos_antebrazos"
   ],
@@ -475,7 +479,9 @@
    "video": "1u18yJELsh0",
    "canal": "Renaissance Periodization",
    "titulo": "Cable Overhead Triceps Extension"
-  }
+  },
+  "video": "media/videos/extension_triceps_sobre_cabeza_polea.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "fondos_paralelas_banco",
@@ -524,7 +530,7 @@
   "descripcion_visual": "Inicio: suspendido en las barras paralelas con brazos rectos, torso recto, piernas flexionadas o cruzadas. Final: codos doblados hacia atrás a 90 grados a nivel de las costillas, hombros por encima de las manos.",
   "busqueda_video": "Triceps dips proper form vertical torso",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/31342424/",
+  "fuente": "",
   "temas": [
    "brazos_antebrazos"
   ],
@@ -543,7 +549,9 @@
    "video": "Tw0axi-Jlqc",
    "canal": "Renaissance Periodization",
    "titulo": "Maximize Dip Technique FOR TRICEPS Growth | Targeting The Muscle Series"
-  }
+  },
+  "video": "media/videos/fondos_paralelas_banco.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "paseo_del_granjero",
@@ -593,7 +601,7 @@
   "descripcion_visual": "Inicio: de pie perfectamente erguido, sosteniendo una mancuerna pesada a cada costado con brazos rectos y nudillos blancos por la presión. Final: tras caminar 20-30 metros con pasos rápidos y cortos, manteniendo la misma postura vertical inquebrantable.",
   "busqueda_video": "Dumbbell farmers walk proper form grip strength",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/31342424/",
+  "fuente": "",
   "temas": [
    "brazos_antebrazos"
   ],
@@ -657,7 +665,7 @@
   "descripcion_visual": "Inicio: acostado en banco plano, brazos apuntando hacia arriba pero con 15 grados de inclinación hacia la cabeza sosteniendo la barra Z. Final: codos doblados en ángulo agudo con la barra situada detrás de la cabeza a la altura de la nuca.",
   "busqueda_video": "EZ bar skull crusher proper form behind head",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/31342424/",
+  "fuente": "",
   "temas": [
    "brazos_antebrazos"
   ],
@@ -676,7 +684,9 @@
    "video": "EyM5vs4-ZKk",
    "canal": "Renaissance Periodization",
    "titulo": "8 Skull Crusher Mistakes and How to Fix Them"
-  }
+  },
+  "video": "media/videos/press_frances_barra_z.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "pushdown_triceps_polea",
@@ -724,7 +734,7 @@
   "descripcion_visual": "Inicio: de pie frente a la polea alta, codos pegados a los costados doblados a 90 grados sujetando la barra a la altura del esternón. Final: brazos rectos estirados apuntando hacia los muslos con los codos fijos a las costillas.",
   "busqueda_video": "Cable triceps pushdown proper form science",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/35802081/",
+  "fuente": "",
   "temas": [
    "brazos_antebrazos"
   ],
@@ -860,7 +870,7 @@
   "descripcion_visual": "Inicio: cabeza alineada neutra. Final: cabeza retraída hacia atrás en línea horizontal formando leve papada con la nuca alargada.",
   "busqueda_video": "How to do chin tucks correctly for forward head posture physical therapy",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/34215438/",
+  "fuente": "",
   "temas": [
    "columna_postura_altura"
   ],
@@ -976,7 +986,7 @@
   "descripcion_visual": "Inicio: de pie junto al poste con antebrazo apoyado en vertical. Final: torso ligeramente adelantado y rotado al lado opuesto abriendo la caja torácica.",
   "busqueda_video": "Doorway pectoral stretch for rounded shoulders posture",
   "evidencia": "moderada",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/38462217/",
+  "fuente": "",
   "temas": [
    "columna_postura_altura"
   ],
@@ -1038,7 +1048,7 @@
   "descripcion_visual": "Inicio: de rodillas con codos en el banco y tronco paralelo al suelo. Final: cadera hacia los talones, cabeza pasando entre los brazos y pecho descendiendo hacia el suelo.",
   "busqueda_video": "Bench thoracic spine mobility extension prayer stretch",
   "evidencia": "moderada",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/36754020/",
+  "fuente": "",
   "temas": [
    "columna_postura_altura"
   ],
@@ -1303,7 +1313,7 @@
   "descripcion_visual": "Inicio: sentado inclinado a 45°, cabeza colgando hacia abajo con la cadena vertical. Final: cabeza elevada mirando al frente, cuello posterior contraído, torso fijo sobre los muslos.",
   "busqueda_video": "how to use a neck harness properly AlphaDestiny",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/9189737/",
+  "fuente": "",
   "temas": [
    "core_cuello"
   ],
@@ -1332,7 +1342,7 @@
    "complejo menor",
    "erectores espinales cervicales"
   ],
-  "equipo": "mancuernas",
+  "equipo": "disco de peso y banco",
   "tipo": "aislamiento",
   "nivel": "principiante",
   "pasos": [
@@ -1368,7 +1378,7 @@
   "descripcion_visual": "Inicio: cabeza inclinada hacia el suelo con la barbilla cerca del pecho y disco en la nuca. Final: cabeza levantada paralela al torso con los músculos posteriores del cuello y trapecios contraídos.",
   "busqueda_video": "neck extension plate form tutorial bodybuilding",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/9189737/",
+  "fuente": "",
   "temas": [
    "core_cuello"
   ],
@@ -1390,7 +1400,7 @@
    "recto anterior de la cabeza",
    "largo del cuello"
   ],
-  "equipo": "mancuernas",
+  "equipo": "disco de peso y banco",
   "tipo": "aislamiento",
   "nivel": "principiante",
   "pasos": [
@@ -1426,7 +1436,7 @@
   "descripcion_visual": "Inicio: cabeza inclinada suavemente hacia abajo por fuera del banco con disco y toalla en la frente. Final: cabeza flexionada hacia el pecho con la barbilla a 2 cm del esternón.",
   "busqueda_video": "neck curl with plate Jeff Nippard technique",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/9189737/",
+  "fuente": "",
   "temas": [
    "core_cuello"
   ],
@@ -1448,7 +1458,7 @@
    "esplenio del cuello",
    "elevador de la escápula"
   ],
-  "equipo": "mancuernas",
+  "equipo": "disco de peso y banco",
   "tipo": "aislamiento",
   "nivel": "intermedio",
   "pasos": [
@@ -1484,7 +1494,7 @@
   "descripcion_visual": "Inicio: acostado de lado, cabeza inclinada hacia el piso en flexión lateral. Final: cabeza elevada hacia el techo formando una curva lateral convexa con el cuello.",
   "busqueda_video": "lateral neck flexion exercise technique",
   "evidencia": "moderada",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/9189737/",
+  "fuente": "",
   "temas": [
    "core_cuello"
   ],
@@ -1542,7 +1552,7 @@
   "descripcion_visual": "Persona sentada con postura impecable y cuello neutro, aplicando presión manual con las palmas en frente, nuca y sienes alternativamente sin desplazar la cabeza.",
   "busqueda_video": "isometric neck strengthening exercises physical therapy",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/24930727/",
+  "fuente": "",
   "temas": [
    "core_cuello"
   ],
@@ -1613,7 +1623,7 @@
   "descripcion_visual": "Inicio y mantenimiento: antebrazos apoyados con codos adelantados respecto a hombros, glúteos apretados, pelvis en retroversión, línea perfecta de hombro a tobillo.",
   "busqueda_video": "RKC plank Brad Schoenfeld long lever posterior tilt",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/25391338/",
+  "fuente": "",
   "temas": [
    "core_cuello"
   ],
@@ -1717,7 +1727,7 @@
    "tríceps",
    "transverso del abdomen"
   ],
-  "equipo": "barra de dominadas",
+  "equipo": "rueda abdominal",
   "tipo": "compuesto",
   "nivel": "intermedio",
   "pasos": [
@@ -1960,7 +1970,7 @@
   "descripcion_visual": "Punto inicial: Hombros caídos y deprimidos, mancuernas colgando a 30° de abducción, cuello relajado. Punto final: Hombros totalmente elevados hacia las orejas, trapecios superiores abultados en contracción máxima.",
   "busqueda_video": "dumbbell shrugs proper form 30 degrees scapular plane",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/24411649/",
+  "fuente": "",
   "temas": [
    "espalda"
   ],
@@ -1983,7 +1993,9 @@
    "video": "zfAHfyTB_Ao",
    "canal": "Renaissance Periodization",
    "titulo": "Barbell Shrug Technique For Growth | Targeting The Muscle"
-  }
+  },
+  "video": "media/videos/encogimientos_mancuernas_inclinado.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "hiperextensiones_banco_45",
@@ -2031,7 +2043,7 @@
   "descripcion_visual": "Punto inicial: Torso flexionado hacia abajo a unos 90° respecto a las piernas, columna larga. Punto final: Torso ascendido formando una línea diagonal recta de 45° con las piernas, espalda baja firme.",
   "busqueda_video": "45 degree back extension proper form erector spinae",
   "evidencia": "moderada",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/35794563/",
+  "fuente": "",
   "temas": [
    "espalda"
   ],
@@ -2101,7 +2113,7 @@
   "descripcion_visual": "Punto inicial: Brazos extendidos en forma de 'Y' sobre la cabeza, torso recto ligeramente angulado. Punto final: Barra rozando el pecho superior, codos apuntando hacia abajo pegados a los costados, escápulas deprimidas.",
   "busqueda_video": "lat pulldown proper form science based",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/24662815/",
+  "fuente": "",
   "temas": [
    "espalda"
   ],
@@ -2130,7 +2142,7 @@
  {
   "id": "pullover_polea_alta",
   "nombre": "Pullover en polea alta con brazos rectos",
-  "nombre_en": "Straight-arm cable pulldown / Cable lat prayer",
+  "nombre_en": "Straight-arm cable pulldown",
   "musculos_principales": [
    "dorsal ancho",
    "redondo mayor"
@@ -2393,7 +2405,7 @@
   "descripcion_visual": "Punto inicial: Brazo perpendicular colgando hacia el suelo, escápula estirada, torso horizontal. Punto final: Mancuerna pegada a la cadera, codo a 90° alineado con el costado del cuerpo.",
   "busqueda_video": "dumbbell row proper form lat focus",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/27433987/",
+  "fuente": "",
   "temas": [
    "espalda"
   ],
@@ -2623,7 +2635,9 @@
    "video": "n5dsI9qQXwY",
    "canal": "Renaissance Periodization",
    "titulo": "Lateral Raise Technique For Huge Delts | Targeting The Muscle Series"
-  }
+  },
+  "video": "media/videos/elevaciones_laterales_mancuerna_pie.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "elevaciones_laterales_polea_cadera",
@@ -2683,17 +2697,13 @@
    "lateral en polea",
    "laterales polea"
   ],
-  "imagen": "media/fotos/elevaciones_laterales_polea_cadera_0.jpg",
-  "imagenes": [
-   "media/fotos/elevaciones_laterales_polea_cadera_0.jpg",
-   "media/fotos/elevaciones_laterales_polea_cadera_1.jpg"
-  ],
-  "foto_fuente": "free-exercise-db: Cable_Seated_Lateral_Raise (dominio público)",
   "youtube": {
    "video": "n5dsI9qQXwY",
    "canal": "Renaissance Periodization",
    "titulo": "Lateral Raise Technique For Huge Delts | Targeting The Muscle Series"
-  }
+  },
+  "video": "media/videos/elevaciones_laterales_polea_cadera.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "face_pull_polea",
@@ -2772,7 +2782,9 @@
    "video": "Q18p2QtQAes",
    "canal": "Powerexplosive",
    "titulo": "FACE PULL: TUTORIAL COMPLETO (TÉCNICA, BENEFICIOS, ERRORES, CONSEJOS...)"
-  }
+  },
+  "video": "media/videos/face_pull_polea.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "pajaros_pecho_apoyado_mancuernas",
@@ -2844,7 +2856,9 @@
    "video": "lPt0GqwaqEw",
    "canal": "Mind Pump TV",
    "titulo": "How To Do A PROPER Dumbbell Rear Delt Fly"
-  }
+  },
+  "video": "media/videos/pajaros_pecho_apoyado_mancuernas.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "pajaros_polea_cruzada",
@@ -2984,7 +2998,9 @@
    "video": "Gu1t7X2yq4M",
    "canal": "ATHLEAN-X™",
    "titulo": "Overhead Shoulder Press (3 MISTAKES!)"
-  }
+  },
+  "video": "media/videos/press_militar_mancuernas_sentado.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "remo_al_menton_polea_agarre_ancho",
@@ -3034,7 +3050,7 @@
   "descripcion_visual": "Inicio: de pie frente a la polea baja, sosteniendo la barra con agarre muy ancho a la altura de los muslos. Final: barra elevada hasta la altura del esternón con codos apuntando hacia los lados a 90° de abducción, nunca por encima de los hombros.",
   "busqueda_video": "Wide Grip Cable Upright Row safe shoulder technique",
   "evidencia": "moderada",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/24149581/",
+  "fuente": "",
   "temas": [
    "hombros"
   ],
@@ -3348,7 +3364,7 @@
   "tempo": "3-1-1-0",
   "series_reps_hipertrofia": "3 x 6-8",
   "series_reps_fuerza": "3 x 5-6",
-  "descanso_seg": 120,
+  "descanso_seg": 75,
   "rir_recomendado": "0-1 (permitido llevar la última serie al fallo concéntrico con seguridad)",
   "progresion": "Aumentar repeticiones dentro del rango de 6 a 8; al alcanzar 8 reps en todas las series, subir un pin en el selector de placas.",
   "alternativas": [
@@ -4054,7 +4070,7 @@
   "descripcion_visual": "Punto inicial: brazos abiertos lateralmente casi en cruz con codos semirrígidos, cables bajo tensión y pecho estirado. Punto final: manos juntas o ligeramente cruzadas frente al esternón con los pectorales completamente apretados.",
   "busqueda_video": "cable fly chest horizontal adduction proper form",
   "evidencia": "fuerte",
-  "fuente": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8884325/",
+  "fuente": "",
   "temas": [
    "pecho"
   ],
@@ -4269,7 +4285,9 @@
    "video": "lt3Wtliiqus",
    "canal": "Renaissance Periodization",
    "titulo": "8 Dips Mistakes and How to Fix Them"
-  }
+  },
+  "video": "media/videos/fondos_en_paralelas_pecho.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "press_inclinado_mancuernas_30",
@@ -4338,7 +4356,9 @@
    "video": "0f6-uCUKqgA",
    "canal": "Renaissance Periodization",
    "titulo": "Incline Dumbbell Press BETTER | Targeting The Muscle Series"
-  }
+  },
+  "video": "media/videos/press_inclinado_mancuernas_30.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "press_pecho_en_polea",
@@ -4387,7 +4407,7 @@
   "descripcion_visual": "Punto inicial: de pie con ligera inclinación al frente, codos flexionados hacia atrás y cables jalando hacia los lados del pecho. Punto final: brazos casi extendidos al frente con las manos juntas a la altura del esternón.",
   "busqueda_video": "standing cable chest press technique form",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/27433987/",
+  "fuente": "",
   "temas": [
    "pecho"
   ],
@@ -4476,7 +4496,9 @@
    "video": "QsYre__-aro",
    "canal": "Jeremy Ethier",
    "titulo": "STOP Doing Dumbbell Press Like This (5 Mistakes Slowing Your Chest Gains)"
-  }
+  },
+  "video": "media/videos/press_plano_mancuernas.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "abduccion_cadera_maquina",
@@ -4615,7 +4637,9 @@
    "media/fotos/aduccion_cadera_maquina_0.jpg",
    "media/fotos/aduccion_cadera_maquina_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Thigh_Adductor (dominio público)"
+  "foto_fuente": "free-exercise-db: Thigh_Adductor (dominio público)",
+  "video": "media/videos/aduccion_cadera_maquina.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "curl_femoral_acostado",
@@ -4683,7 +4707,9 @@
    "video": "jobEeklwrrs",
    "canal": "Renaissance Periodization",
    "titulo": "9 Leg Curl Mistakes and How to Fix Them"
-  }
+  },
+  "video": "media/videos/curl_femoral_acostado.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "curl_femoral_sentado",
@@ -4754,7 +4780,9 @@
    "video": "N6FVnaasdq0",
    "canal": "Renaissance Periodization",
    "titulo": "Single Leg Leg Curl"
-  }
+  },
+  "video": "media/videos/curl_femoral_sentado.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "elevacion_talones_prensa",
@@ -4803,7 +4831,7 @@
   "descripcion_visual": "Inicio: Metatarsos en el borde de la plataforma, talones descendidos al máximo por debajo de la plancha, gemelos elongados al límite. Final: Pies empujados en punta completa hacia arriba, gemelos con forma de diamante contraídos rígidamente.",
   "busqueda_video": "leg press calf raise form stretch pause Kassiano",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/37098448/",
+  "fuente": "",
   "temas": [
    "pierna_gluteo"
   ],
@@ -4873,7 +4901,7 @@
   "descripcion_visual": "Inicio: Sentado a 90 grados, mancuernas sobre las rodillas, talones caídos por debajo del bloque. Final: Talones elevados al máximo en el aire, parte lateral e inferior de la pantorrilla hinchada en contracción.",
   "busqueda_video": "seated calf raise dumbbell soleus technique",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/37098448/",
+  "fuente": "",
   "temas": [
    "pierna_gluteo"
   ],
@@ -4887,7 +4915,9 @@
    "media/fotos/elevacion_talones_sentado_mancuerna_0.jpg",
    "media/fotos/elevacion_talones_sentado_mancuerna_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Barbell_Seated_Calf_Raise (dominio público)"
+  "foto_fuente": "free-exercise-db: Barbell_Seated_Calf_Raise (dominio público)",
+  "video": "media/videos/elevacion_talones_sentado_mancuerna.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "extension_cuadriceps_maquina",
@@ -5030,7 +5060,9 @@
    "video": "ZSPmIyX9RZs",
    "canal": "Renaissance Periodization",
    "titulo": "Machine Hip Thrust"
-  }
+  },
+  "video": "media/videos/hip_thrust_banco_mancuerna.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "peso_muerto_rumano_mancuernas",
@@ -5101,7 +5133,9 @@
    "video": "uhghy9pFIPY",
    "canal": "E3 Rehab",
    "titulo": "How To Perform PERFECT Romanian Deadlifts | RDLs (Everything You Need To Know)"
-  }
+  },
+  "video": "media/videos/peso_muerto_rumano_mancuernas.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "prensa_piernas_45",
@@ -5170,7 +5204,9 @@
    "video": "8vk6rWMSxOk",
    "canal": "Renaissance Periodization",
    "titulo": "7 Leg Press Mistakes and How to Fix Them"
-  }
+  },
+  "video": "media/videos/prensa_piernas_45.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  },
  {
   "id": "sentadilla_bulgara_mancuernas",
@@ -5510,7 +5546,7 @@
   "descripcion_visual": "Inicio: Sentado en la máquina con el pecho levantado y escápulas fijas, manerales a los lados del esternón con codos a 45 grados en estiramiento profundo. Final: Brazos extendidos al frente empujando los manerales en convergencia, pecho apretado al máximo sin despegar la espalda.",
   "busqueda_video": "plate loaded chest press machine technique form hypertrophy",
   "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/38032777/"
+  "fuente": ""
  },
  {
   "id": "press_banca_barra",
@@ -5582,6 +5618,8 @@
    "video": "4Y2ZdHCOXok",
    "canal": "Jeremy Ethier",
    "titulo": "How to PROPERLY Bench Press for Growth (5 Easy Steps)"
-  }
+  },
+  "video": "media/videos/press_banca_barra.mp4",
+  "video_fuente": "Video: Goulart · wger.de · CC BY-SA 4.0 (recortado y comprimido)"
  }
 ]

@@ -1,20 +1,22 @@
 /**
  * ajustes.js - Sección 9: Ajustes y Configuración de Forja (Dirección de Arte v2 «Revista de Sala»)
  *
- * Características v2 y Correcciones de Auditoría:
+ * Características v2 y Correcciones de Auditoría (Rondas 1 y 2):
  * - Titulares en Instrument Serif cursivo (emocionales, limpios, elegantes).
  * - Campos de formulario con fondo papel 2 (#E9E4D8) o papel (#F3F0E8) y radio estricto de 28px.
  * - Botones en píldora canónica (border-radius: 999px, min-height: 48px) con acento único Lima (#C8F03C).
- * - Cero emojis y cero backdrop-filter: iconos vectoriales limpios vía icono() de ./iconos.js y contraste accesible (#5D5951).
- * - Seguridad PIN (Hallazgos 3 y 4):
+ * - Cero emojis y cero backdrop-filter: iconos vectoriales limpios vía icono() de ./iconos.js y contraste accesible (#5D5951, #B83218).
+ * - Seguridad PIN (Seguridad R1 Hallazgos 3 y 4):
  *   1. No exporta ni importa el hash/sal del PIN en copias de seguridad JSON.
  *   2. Exige ingresar el PIN actual para quitarlo o cambiarlo.
  *   3. Bloqueo temporal de 30 segundos tras 5 intentos fallidos consecutivos (persistido en localStorage).
- * - Importación unificada (ALTO-05, CRÍTICO-01 y Seguridad 5):
- *   1. Usa importarTodo() tanto en copia completa como en historial, aceptando {datos:...} o listas en raíz sin duplicar.
- *   2. Muestra cuántos registros fueron agregados y actualizados.
- *   3. En fotos importadas, solo acepta esquemas data:image/ (bloquea URLs externas) y preserva Blobs locales existentes.
+ * - Importación unificada y deduplicación defensiva (logica_datos.md CRÍTICO-02, ALTO-05 y Seguridad R1 5):
+ *   1. Control de tamaño máximo de archivo a 50 MB para prevenir DoS por memoria (seguridad_privacidad.md Hallazgo Nuevo 3).
+ *   2. Deduplicación robusta de series y sesiones sin ID mediante Set de IDs asignados, impidiendo colapso de series idénticas (CRÍTICO-02).
+ *   3. En fotos importadas, solo acepta esquemas data:image/ (bloquea URLs externas) y preserva Blobs locales existentes (CRÍTICO-01).
+ *   4. Asigna IDs automáticos determinísticos a medidas, comidas, chat y cámara sin ID para que nunca sean descartadas (ALTO-01).
  * - Sincronización de modelos IA (CFG-01): importa WEBLLM_MODELO y WEBLLM_MODELO_RESPALDO desde ./config.js.
+ * - Asistente inicial canónico con estilos garantizados y atajo «¿Ya tienes tu archivo de Forja? Cárgalo aquí».
  */
 
 import { ajuste, ponerAjuste, guardar, todos, nuevoId, exportarTodo, importarTodo } from './db.js';
@@ -29,6 +31,7 @@ const CLAVE_PIN_INTENTOS = 'forja_pin_intentos';
 const CLAVE_PIN_BLOQUEO = 'forja_pin_bloqueo_hasta';
 const MAX_INTENTOS_PIN = 5;
 const SEGUNDOS_BLOQUEO_PIN = 30;
+const TAMANO_MAX_BACKUP = 50 * 1024 * 1024; // 50 MB (Seguridad Hallazgo Nuevo 3)
 
 let contenedorActual = null;
 let perfilDatos = null;
@@ -157,13 +160,8 @@ function guardarEstadoBloqueoPin(intentos, bloqueadoHasta) {
 }
 
 /**
- * CONTRATO: Asistente inicial de 3 pasos al abrir la app por primera vez
- * Adaptado a la estética Forja v2 (titulares serif, campos papel 2 y radio 28, botones píldora, sin backdrop-filter)
- * @returns {Promise<boolean>}
- */
-/**
  * Estilos que necesitan el asistente y el PIN. Se cargan al abrirlos porque aparecen ANTES de la pantalla de
- * Ajustes (que es la que cargaba estas clases): sin esto los botones salían grises y los campos se desbordaban (7-nov).
+ * Ajustes (que es la que cargaba estas clases): sin esto los botones salían grises y los campos se desbordaban.
  */
 function asegurarEstilosAsistente() {
   if (document.getElementById('forja-estilos-asistente')) return;
@@ -185,6 +183,12 @@ function asegurarEstilosAsistente() {
   `));
 }
 
+/**
+ * CONTRATO: Asistente inicial de 3 pasos al abrir la app por primera vez
+ * Adaptado a la estética Forja v2 (titulares serif, campos papel 2 y radio 28, botones píldora, sin backdrop-filter)
+ * Mantiene intacto el botón canónico «¿Ya tienes tu archivo de Forja? Cárgalo aquí»
+ * @returns {Promise<boolean>}
+ */
 export function asistenteInicial() {
   asegurarEstilosAsistente();
   return new Promise((resolve) => {
@@ -268,7 +272,7 @@ export function asistenteInicial() {
               const archivo = entrada.files && entrada.files[0];
               if (!archivo) return;
               try {
-                if (archivo.size > 50 * 1024 * 1024) throw new Error('El archivo es demasiado grande.');
+                if (archivo.size > TAMANO_MAX_BACKUP) throw new Error('El archivo supera el límite permitido (máx. 50 MB).');
                 const obj = JSON.parse(await archivo.text());
                 if (!obj || typeof obj !== 'object' || !obj.datos) throw new Error('No parece un archivo de Forja.');
                 const r = await importarTodo(obj);
@@ -669,8 +673,8 @@ async function renderizar() {
       width: 100%;
     }
     .v2-btn-peligro {
-      background-color: #E2553A;
-      color: #F3F0E8;
+      background-color: #B83218;
+      color: #FFFFFF;
     }
     .v2-input-redondo {
       background-color: #F3F0E8;
@@ -877,7 +881,7 @@ async function abrirEditorRutina() {
       dias.map(dia => {
         const activo = !!baseDias[dia];
         const nom = baseDias[dia]?.nombre || '';
-        const chk = h('input', { type: 'checkbox', checked: activo, style: 'width: 22px; height: 22px; accent-color: #C8F03C; cursor: pointer;' });
+        const chk = h('input', { type: 'checkbox', checked: activo, style: 'width: 24px; height: 24px; accent-color: #C8F03C; cursor: pointer;' });
         const txt = h('input', {
           class: 'v2-input-redondo',
           type: 'text',
@@ -1179,14 +1183,21 @@ function renderizarSeccionDatos() {
 
 /**
  * Lee, valida y procesa un archivo JSON para importación usando importarTodo()
+ * - Validación de tamaño máximo (50 MB) para prevenir DoS por memoria (seguridad_privacidad.md Hallazgo Nuevo 3).
  * - Acepta formato { datos: {...} } y también colecciones en la raíz { sesiones: [...], series: [...] } (ALTO-05).
- * - Asigna IDs determinísticos o enlaza con registros existentes cuando el historial no trae 'id' para no duplicar al reintentar.
+ * - Deduplicación segura con Set de IDs asignados en series y sesiones sin id (CRÍTICO-02).
  * - Seguridad 3: Filtra cualquier clave 'pin' en ajustes importados.
  * - Seguridad 5: En fotos, solo permite cadenas data:image/ y bloquea cualquier URL externa (http/https/etc.).
  * - CRÍTICO-01: Preserva el Blob de fotos locales existentes si el respaldo importado viene sin foto.
+ * - ALTO-01: Genera IDs automáticos a medidas, comidas, chat y cámara sin ID para no descartarlas.
  */
 async function procesarArchivoImportar(archivo, tipo) {
   if (!archivo) return;
+  if (archivo.size > TAMANO_MAX_BACKUP) {
+    aviso('El archivo seleccionado supera el límite permitido (máx. 50 MB)', 'error');
+    return;
+  }
+
   try {
     const texto = await archivo.text();
     const obj = JSON.parse(texto);
@@ -1221,38 +1232,60 @@ async function procesarArchivoImportar(archivo, tipo) {
       datosNormalizados.ajustes = datosNormalizados.ajustes.filter(aj => aj && aj.id !== 'pin');
     }
 
-    // 3. Evitar duplicados en sesiones sin id (ALTO-05)
+    // 3. Evitar duplicados en sesiones sin id (ALTO-05 / CRÍTICO-02)
     if (Array.isArray(datosNormalizados.sesiones)) {
       const sesionesExistentes = await todos('sesiones');
+      const idsSesionesAsignadas = new Set();
       datosNormalizados.sesiones.forEach((s, idx) => {
         if (!s || typeof s !== 'object') return;
         if (!s.id) {
-          const existente = sesionesExistentes.find(e => e.fecha && s.fecha && e.fecha === s.fecha);
-          s.id = existente ? existente.id : `sesion-${s.fecha || idx}`;
+          const existente = sesionesExistentes.find(e => !idsSesionesAsignadas.has(e.id) && e.fecha && s.fecha && e.fecha === s.fecha);
+          if (existente) {
+            s.id = existente.id;
+            idsSesionesAsignadas.add(existente.id);
+          } else {
+            s.id = `sesion-${s.fecha || idx}-${nuevoId().slice(0, 6)}`;
+          }
         }
       });
     }
 
-    // 4. Evitar duplicados en series sin id (ALTO-05)
+    // 4. Evitar duplicados y colapso de series idénticas sin id (CRÍTICO-02 logica_datos.md)
     if (Array.isArray(datosNormalizados.series)) {
       const seriesExistentes = await todos('series');
+      const idsYaAsignados = new Set();
       datosNormalizados.series.forEach((se, idx) => {
         if (!se || typeof se !== 'object') return;
         if (!se.id) {
           const existente = seriesExistentes.find(e =>
+            !idsYaAsignados.has(e.id) &&
             e.fecha === se.fecha &&
             e.ejercicioId === se.ejercicioId &&
             ((e.hora && se.hora && Math.abs(e.hora - se.hora) < 2000) ||
              (!se.hora && Number(e.kg || 0) === Number(se.kg || 0) && Number(e.reps || 0) === Number(se.reps || 0) && (e.nota || '') === (se.nota || '')))
           );
-          se.id = existente
-            ? existente.id
-            : `serie-${se.fecha || 'f'}-${se.ejercicioId || 'ej'}-${se.hora || idx}-${se.kg ?? 'bw'}-${se.reps ?? 0}`;
+          if (existente) {
+            se.id = existente.id;
+            idsYaAsignados.add(existente.id);
+          } else {
+            se.id = `serie-${se.fecha || 'f'}-${se.ejercicioId || 'ej'}-${se.hora || idx}-${se.kg ?? 'bw'}-${se.reps ?? 0}-${nuevoId().slice(0, 6)}`;
+          }
         }
       });
     }
 
-    // 5. Seguridad 5 y CRÍTICO-01 en fotos: validar solo data:image/ y preservar Blob existente si falta
+    // 5. Garantizar que medidas, comidas, chat y cámara sin id reciban nuevoId() para no ser descartadas (ALTO-01 logica_datos.md)
+    for (const st of ['medidas', 'comidas', 'chat', 'camara']) {
+      if (Array.isArray(datosNormalizados[st])) {
+        datosNormalizados[st].forEach((item) => {
+          if (item && typeof item === 'object' && !item.id) {
+            item.id = nuevoId();
+          }
+        });
+      }
+    }
+
+    // 6. Seguridad 5 y CRÍTICO-01 en fotos: validar solo data:image/ y preservar Blob existente si falta
     let urlsExternasRechazadas = 0;
     if (Array.isArray(datosNormalizados.fotos)) {
       const fotosLocales = await todos('fotos');
@@ -1280,7 +1313,7 @@ async function procesarArchivoImportar(archivo, tipo) {
       }
     }
 
-    // 6. Ejecutar importarTodo con estructura canónica { version, fecha, datos }
+    // 7. Ejecutar importarTodo con estructura canónica { version, fecha, datos }
     const payload = {
       version: obj.version || 1,
       fecha: obj.fecha || new Date().toISOString(),

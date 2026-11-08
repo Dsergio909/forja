@@ -24,6 +24,7 @@ let poseLandmarker = null;
 let cargandoModelo = false;
 let errorModelo = null;
 let desmontado = false; // Bandera para evitar fugas de hardware al navegar
+let ultimoLandmarksDetectados = null; // Última pose detectada para el momento del disparo fotográfico (MEDIO-5)
 
 // Parámetros de la cámara
 let modoActual = 'foto'; // 'foto' | 'medir' | 'reps' | 'qr'
@@ -66,7 +67,8 @@ let estadoReps = {
   rangoIncompleto: false,
   tiempoInicioFase: 0,
   duracionUltimaRep: 0,
-  cadenciaAviso: ''
+  cadenciaAviso: '',
+  ladoElegido: null // 'izq' | 'der' | null - bloqueado durante repetición activa (BAJO-8)
 };
 
 // Estado de Modo 4: QR & Sincronización
@@ -106,9 +108,9 @@ const EJERCICIOS_CONFIG = {
     nombre: 'Press militar con mancuernas sentado',
     articulacion: 'Codo y hombro',
     puntos: [11, 13, 15],
-    anguloExtendido: 155, // brazos extendidos arriba
-    anguloContraido: 75,  // codos flexionados abajo
-    invertido: false
+    anguloExtendido: 75,  // codos flexionados en hombros (posición inicial)
+    anguloContraido: 155, // brazos extendidos arriba (pico concéntrico)
+    invertido: true       // ángulo creciente en la fase concéntrica (ALTO-4)
   },
   sentadilla_hack: {
     id: 'sentadilla_hack',
@@ -255,8 +257,9 @@ async function iniciarCamara() {
   const facingMode = camaraTrasera ? { ideal: 'environment' } : { ideal: 'user' };
   actualizarUIEstado('Iniciando cámara...');
 
+  let stream = null;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
+    stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode,
         width: { ideal: 1280 },
@@ -278,6 +281,12 @@ async function iniciarCamara() {
     iniciarBucleDeteccion();
   } catch (err) {
     console.error('Error al acceder a la cámara:', err);
+    detenerCamara();
+    if (stream) {
+      try {
+        stream.getTracks().forEach((track) => track.stop());
+      } catch (_) {}
+    }
     let msg = 'Permiso de cámara denegado o no disponible';
     if (err.name === 'NotAllowedError') {
       msg = 'Habilita el permiso de cámara en tu navegador y toca Reintentar';
@@ -368,6 +377,7 @@ function iniciarBucleDeteccion() {
           resultados = poseLandmarker.detectForVideo(elementoVideo, timestamp);
           if (resultados && resultados.landmarks && resultados.landmarks.length > 0) {
             const landmarks = resultados.landmarks[0];
+            ultimoLandmarksDetectados = landmarks;
             dibujarEsqueleto(landmarks, videoW, videoH);
             procesarModoActivo(landmarks, videoW, videoH, resultados.segmentationMasks);
           } else {
@@ -633,6 +643,7 @@ function cancelarCuentaRegresiva() {
 }
 
 async function tomarFotoProgreso(altoPx, landmarks) {
+  estadoFoto.cuentaRegresiva = null; // Restablecer estado para permitir capturas posteriores (ALTO-3)
   vibrar([100, 50, 100]);
   sonido();
 
@@ -647,13 +658,14 @@ async function tomarFotoProgreso(altoPx, landmarks) {
   }
   ctxFoto.drawImage(elementoVideo, 0, 0);
 
-  // Reflejar coordenadas X de landmarks si la cámara es frontal (ALTO-6 camara_cuerpo.md)
-  const puntosNormalizados = (!camaraTrasera && Array.isArray(landmarks))
-    ? landmarks.map((pt) => ({
+  // Usar pose en el momento exacto del disparo fotográfico (MEDIO-5) y reflejar X si es frontal
+  const puntosMomento = ultimoLandmarksDetectados || landmarks;
+  const puntosNormalizados = (!camaraTrasera && Array.isArray(puntosMomento))
+    ? puntosMomento.map((pt) => ({
         ...pt,
         x: typeof pt.x === 'number' ? 1 - pt.x : pt.x
       }))
-    : landmarks;
+    : puntosMomento;
 
   canvasFoto.toBlob(async (blob) => {
     if (!blob) {
@@ -693,6 +705,7 @@ async function tomarFotoProgreso(altoPx, landmarks) {
         ]
       }).then((resp) => {
         URL.revokeObjectURL(urlImg);
+        estadoFoto.cuentaRegresiva = null;
         if (resp === 'cuerpo') ir('#cuerpo');
       });
     } catch (err) {
@@ -774,7 +787,7 @@ function procesarMedicion(landmarks, w, h, masks) {
   const anchoHombrosPx = distancia2D(hombroIzq, hombroDer, w, h) * 1.14;
   const hombrosCm = anchoHombrosPx * cmPorPx;
 
-  // Ancho de cintura usando el contorno de la máscara de segmentación (CRÍTICO-4)
+  // Ancho de cintura usando el contorno de la máscara de segmentación aislando el torso central (CRÍTICO-2)
   let anchoCinturaPx = 0;
   if (masks && masks[0]) {
     const mask = masks[0];
@@ -785,37 +798,28 @@ function procesarMedicion(landmarks, w, h, masks) {
     const yPixel = Math.min(maskH - 1, Math.max(0, Math.round(yTorsoNorm * maskH)));
     const filaOffset = yPixel * maskW;
 
-    let xMin = -1;
-    let xMax = -1;
+    const xCentro = Math.min(maskW - 1, Math.max(0, Math.round(((caderaIzq.x + caderaDer.x) / 2) * maskW)));
 
-    if (typeof mask.getAsFloat32Array === 'function') {
-      const maskData = mask.getAsFloat32Array();
-      for (let x = 0; x < maskW; x++) {
-        if (maskData[filaOffset + x] > 0.5) {
-          if (xMin === -1) xMin = x;
-          xMax = x;
-        }
-      }
-    } else if (typeof mask.getAsUint8Array === 'function') {
-      const maskData = mask.getAsUint8Array();
-      for (let x = 0; x < maskW; x++) {
-        if (maskData[filaOffset + x] > 127) {
-          if (xMin === -1) xMin = x;
-          xMax = x;
-        }
-      }
-    }
+    const maskData = typeof mask.getAsFloat32Array === 'function'
+      ? mask.getAsFloat32Array()
+      : (typeof mask.getAsUint8Array === 'function' ? mask.getAsUint8Array() : null);
 
-    if (xMin !== -1 && xMax > xMin) {
-      const candidatoPx = ((xMax - xMin) / maskW) * w;
-      // Validar que el contorno segmentado esté en un rango anatómico coherente (no brazos extendidos)
-      if (candidatoPx > anchoHombrosPx * 0.45 && candidatoPx < anchoHombrosPx * 1.15) {
+    const esCuerpo = (idx) => maskData ? (maskData[idx] > (maskData instanceof Float32Array ? 0.5 : 127)) : false;
+
+    if (maskData && esCuerpo(filaOffset + xCentro)) {
+      let xIzq = xCentro;
+      let xDer = xCentro;
+      while (xIzq > 0 && esCuerpo(filaOffset + (xIzq - 1))) xIzq--;
+      while (xDer < maskW - 1 && esCuerpo(filaOffset + (xDer + 1))) xDer++;
+
+      const candidatoPx = ((xDer - xIzq) / maskW) * w;
+      if (candidatoPx > anchoHombrosPx * 0.45 && candidatoPx < anchoHombrosPx * 0.95) {
         anchoCinturaPx = candidatoPx;
       }
     }
   }
 
-  // Fallback si la máscara no estuvo disponible en este cuadro
+  // Fallback si la máscara no estuvo disponible en este cuadro o el contorno fue descartado
   if (!anchoCinturaPx) {
     anchoCinturaPx = distancia2D(caderaIzq, caderaDer, w, h) * 1.15;
   }
@@ -987,22 +991,36 @@ function procesarContadorReps(landmarks, w, h) {
   let pB = landmarks[conf.puntos[1]];
   let pC = landmarks[conf.puntos[2]];
 
-  // Conmutar al perfil más visible respetando la anatomía de cada ejercicio (CRÍTICO-2)
-  if (estadoReps.ejercicio === 'elevaciones_laterales_mancuerna_pie') {
-    // [23, 11, 13] (cadera, hombro, codo izq) -> [24, 12, 14] (cadera, hombro, codo der)
-    if ((landmarks[11]?.visibility || 0) < (landmarks[12]?.visibility || 0)) {
+  // Bloquear la lateralidad elegida durante una repetición activa para evitar avisos espurios de rango incompleto (BAJO-8)
+  if (estadoReps.fase === 'extendido' || !estadoReps.ladoElegido) {
+    let lado = 'izq';
+    if (estadoReps.ejercicio === 'elevaciones_laterales_mancuerna_pie') {
+      // [23, 11, 13] (cadera, hombro, codo izq) -> [24, 12, 14] (cadera, hombro, codo der)
+      if ((landmarks[11]?.visibility || 0) < (landmarks[12]?.visibility || 0)) {
+        lado = 'der';
+      }
+    } else if (conf.puntos[0] === 11 && (landmarks[11]?.visibility || 0) < (landmarks[12]?.visibility || 0)) {
+      lado = 'der';
+    } else if (conf.puntos[0] === 23 && (landmarks[23]?.visibility || 0) < (landmarks[24]?.visibility || 0)) {
+      lado = 'der';
+    }
+    estadoReps.ladoElegido = lado;
+  }
+
+  if (estadoReps.ladoElegido === 'der') {
+    if (estadoReps.ejercicio === 'elevaciones_laterales_mancuerna_pie') {
       pA = landmarks[24];
       pB = landmarks[12];
       pC = landmarks[14];
+    } else if (conf.puntos[0] === 11) {
+      pA = landmarks[12];
+      pB = landmarks[14];
+      pC = landmarks[16];
+    } else if (conf.puntos[0] === 23) {
+      pA = landmarks[24];
+      pB = landmarks[26];
+      pC = landmarks[28];
     }
-  } else if (conf.puntos[0] === 11 && (pA?.visibility || 0) < (landmarks[12]?.visibility || 0)) {
-    pA = landmarks[12];
-    pB = landmarks[14];
-    pC = landmarks[16];
-  } else if (conf.puntos[0] === 23 && (pA?.visibility || 0) < (landmarks[24]?.visibility || 0)) {
-    pA = landmarks[24];
-    pB = landmarks[26];
-    pC = landmarks[28];
   }
 
   if (!pA || !pB || !pC || (pB.visibility || 1) < 0.5) return;
@@ -1038,6 +1056,7 @@ function procesarContadorReps(landmarks, w, h) {
     } else if (abortaMovimiento) {
       estadoReps.fase = 'extendido';
       estadoReps.rangoIncompleto = true;
+      estadoReps.ladoElegido = null;
     }
   } else if (estadoReps.fase === 'contraido') {
     const iniciaRetorno = inv
@@ -1057,6 +1076,7 @@ function procesarContadorReps(landmarks, w, h) {
     if (completaRep) {
       estadoReps.reps++;
       estadoReps.fase = 'extendido';
+      estadoReps.ladoElegido = null;
       const durSeg = ((performance.now() - estadoReps.tiempoInicioFase) / 1000).toFixed(1);
       estadoReps.duracionUltimaRep = durSeg;
 
@@ -1413,7 +1433,7 @@ export async function montar(contenedor, params = []) {
     { id: 'foto', icono: 'camara', texto: 'Foto guiada' },
     { id: 'medir', icono: 'regla', texto: 'Proporciones' },
     { id: 'reps', icono: 'reps', texto: 'Contar reps' },
-    { id: 'qr', icono: 'qr', texto: 'QR PC ⇄ Cel' }
+    { id: 'qr', icono: 'qr', texto: 'Escanear QR' }
   ];
 
   const botonesModo = modos.map((m) =>
@@ -1590,6 +1610,7 @@ function renderizarPanelModo() {
           estadoReps.reps = 0;
           estadoReps.fase = 'extendido';
           estadoReps.rangoIncompleto = false;
+          estadoReps.ladoElegido = null;
           actualizarUIReps();
           actualizarUIRepsDinamica();
         }
@@ -1637,6 +1658,7 @@ function renderizarPanelModo() {
               estadoReps.reps = 0;
               estadoReps.fase = 'extendido';
               estadoReps.rangoIncompleto = false;
+              estadoReps.ladoElegido = null;
               actualizarUIReps();
               actualizarUIRepsDinamica();
             }
@@ -1741,6 +1763,7 @@ async function guardarSerieContada() {
     await guardar('series', serie);
     aviso(`Serie de ${estadoReps.reps} reps guardada`, 'ok');
     estadoReps.reps = 0;
+    estadoReps.ladoElegido = null;
     actualizarUIReps();
   }
 }
@@ -1775,6 +1798,11 @@ function renderizarContenidoQR() {
         change: (e) => {
           const archivo = e.target.files?.[0];
           if (!archivo) return;
+          const TAMANO_MAX_BACKUP = 50 * 1024 * 1024; // 50 MB (Seguridad Hallazgo 3)
+          if (archivo.size > TAMANO_MAX_BACKUP) {
+            aviso('El archivo seleccionado supera el límite permitido (máx. 50 MB)', 'error');
+            return;
+          }
           const lector = new FileReader();
           lector.onload = async (ev) => {
             try {
@@ -1952,6 +1980,8 @@ export function desmontar() {
     poseLandmarker = null;
   }
 
+  ultimoLandmarksDetectados = null;
+  estadoReps.ladoElegido = null;
   contenedorRaiz = null;
   elementoVideo = null;
   canvasSuperpuesto = null;
