@@ -173,7 +173,9 @@ async function obtenerAjusteIASincronizado() {
   const modeloPrincipal = config.WEBLLM_MODELO || 'Qwen3.5-2B-q4f16_1-MLC';
   const aj = await db.ajuste('ia', { activa: false, modelo: modeloPrincipal });
   const modeloSinc = normalizarModeloConfig(aj?.modelo);
-  const estado = { activa: Boolean(aj?.activa), modelo: modeloSinc };
+  // 7-nov: el modelo 2B trababa el celular de Sergio → quien lo tenía queda con la IA APAGADA y el modelo liviano.
+  const veniaDel2B = typeof aj?.modelo === 'string' && /\b2B\b|1\.5B/.test(aj.modelo);
+  const estado = { activa: veniaDel2B ? false : Boolean(aj?.activa), modelo: modeloSinc };
   if (aj && aj.modelo !== modeloSinc) {
     try { await db.ponerAjuste('ia', estado); } catch (_) {}
   }
@@ -761,7 +763,7 @@ async function cargarMotorInterno(alAvance, modelo) {
     try {
       mlcEngine = await webllm.CreateMLCEngine(modeloACargar, {
         initProgressCallback: rep => { if (typeof alAvance === 'function') alAvance(rep); }
-      });
+      }, { context_window_size: 2048 });   // memoria de conversación corta: menos RAM y menos traba en el celular
       mlcEngine._modeloCargado = modeloACargar;
       await db.ponerAjuste('ia', { ...aj, activa: true, modelo: modeloACargar });
       if (estadoPantalla?.actualizarModo) estadoPantalla.actualizarModo(true, modeloACargar);
@@ -785,7 +787,7 @@ async function cargarMotorInterno(alAvance, modelo) {
           }
           mlcEngine = await webllm.CreateMLCEngine(modeloACargar, {
             initProgressCallback: rep => { if (typeof alAvance === 'function') alAvance(rep); }
-          });
+          }, { context_window_size: 2048 });
           mlcEngine._modeloCargado = modeloACargar;
           ui.aviso('Modelo de respaldo listo para usar', 'ok');
           return mlcEngine;
@@ -881,7 +883,7 @@ async function responderConIA(pregunta, onChunk, onProgreso) {
     enGeneracion = true;
     let acc = '';
     try {
-      const stream = await mlcEngine.chat.completions.create({ messages: msgs, stream: true });
+      const stream = await mlcEngine.chat.completions.create({ messages: msgs, stream: true, max_tokens: 350, temperature: 0.6 });
       for await (const chunk of stream) {
         if (!enGeneracion) break;
         acc += chunk.choices[0]?.delta?.content || '';

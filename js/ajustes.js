@@ -1370,10 +1370,10 @@ function renderizarSeccionIA() {
     }
   },
     h('option', { value: modeloPrincipal, selected: iaAjustes.modelo === modeloPrincipal },
-      `2B ≈ 1,3 GB (Recomendado: ${modeloPrincipal})`
+      `Liviano ≈ 0,6 GB (${modeloPrincipal})`
     ),
     h('option', { value: modeloRespaldo, selected: iaAjustes.modelo === modeloRespaldo },
-      `0.8B ≈ 0,5 GB (Ligero: ${modeloRespaldo})`
+      `Muy liviano ≈ 0,4 GB (${modeloRespaldo})`
     )
   );
 
@@ -1383,7 +1383,7 @@ function renderizarSeccionIA() {
       'IA local en el ', h('em', {}, 'teléfono')
     ),
     h('p', { style: 'font-size: 13px; color: #5D5951;' },
-      'Entrenador inteligente que analiza tus datos sin internet mediante WebGPU.'
+      'Opcional y experimental: el Coach ya responde sin IA (¿cómo voy?, ¿qué me toca?, ¿qué peso uso?). La IA solo sirve para preguntas libres y en muchos celulares los traba. Si se te traba, bórrala con el botón de abajo.'
     ),
     !tieneWebGPU
       ? h('div', {

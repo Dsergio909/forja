@@ -14,8 +14,9 @@ export const MEDIAPIPE_MODELO = 'https://storage.googleapis.com/mediapipe-models
 // IA local en el navegador (WebLLM)
 // Versión y modelos comprobados en npm el 7-nov-2026. El modelo final se elige con la prueba de sus preguntas.
 export const WEBLLM_URL = 'https://esm.run/@mlc-ai/web-llm@0.2.87';
-export const WEBLLM_MODELO = 'Qwen3.5-2B-q4f16_1-MLC';
-export const WEBLLM_MODELO_RESPALDO = 'Qwen3.5-0.8B-q4f16_1-MLC';   // por si el celular se queda sin memoria
+// 7-nov: el 2B trababa el celular de Sergio (POCO X7 Pro). Ahora el liviano por defecto y uno aún más chico de respaldo.
+export const WEBLLM_MODELO = 'Qwen3.5-0.8B-q4f16_1-MLC';           // ~0,6 GB
+export const WEBLLM_MODELO_RESPALDO = 'Qwen3-0.6B-q4f16_1-MLC';    // ~0,4 GB, por si aun así se traba
 
 // Fórmula por defecto para cálculo de 1RM ('epley' o 'brzycki')
 export const FORMULA_1RM = 'epley';
