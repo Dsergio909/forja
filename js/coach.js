@@ -222,6 +222,11 @@ export function clasificarPregunta(texto) {
   const n = normalizar(texto);
   if (!n) return null;
 
+  // 0. «¿sabes quién soy?» / «¿cómo me llamo?» / «¿qué sabes de mí?» (7-nov: antes caía en la IA)
+  if (/\b(quien soy|sabes quien soy|como me llamo|mi nombre|que sabes de mi|me conoces|sabes algo de mi|mis datos)\b/.test(n)) {
+    return { tipo: 'QUIEN_SOY' };
+  }
+
   // 1. «¿cómo voy?» y variantes
   if (
     /^(como voy|resumen|progreso|reporte|estado)\b/.test(n) ||
@@ -302,6 +307,29 @@ export function clasificarPregunta(texto) {
 // ============================================================================
 // 3. RESPUESTAS POR REGLAS (CÁLCULOS DETERMINÍSTICOS SIN EMOJIS)
 // ============================================================================
+
+/** «¿Sabes quién soy?»: responde con el perfil y el resumen de lo registrado (sin IA). */
+async function responderQuienSoy() {
+  const p = await datos.perfil();
+  const series = await db.todos('series');
+  const medidas = (await db.todos('medidas')).filter(m => m.peso).sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
+  const dias = [...new Set(series.map(s => s.fecha))].sort();
+  const r = await datos.rutina();
+  const diasRutina = Object.keys(r?.dias || {});
+  const partes = [];
+  partes.push(p?.nombre ? `¡Claro, ${p.nombre}! Esto es lo que sé de ti (todo guardado solo en este teléfono):` :
+    'Todavía no me dijiste tu nombre (ponlo en Ajustes). Esto es lo que sé:');
+  if (p?.estaturaCm) partes.push(`- Estatura: ${p.estaturaCm} cm.`);
+  if (medidas.length) partes.push(`- Último peso: ${medidas[medidas.length - 1].peso} kg (${ui.fechaBonita(medidas[medidas.length - 1].fecha)}).`);
+  if (p?.metaNombre) partes.push(`- Meta: ${p.metaNombre}${p.metaFecha ? ` (${ui.fechaBonita(p.metaFecha)})` : ' (sin fecha todavía; ponla en Ajustes)'}.`);
+  if (p?.metaMes) partes.push(`- Meta del mes: ${p.metaMes}.`);
+  partes.push(`- Metas diarias: ${p?.kcal || 2200} kcal y ${p?.proteina || 128} g de proteína.`);
+  if (diasRutina.length) partes.push(`- Tu rutina: ${diasRutina.join(', ')}.`);
+  partes.push(dias.length ? `- Llevas ${series.length} series en ${dias.length} días de entrenamiento (desde ${ui.fechaBonita(dias[0])}).`
+    : '- Aún no hay series registradas.');
+  partes.push('\nPregúntame «¿cómo voy?», «¿qué me toca hoy?» o «¿qué peso uso en el jalón?».');
+  return partes.join('\n');
+}
 
 async function responderComoVoy() {
   const [perfil, series, sesiones, medidas, comidas, ejs, rut] = await Promise.all([
@@ -695,9 +723,26 @@ async function armarResumenParaIA() {
  * Si el modelo grande falla por memoria, ofrece cambiar al de respaldo de config.js.
  * Exportada para ser utilizada tanto por el Coach como por Ajustes.
  */
+let promesaCarga = null;   // 7-nov: una sola carga compartida; quien llega después ESPERA (antes recibía null → «reading 'chat'»)
+const oyentesAvance = new Set();
+
 export async function descargarModelo(alAvance, modelo = null) {
   if (!tieneWebGPU()) throw new Error('WebGPU no está disponible en este dispositivo o navegador.');
-  if (descargando) return mlcEngine;
+  if (typeof alAvance === 'function') oyentesAvance.add(alAvance);
+  if (promesaCarga) {
+    try { return await promesaCarga; } finally { oyentesAvance.delete(alAvance); }
+  }
+  const avisarTodos = (rep) => oyentesAvance.forEach(fn => { try { fn(rep); } catch (_) {} });
+  promesaCarga = cargarMotorInterno(avisarTodos, modelo);
+  try {
+    return await promesaCarga;
+  } finally {
+    promesaCarga = null;
+    oyentesAvance.clear();
+  }
+}
+
+async function cargarMotorInterno(alAvance, modelo) {
   descargando = true;
   try {
     const webllm = await import(config.WEBLLM_URL);
@@ -814,6 +859,10 @@ async function responderConIA(pregunta, onChunk, onProgreso) {
       }
     }
 
+    if (!mlcEngine || !mlcEngine.chat) {
+      return 'La IA local todavía no está lista en este teléfono. Ve a Ajustes → IA local → Descargar (con wifi, ~1,5 GB, una sola vez) y espera a que llegue al 100 %. Mientras tanto te respondo con mis reglas: prueba «¿cómo voy?» o «¿qué me toca hoy?».';
+    }
+
     const contexto = await armarResumenParaIA();
     // COA-03: excluir la pregunta recién guardada del historial previo para no duplicarla
     const todosMsgs = (await db.todos('chat')).sort((a, b) => (a.hora || 0) - (b.hora || 0));
@@ -859,6 +908,7 @@ function mensajeSugerencias() {
 export async function responder(texto, { onChunk, onProgreso } = {}) {
   const c = clasificarPregunta(texto);
   if (c) {
+    if (c.tipo === 'QUIEN_SOY') return await responderQuienSoy();
     if (c.tipo === 'COMO_VOY') return await responderComoVoy();
     if (c.tipo === 'PROTEINA_LLEVO') return await responderProteinaLlevo();
     if (c.tipo === 'QUE_TOCA_HOY') return await responderQueTocaHoy();
@@ -878,7 +928,7 @@ export async function responder(texto, { onChunk, onProgreso } = {}) {
 
 const CSS_COACH = `
 .coach-pantalla { display: flex; flex-direction: column; height: 100%; max-height: calc(100vh - 120px); max-width: 520px; margin: 0 auto; box-sizing: border-box; padding: 8px 16px 12px; background: var(--papel, #F3F0E8); color: var(--tinta, #17171A); font-family: 'Bricolage Grotesque', system-ui, sans-serif; }
-.coach-cabecera { display: flex; justify-content: space-between; align-items: center; padding: 4px 0 10px; }
+.coach-cabecera { display: flex; justify-content: space-between; align-items: center; padding: 4px 0 10px; flex-shrink: 0; }
 .coach-cabecera-texto { display: flex; flex-direction: column; gap: 2px; }
 .coach-titulo { font-family: 'Instrument Serif', Georgia, serif; font-size: 32px; font-weight: 400; line-height: 1.05; color: var(--tinta, #17171A); letter-spacing: -0.01em; margin: 0; }
 .coach-titulo em { font-style: italic; }
@@ -886,7 +936,7 @@ const CSS_COACH = `
 .coach-punto { width: 6px; height: 6px; border-radius: 999px; background-color: var(--lima, #C8F03C); }
 .coach-btn-limpiar { width: 48px; height: 48px; min-width: 48px; min-height: 48px; border-radius: 999px; background: var(--papel2, #E9E4D8); border: none; color: var(--tinta, #17171A); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 140ms, background 140ms; }
 .coach-btn-limpiar:active { transform: scale(0.94); background: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }
-.coach-chips { display: flex; gap: 8px; overflow-x: auto; padding: 8px 0 12px; scrollbar-width: none; -ms-overflow-style: none; }
+.coach-chips { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 8px 0 12px; flex-shrink: 0; min-height: 68px; scrollbar-width: none; -ms-overflow-style: none; }
 .coach-chips::-webkit-scrollbar { display: none; }
 .coach-chip-btn { flex-shrink: 0; min-height: 48px; font-family: 'Bricolage Grotesque', sans-serif; font-size: 13px; font-weight: 600; padding: 0 16px; border-radius: 999px; border: none; background: var(--papel2, #E9E4D8); color: var(--tinta, #17171A); cursor: pointer; transition: transform 140ms, background 140ms, color 140ms; white-space: nowrap; display: inline-flex; align-items: center; }
 .coach-chip-btn:active { transform: scale(0.96); background: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }

@@ -11,7 +11,7 @@
    - NOTIFICACIONES: maneja notificationclick para enfocar la app y navegar a #registrar (C2-02).
    ========================================================================== */
 
-const CACHE_NAME = 'forja-20261107-2139';
+const CACHE_NAME = 'forja-20261107-2210';
 const TIEMPO_LIMITE_RED_MS = 3000;
 
 // Lista completa de archivos de la app para precaché
