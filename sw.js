@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    FORJA - Service Worker (sw.js)
    Versión de caché: forja-v4
    Garantiza funcionamiento 100% offline y actualizaciones sin fricción.
@@ -10,7 +10,7 @@
    - CACHÉ PRIMERO para: multimedia local (media/) y librerías del CDN permitido.
    ========================================================================== */
 
-const CACHE_NAME = 'forja-20261107-1937';
+const CACHE_NAME = 'forja-20261107-2036';
 const TIEMPO_LIMITE_RED_MS = 3000;
 
 // Lista completa de archivos de la app para precaché
@@ -20,6 +20,8 @@ const ARCHIVOS_APP = [
   './styles.css',
   './manifest.webmanifest',
   './icon.svg',
+  './icon-192.png',
+  './icon-512.png',
   './fonts/fuentes.css',
   './fonts/BricolageGrotesque-normal-latin-ext.woff2',
   './fonts/BricolageGrotesque-normal-latin.woff2',
