@@ -161,22 +161,48 @@ function guardarEstadoBloqueoPin(intentos, bloqueadoHasta) {
  * Adaptado a la estética Forja v2 (titulares serif, campos papel 2 y radio 28, botones píldora, sin backdrop-filter)
  * @returns {Promise<boolean>}
  */
+/**
+ * Estilos que necesitan el asistente y el PIN. Se cargan al abrirlos porque aparecen ANTES de la pantalla de
+ * Ajustes (que es la que cargaba estas clases): sin esto los botones salían grises y los campos se desbordaban (7-nov).
+ */
+function asegurarEstilosAsistente() {
+  if (document.getElementById('forja-estilos-asistente')) return;
+  document.head.appendChild(h('style', { id: 'forja-estilos-asistente' }, `
+    .v2-asistente-overlay *, .v2-asistente-overlay *::before, .v2-asistente-overlay *::after { box-sizing: border-box; }
+    .v2-asistente-overlay .v2-btn-pildora { min-height: 48px; border-radius: 999px; border: none; padding: 0 22px;
+      font-family: inherit; font-size: 15px; font-weight: 600; display: inline-flex; align-items: center;
+      justify-content: center; gap: 8px; cursor: pointer; background-color: #E9E4D8; color: #17171A; }
+    .v2-asistente-overlay .v2-btn-pildora:active { transform: scale(0.97); }
+    .v2-asistente-overlay .v2-btn-lima { background-color: #C8F03C; color: #17171A; font-size: 16px; min-height: 52px; }
+    .v2-asistente-overlay .v2-input-redondo { background-color: #E9E4D8; color: #17171A; border: none; border-radius: 28px;
+      padding: 14px 18px; font-family: inherit; font-size: 16px; outline: none; width: 100%; min-width: 0; }
+    .v2-asistente-overlay .v2-input-redondo::placeholder { color: #6B675F; }
+    .v2-asistente-overlay .v2-input-redondo:focus { box-shadow: 0 0 0 2px #17171A; }
+    .v2-asistente-overlay label { display: block; margin-bottom: 6px; }
+    .v2-asistente-overlay [style*="grid-template-columns"] > div { min-width: 0; }
+    .v2-asistente-overlay .v2-enlace { background: none; border: none; padding: 8px 0; font: inherit; font-size: 14px;
+      font-weight: 600; color: #17171A; text-decoration: underline; cursor: pointer; text-align: left; }
+  `));
+}
+
 export function asistenteInicial() {
+  asegurarEstilosAsistente();
   return new Promise((resolve) => {
     let pasoActual = 1;
+    // Versión pública: campos vacíos (cada persona escribe lo suyo). Sergio usa su archivo personal (botón de abajo).
     const datosAsistente = {
       nombre: '',
-      metaNombre: 'Grado universitario',
+      metaNombre: '',
       metaFecha: '',
-      metaMes: 'Constancia 4 días a la semana',
-      estaturaCm: 175,
-      peso: 70,
-      cintura: 82,
-      cuello: 38,
+      metaMes: '',
+      estaturaCm: '',
+      peso: '',
+      cintura: '',
+      cuello: '',
       kcal: 2200,
-      proteina: 130,
+      proteina: 120,
       aguaVasos: 10,
-      pasos: 9000
+      pasos: 8000
     };
 
     const modal = h('div', {
@@ -202,7 +228,7 @@ export function asistenteInicial() {
           class: 'v2-input-redondo',
           type: 'text',
           value: datosAsistente.metaNombre,
-          placeholder: 'Grado universitario'
+          placeholder: 'Ej.: verme mejor para mi grado'
         });
         const inputMetaFec = h('input', {
           class: 'v2-input-redondo',
@@ -234,7 +260,31 @@ export function asistenteInicial() {
                 }
               }
             }, 'Siguiente')
-          )
+          ),
+          // Atajo para quien ya tiene su archivo de Forja (respaldo o archivo personal): todo queda listo sin escribir.
+          (() => {
+            const entrada = h('input', { type: 'file', accept: '.json,application/json', style: 'display:none' });
+            entrada.addEventListener('change', async () => {
+              const archivo = entrada.files && entrada.files[0];
+              if (!archivo) return;
+              try {
+                if (archivo.size > 50 * 1024 * 1024) throw new Error('El archivo es demasiado grande.');
+                const obj = JSON.parse(await archivo.text());
+                if (!obj || typeof obj !== 'object' || !obj.datos) throw new Error('No parece un archivo de Forja.');
+                const r = await importarTodo(obj);
+                await ponerAjuste('primeraVez', false);
+                modal.remove();
+                aviso(`Listo: se cargaron ${r.agregados} datos de tu archivo.`, 'ok');
+                resolve(true);
+              } catch (err) {
+                aviso('No se pudo cargar el archivo: ' + (err && err.message ? err.message : err), 'error');
+              }
+            });
+            return h('div', { style: 'border-top: 1px solid rgba(23,23,26,.10); padding-top: 12px; margin-top: 4px;' },
+              h('button', { class: 'v2-enlace', type: 'button', on: { click: () => entrada.click() } },
+                '¿Ya tienes tu archivo de Forja? Cárgalo aquí'),
+              entrada);
+          })()
         );
       } else if (pasoActual === 2) {
         // Paso 2: Medidas corporales
@@ -365,6 +415,7 @@ export function asistenteInicial() {
  * @param {Object} opciones - Opciones internas ({ cancelar: boolean, subtitulo: string })
  */
 export async function pedirPin(opciones = {}) {
+  asegurarEstilosAsistente();
   const pinGuardado = await ajuste('pin', null);
   if (!pinGuardado || !pinGuardado.hash) return true;
 
