@@ -19,10 +19,12 @@ const DB_NOMBRE = 'forja';
 const DB_VERSION = 1;
 
 let dbInstancia = null;
+let promesaApertura = null;
 
 /**
  * Abre o reutiliza la conexión a la base de datos IndexedDB 'forja' v1.
  * Crea los almacenes (stores) requeridos con keyPath 'id'.
+ * Controla concurrencia en el arranque y escucha cambios de versión.
  * Solicita persistencia de almacenamiento al navegador.
  * @returns {Promise<IDBDatabase>}
  */
@@ -30,8 +32,11 @@ export async function abrir() {
   if (dbInstancia) {
     return dbInstancia;
   }
+  if (promesaApertura) {
+    return promesaApertura;
+  }
 
-  return new Promise((resolve, reject) => {
+  promesaApertura = new Promise((resolve, reject) => {
     const peticion = indexedDB.open(DB_NOMBRE, DB_VERSION);
 
     peticion.onupgradeneeded = (evento) => {
@@ -46,8 +51,12 @@ export async function abrir() {
     peticion.onsuccess = (evento) => {
       dbInstancia = evento.target.result;
 
-      // Limpiar referencia en caso de cierre inesperado
+      // Limpiar referencia en caso de cierre inesperado o actualización de versión
       dbInstancia.onclose = () => {
+        dbInstancia = null;
+      };
+      dbInstancia.onversionchange = () => {
+        dbInstancia.close();
         dbInstancia = null;
       };
 
@@ -62,7 +71,11 @@ export async function abrir() {
     peticion.onerror = () => {
       reject(new Error(`Error al abrir IndexedDB '${DB_NOMBRE}': ${peticion.error?.message}`));
     };
+  }).finally(() => {
+    promesaApertura = null;
   });
+
+  return promesaApertura;
 }
 
 /**
@@ -195,6 +208,7 @@ export async function ponerAjuste(clave, valor) {
 /**
  * Exporta toda la base de datos a un objeto JSON serializable.
  * Si conFotos es true, convierte los Blobs de 'fotos' a cadenas dataURL (base64).
+ * Excluye la clave sensible 'pin' en 'ajustes' para no exfiltrar el hash/sal del PIN.
  * @param {Object} opciones
  * @param {boolean} opciones.conFotos
  * @returns {Promise<{version: number, fecha: string, datos: Object}>}
@@ -222,6 +236,9 @@ export async function exportarTodo({ conFotos = false } = {}) {
         }
       }
       resultado.datos[store] = fotosProcesadas;
+    } else if (store === 'ajustes') {
+      // No exportar nunca el hash/sal del PIN en copias de seguridad
+      resultado.datos[store] = items.filter((aj) => aj.id !== 'pin');
     } else {
       resultado.datos[store] = items;
     }
@@ -231,30 +248,68 @@ export async function exportarTodo({ conFotos = false } = {}) {
 }
 
 /**
- * Importa datos a la base de datos uniendo por 'id'.
- * En caso de conflicto de id, gana el registro con 'actualizado' más reciente.
- * @param {Object} obj Objeto exportado previamente con estructura {datos: {...}}
+ * Importa datos a la base de datos uniendo por 'id' (o clave natural si no trae id).
+ * - En caso de conflicto de id, gana el registro con 'actualizado' mayor (no pisa datos más nuevos).
+ * - Preserva el Blob local en 'fotos' si la copia importada se generó con conFotos: false.
+ * - Preserva la marca temporal original 'actualizado' del respaldo sin destruirla.
+ * - No duplica sesiones ni series al reintentar importar historiales.
+ * @param {Object} obj Objeto exportado previamente con estructura {datos: {...}} o listas por store
  * @returns {Promise<{agregados: number, actualizados: number}>}
  */
 export async function importarTodo(obj) {
-  if (!obj || typeof obj !== 'object' || !obj.datos) {
+  const fuenteDatos = (obj && typeof obj === 'object')
+    ? (obj.datos && typeof obj.datos === 'object'
+        ? obj.datos
+        : (STORES.some((s) => Array.isArray(obj[s])) ? obj : null))
+    : null;
+
+  if (!fuenteDatos) {
     throw new Error('Formato de importación inválido: falta propiedad "datos".');
   }
 
+  const db = await abrir();
   let agregados = 0;
   let actualizados = 0;
 
   for (const store of STORES) {
-    const listaImportar = obj.datos[store];
-    if (!Array.isArray(listaImportar)) continue;
+    const listaImportar = fuenteDatos[store];
+    if (!Array.isArray(listaImportar) || listaImportar.length === 0) continue;
 
     const existentes = await todos(store);
     const mapaExistentes = new Map(existentes.map((item) => [item.id, item]));
+    const colaEscritura = [];
 
-    for (const item of listaImportar) {
-      if (!item || !item.id) continue;
+    for (const rawItem of listaImportar) {
+      if (!rawItem || typeof rawItem !== 'object') continue;
 
-      // Reconstruir Blob de foto si viene como dataUrl
+      // Nunca permitir sobreescribir el PIN de seguridad desde una importación
+      if (store === 'ajustes' && rawItem.id === 'pin') continue;
+
+      const item = { ...rawItem };
+
+      // Deduplicación de historiales sin id (ALTO-05)
+      if (!item.id) {
+        if (store === 'sesiones' && item.fecha) {
+          const dupSesion = Array.from(mapaExistentes.values()).find((e) => e.fecha === item.fecha);
+          if (dupSesion) continue;
+          item.id = nuevoId();
+        } else if (store === 'series' && item.fecha && item.ejercicioId) {
+          const dupSerie = Array.from(mapaExistentes.values()).find(
+            (e) =>
+              e.fecha === item.fecha &&
+              e.ejercicioId === item.ejercicioId &&
+              Number(e.reps) === Number(item.reps) &&
+              Number(e.kg || 0) === Number(item.kg || 0) &&
+              Math.abs((e.hora || 0) - (item.hora || 0)) < 2000
+          );
+          if (dupSerie) continue;
+          item.id = nuevoId();
+        } else {
+          continue;
+        }
+      }
+
+      // Reconstruir Blob de foto si viene como dataUrl válido (data:image/...)
       if (store === 'fotos' && item.dataUrl) {
         try {
           item.blob = await dataURLABlob(item.dataUrl);
@@ -265,17 +320,46 @@ export async function importarTodo(obj) {
       }
 
       const existente = mapaExistentes.get(item.id);
+
+      // CRÍTICO-01: Si se importa una foto sin blob (respaldo ligero) pero ya existía con blob local, preservarlo
+      if (store === 'fotos' && !item.blob && existente && existente.blob) {
+        item.blob = existente.blob;
+      }
+
       if (!existente) {
-        await guardar(store, item);
+        // MEDIO-01: Respetar la marca temporal original 'actualizado' si ya viene en el respaldo
+        if (!item.actualizado) {
+          item.actualizado = Date.now();
+        }
+        colaEscritura.push(item);
+        mapaExistentes.set(item.id, item);
         agregados++;
       } else {
-        const fechaNueva = item.actualizado || 0;
-        const fechaVieja = existente.actualizado || 0;
+        const fechaNueva = Number(item.actualizado || 0);
+        const fechaVieja = Number(existente.actualizado || 0);
+
         if (fechaNueva >= fechaVieja) {
-          await guardar(store, item);
+          if (!item.actualizado) {
+            item.actualizado = existente.actualizado || Date.now();
+          }
+          colaEscritura.push(item);
+          mapaExistentes.set(item.id, item);
           actualizados++;
         }
       }
+    }
+
+    // MEDIO-02: Ejecutar una sola transacción atómica por store
+    if (colaEscritura.length > 0) {
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(store, 'readwrite');
+        const os = tx.objectStore(store);
+        for (const registro of colaEscritura) {
+          os.put(registro);
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(new Error(`Error al importar en '${store}': ${tx.error?.message}`));
+      });
     }
   }
 
@@ -294,6 +378,9 @@ function blobADataURL(blob) {
 }
 
 async function dataURLABlob(dataUrl) {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+    throw new Error('Formato no permitido: la imagen debe ser un Data URL (data:image/...)');
+  }
   const respuesta = await fetch(dataUrl);
   return await respuesta.blob();
 }

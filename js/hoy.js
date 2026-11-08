@@ -1,16 +1,17 @@
 // js/hoy.js - Pantalla «Hoy» de Forja (Dirección de Arte v2 «Revista de Sala»)
 // Portada editorial: saludo con día y rutina, titular Instrument Serif enorme,
-// chips de proteína y agua con barra fina lima, tarjeta-video de 420px del primer
-// ejercicio que falta, carrusel horizontal de ejercicios y botón lima canónico.
+// chips del día (proteína, agua, pasos, sueño) con barra fina lima, tarjeta-video de 420px
+// del primer ejercicio que falta, carrusel horizontal de ejercicios y botón lima canónico.
 
 import { todos, filtrar, ajuste, ponerAjuste } from './db.js';
-import { h, aviso, hoyISO, fechaBonita, formatoKg } from './ui.js';
+import { h, aviso, dialogo, hoyISO, fechaBonita, formatoKg } from './ui.js';
 import { ejercicios, rutina, perfil } from './datos.js';
 import { pesoSugerido } from './calculos.js';
 import { ir } from './app.js';
 import { icono } from './iconos.js';
 
 let cleanupFn = null;
+let fechaVista = null;
 
 /**
  * Formatea el peso o carga de una serie respetando unidad ('kg' | 'placa').
@@ -28,6 +29,22 @@ function formatearCargaSerie(s) {
 }
 
 /**
+ * Suma o resta días a una fecha ISO 'AAAA-MM-DD' en hora local.
+ *
+ * @param {string} iso - Fecha 'AAAA-MM-DD'
+ * @param {number} deltaDias - Días a desplazar
+ * @returns {string} Nueva fecha 'AAAA-MM-DD'
+ */
+function desplazarFechaISO(iso, deltaDias) {
+  const d = new Date(iso + 'T12:00:00');
+  d.setDate(d.getDate() + deltaDias);
+  const anio = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${anio}-${mes}-${dia}`;
+}
+
+/**
  * Monta la pantalla «Hoy» en el contenedor provisto.
  *
  * @param {HTMLElement} contenedor - Elemento DOM donde se renderiza la vista
@@ -36,14 +53,22 @@ function formatearCargaSerie(s) {
 export async function montar(contenedor, params = []) {
   contenedor.innerHTML = '';
 
+  const hoyReal = hoyISO();
+  if (params && params[0] && /^\d{4}-\d{2}-\d{2}$/.test(params[0])) {
+    fechaVista = params[0];
+  } else if (!fechaVista) {
+    fechaVista = hoyReal;
+  }
+  const hoyStr = fechaVista;
+
   const pantalla = h('div', { class: 'pantalla hoy-pantalla' });
 
-  // Estilos editoriales v2 «Revista de sala»
+  // Estilos editoriales v2 «Revista de sala» (SOLO radios 28px y 999px, sin bordes 1px, táctil >= 48px)
   const estilo = h('style', {}, `
     .hoy-pantalla {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
       padding: 4px 20px 104px;
       background-color: var(--fondo, #F3F0E8);
       color: var(--texto, #17171A);
@@ -55,10 +80,45 @@ export async function montar(contenedor, params = []) {
       gap: 4px;
       margin-top: 4px;
     }
+    .hoy-saludo-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
     .hoy-saludo {
       font-size: 14px;
-      color: var(--sutil, #6B675F);
+      color: var(--sutil, #5D5951);
       font-weight: 500;
+    }
+    .hoy-fecha-controles {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .hoy-btn-dia {
+      min-width: 48px;
+      min-height: 48px;
+      border-radius: 999px;
+      border: none;
+      background-color: var(--superficie2, #E9E4D8);
+      color: var(--texto, #17171A);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0 12px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      transition: transform 120ms ease;
+    }
+    .hoy-btn-dia:active {
+      transform: scale(0.96);
+    }
+    .hoy-btn-dia.volver-hoy {
+      background-color: var(--lima, #C8F03C);
+      color: #17171A;
     }
     .hoy-titular {
       font-family: 'Instrument Serif', Georgia, serif;
@@ -71,17 +131,26 @@ export async function montar(contenedor, params = []) {
     .hoy-titular em {
       font-style: italic;
     }
+    .hoy-meta-mes {
+      font-size: 13px;
+      color: var(--sutil, #5D5951);
+      font-weight: 500;
+      line-height: 1.35;
+      margin-top: 2px;
+    }
     .chips-nutricion-row {
       display: flex;
       gap: 10px;
     }
     .chip-nutricion {
       flex: 1;
+      min-height: 52px;
       background-color: var(--superficie2, #E9E4D8);
       border-radius: 999px;
       padding: 10px 16px;
       display: flex;
       flex-direction: column;
+      justify-content: center;
       gap: 6px;
       cursor: pointer;
       user-select: none;
@@ -97,10 +166,27 @@ export async function montar(contenedor, params = []) {
       font-size: 12px;
       font-weight: 600;
       color: var(--texto, #17171A);
+      gap: 4px;
     }
-    .chip-nutricion-info span:last-child {
-      color: var(--sutil, #6B675F);
-      font-weight: 400;
+    .chip-nutricion-info span.meta-sutil {
+      color: var(--sutil, #5D5951);
+      font-weight: 500;
+    }
+    .chip-agua-menos {
+      min-width: 28px;
+      height: 22px;
+      border-radius: 999px;
+      border: none;
+      background-color: var(--fondo, #F3F0E8);
+      color: var(--texto, #17171A);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      padding: 0 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
     .progress-bar-track {
       width: 100%;
@@ -121,8 +207,10 @@ export async function montar(contenedor, params = []) {
     }
     .hoy-pildora-link {
       flex: 1;
-      height: 44px;
+      min-height: 48px;
+      height: 48px;
       background-color: var(--superficie2, #E9E4D8);
+      border: none;
       border-radius: 999px;
       display: flex;
       align-items: center;
@@ -130,6 +218,7 @@ export async function montar(contenedor, params = []) {
       gap: 8px;
       text-decoration: none;
       color: var(--texto, #17171A);
+      font-family: inherit;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
@@ -195,6 +284,12 @@ export async function montar(contenedor, params = []) {
       line-height: 1.1;
       letter-spacing: -0.01em;
     }
+    .hero-exercise-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 2px;
+    }
     .hero-exercise-pill {
       align-self: flex-start;
       background-color: #F3F0E8;
@@ -203,7 +298,10 @@ export async function montar(contenedor, params = []) {
       padding: 6px 14px;
       font-size: 13px;
       font-weight: 600;
-      margin-top: 2px;
+    }
+    .hero-exercise-pill.sugerido {
+      background-color: var(--lima, #C8F03C);
+      color: #17171A;
     }
     .section-headline {
       font-size: 14px;
@@ -269,6 +367,7 @@ export async function montar(contenedor, params = []) {
     }
     .btn-primary-lima {
       width: 100%;
+      min-height: 60px;
       height: 60px;
       background-color: var(--lima, #C8F03C);
       border: none;
@@ -302,7 +401,7 @@ export async function montar(contenedor, params = []) {
     }
     .hoy-descanso-card {
       width: 100%;
-      height: 380px;
+      height: 360px;
       border-radius: 28px;
       background-color: var(--superficie2, #E9E4D8);
       padding: 32px 24px;
@@ -319,42 +418,43 @@ export async function montar(contenedor, params = []) {
     }
     .hoy-descanso-sub {
       font-size: 14px;
-      color: var(--sutil, #6B675F);
+      color: var(--sutil, #5D5951);
       line-height: 1.45;
       margin-top: 8px;
     }
   `);
   pantalla.appendChild(estilo);
 
-  // Cargar datos en paralelo
-  const hoyStr = hoyISO();
+  // Cargar datos en paralelo incluyendo diario-AAAA-MM-DD para pasos y sueño (M-03)
   const [
     datosPerfil,
     datosRutina,
     catalogoEjercicios,
     seriesTotales,
     comidasHoy,
-    aguaVasos
+    aguaVasos,
+    diarioHoy
   ] = await Promise.all([
     perfil(),
     rutina(),
     ejercicios(),
     todos('series'),
     filtrar('comidas', c => c.fecha === hoyStr),
-    ajuste('agua-' + hoyStr, 0)
+    ajuste('agua-' + hoyStr, 0),
+    ajuste('diario-' + hoyStr, { pasos: 0, suenoH: null })
   ]);
 
   const mapaCatalogo = new Map(catalogoEjercicios.map(e => [e.id, e]));
 
   // ==========================================
-  // 1. SALUDO Y TITULAR INSTRUMENT SERIF
+  // 1. SALUDO, SELECTOR DE FECHA Y TITULAR INSTRUMENT SERIF
   // ==========================================
   const fechaHoyDate = new Date(hoyStr + 'T12:00:00');
   const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
   const diaClaveHoy = diasSemana[fechaHoyDate.getDay()];
   const rutinaHoy = datosRutina?.dias?.[diaClaveHoy];
 
-  // Saludo pequeño con día y rutina: "Sábado 7 · Espalda y brazos"
+  // Saludo pequeño con día y rutina: "Sábado 7 · espalda y brazos"
   const nombreDiaCapitalizado = fechaBonita(hoyStr);
   const nombreRutina = rutinaHoy?.nombre ? rutinaHoy.nombre.toLowerCase() : 'descanso programado';
   const textoSaludo = `${nombreDiaCapitalizado} · ${nombreRutina}`;
@@ -365,7 +465,7 @@ export async function montar(contenedor, params = []) {
 
   if (datosPerfil?.metaFecha) {
     const fMeta = new Date(datosPerfil.metaFecha + 'T12:00:00');
-    const diffMs = fMeta.getTime() - fechaHoyDate.getTime();
+    const diffMs = fMeta.getTime() - new Date(hoyReal + 'T12:00:00').getTime();
     const numeroDias = Math.ceil(diffMs / (24 * 60 * 60 * 1000));
     const nombreMeta = datosPerfil.metaNombre || 'la meta';
 
@@ -376,33 +476,74 @@ export async function montar(contenedor, params = []) {
       textoMetaEm = '¡Hoy es el día';
       textoMetaResto = `de ${nombreMeta}!`;
     } else {
-      textoMetaEm = `${Math.abs(numeroDias)} días`;
-      textoMetaResto = `desde ${nombreMeta}`;
+      // Corrección B-03: evitar texto negativo cuando la meta ya se alcanzó
+      textoMetaEm = '¡Meta alcanzada!';
+      textoMetaResto = nombreMeta;
     }
   } else if (datosPerfil?.metaNombre) {
     textoMetaEm = 'Meta activa:';
     textoMetaResto = datosPerfil.metaNombre;
   }
 
+  const controlesFecha = h('div', { class: 'hoy-fecha-controles' },
+    h('button', {
+      class: 'hoy-btn-dia',
+      type: 'button',
+      'aria-label': 'Día anterior',
+      on: {
+        click: async () => {
+          fechaVista = desplazarFechaISO(hoyStr, -1);
+          await montar(contenedor, [fechaVista]);
+        }
+      }
+    }, icono('atras', 16)),
+    hoyStr !== hoyReal ? h('button', {
+      class: 'hoy-btn-dia volver-hoy',
+      type: 'button',
+      on: {
+        click: async () => {
+          fechaVista = hoyReal;
+          await montar(contenedor, []);
+        }
+      }
+    }, 'Hoy') : null,
+    h('button', {
+      class: 'hoy-btn-dia',
+      type: 'button',
+      'aria-label': 'Día siguiente',
+      on: {
+        click: async () => {
+          fechaVista = desplazarFechaISO(hoyStr, 1);
+          await montar(contenedor, [fechaVista]);
+        }
+      }
+    }, icono('flecha', 16))
+  );
+
   const headerHoy = h('div', { class: 'hoy-header' },
-    h('span', { class: 'hoy-saludo' }, textoSaludo),
+    h('div', { class: 'hoy-saludo-row' },
+      h('span', { class: 'hoy-saludo' }, textoSaludo),
+      controlesFecha
+    ),
     h('h2', { class: 'hoy-titular' },
       h('em', {}, textoMetaEm),
       ' ' + textoMetaResto
-    )
+    ),
+    datosPerfil?.metaMes ? h('p', { class: 'hoy-meta-mes' }, `Meta del mes: ${datosPerfil.metaMes}`) : null
   );
   pantalla.appendChild(headerHoy);
 
   // ==========================================
-  // 2. CHIPS DE PROTEÍNA Y AGUA CON BARRA FINA LIMA
+  // 2. CHIPS DEL DÍA: PROTEÍNA, AGUA, PASOS Y SUEÑO (M-03 y B-01)
   // ==========================================
   const proteinaMeta = Number(datosPerfil?.proteina || 128);
   const proteinaTotalHoy = comidasHoy.reduce((acc, c) => acc + (Number(c.proteina) || 0), 0);
   const pctProteina = Math.min(100, Math.round((proteinaTotalHoy / proteinaMeta) * 100));
 
   const aguaMetaVasos = Number(datosPerfil?.aguaVasos || 10);
-  const pctAgua = Math.min(100, Math.round((aguaVasos / aguaMetaVasos) * 100));
-  const aguaLitros = (aguaVasos * 0.25).toFixed(1);
+  const vasosActuales = Number(aguaVasos || 0);
+  const pctAgua = Math.min(100, Math.round((vasosActuales / aguaMetaVasos) * 100));
+  const aguaLitros = (vasosActuales * 0.25).toFixed(1);
   const metaAguaLitros = (aguaMetaVasos * 0.25).toFixed(1);
 
   const filaNutricion = h('div', { class: 'chips-nutricion-row' },
@@ -413,18 +554,18 @@ export async function montar(contenedor, params = []) {
     },
       h('div', { class: 'chip-nutricion-info' },
         h('span', {}, `${Math.round(proteinaTotalHoy)} g proteína`),
-        h('span', {}, `/ ${proteinaMeta} g`)
+        h('span', { class: 'meta-sutil' }, `/ ${proteinaMeta} g`)
       ),
       h('div', { class: 'progress-bar-track' },
         h('div', { class: 'progress-bar-fill', style: `width: ${pctProteina}%;` })
       )
     ),
-    // Chip Agua (tocar suma +1 vaso directamente)
+    // Chip Agua (tocar suma +1 vaso, botón − permite restar si se tocó por error: B-01)
     h('div', {
       class: 'chip-nutricion',
       on: {
         click: async () => {
-          const nuevoTotal = aguaVasos + 1;
+          const nuevoTotal = vasosActuales + 1;
           await ponerAjuste('agua-' + hoyStr, nuevoTotal);
           aviso(`+1 vaso de agua (${nuevoTotal}/${aguaMetaVasos})`, 'ok');
           await montar(contenedor, params);
@@ -433,7 +574,23 @@ export async function montar(contenedor, params = []) {
     },
       h('div', { class: 'chip-nutricion-info' },
         h('span', {}, `${aguaLitros} L agua`),
-        h('span', {}, `/ ${metaAguaLitros} L`)
+        h('div', { style: 'display: flex; align-items: center; gap: 6px;' },
+          vasosActuales > 0 ? h('button', {
+            type: 'button',
+            class: 'chip-agua-menos',
+            'aria-label': 'Restar 1 vaso de agua',
+            on: {
+              click: async (e) => {
+                e.stopPropagation();
+                const nuevoTotal = Math.max(0, vasosActuales - 1);
+                await ponerAjuste('agua-' + hoyStr, nuevoTotal);
+                aviso(`−1 vaso de agua (${nuevoTotal}/${aguaMetaVasos})`, 'info');
+                await montar(contenedor, params);
+              }
+            }
+          }, '−1') : null,
+          h('span', { class: 'meta-sutil' }, `/ ${metaAguaLitros} L`)
+        )
       ),
       h('div', { class: 'progress-bar-track' },
         h('div', { class: 'progress-bar-fill', style: `width: ${pctAgua}%;` })
@@ -441,6 +598,103 @@ export async function montar(contenedor, params = []) {
     )
   );
   pantalla.appendChild(filaNutricion);
+
+  // Segunda fila de chips del día: Pasos (manual) y Sueño (manual) en diario-AAAA-MM-DD (M-03)
+  const pasosMeta = Number(datosPerfil?.pasos || 9000);
+  const pasosHoy = Number(diarioHoy?.pasos || 0);
+  const pctPasos = Math.min(100, Math.round((pasosHoy / pasosMeta) * 100));
+
+  const suenoMeta = 8;
+  const suenoHoy = diarioHoy?.suenoH != null ? Number(diarioHoy.suenoH) : null;
+  const pctSueno = suenoHoy != null ? Math.min(100, Math.round((suenoHoy / suenoMeta) * 100)) : 0;
+
+  const filaDiario = h('div', { class: 'chips-nutricion-row' },
+    // Chip Pasos
+    h('div', {
+      class: 'chip-nutricion',
+      on: {
+        click: async () => {
+          const inputPasos = h('input', {
+            type: 'number',
+            min: '0',
+            step: '500',
+            value: String(pasosHoy || ''),
+            placeholder: String(pasosMeta),
+            style: 'width: 100%; height: 48px; border-radius: 999px; border: none; background: var(--superficie2, #E9E4D8); padding: 0 18px; font-size: 16px; font-weight: 700; color: var(--texto, #17171A);'
+          });
+          const resp = await dialogo({
+            titulo: 'Pasos del día',
+            cuerpo: h('div', { class: 'col', style: 'gap: 8px;' },
+              h('span', { style: 'font-size: 13px; color: var(--sutil, #5D5951);' }, `Meta diaria: ${pasosMeta} pasos`),
+              inputPasos
+            ),
+            botones: [
+              { texto: 'Cancelar', valor: false, tipo: 'fantasma' },
+              { texto: 'Guardar', valor: true, tipo: 'primario' }
+            ]
+          });
+          if (resp) {
+            const val = Math.max(0, parseInt(inputPasos.value || '0', 10) || 0);
+            await ponerAjuste('diario-' + hoyStr, { ...(diarioHoy || {}), pasos: val });
+            aviso(`Pasos actualizados: ${val}`, 'ok');
+            await montar(contenedor, params);
+          }
+        }
+      }
+    },
+      h('div', { class: 'chip-nutricion-info' },
+        h('span', {}, `${pasosHoy} pasos`),
+        h('span', { class: 'meta-sutil' }, `/ ${pasosMeta}`)
+      ),
+      h('div', { class: 'progress-bar-track' },
+        h('div', { class: 'progress-bar-fill', style: `width: ${pctPasos}%;` })
+      )
+    ),
+    // Chip Sueño
+    h('div', {
+      class: 'chip-nutricion',
+      on: {
+        click: async () => {
+          const inputSueno = h('input', {
+            type: 'number',
+            min: '0',
+            max: '24',
+            step: '0.5',
+            value: suenoHoy != null ? String(suenoHoy) : '7.5',
+            placeholder: '8',
+            style: 'width: 100%; height: 48px; border-radius: 999px; border: none; background: var(--superficie2, #E9E4D8); padding: 0 18px; font-size: 16px; font-weight: 700; color: var(--texto, #17171A);'
+          });
+          const resp = await dialogo({
+            titulo: 'Horas de sueño',
+            cuerpo: h('div', { class: 'col', style: 'gap: 8px;' },
+              h('span', { style: 'font-size: 13px; color: var(--sutil, #5D5951);' }, '¿Cuántas horas dormiste anoche?'),
+              inputSueno
+            ),
+            botones: [
+              { texto: 'Cancelar', valor: false, tipo: 'fantasma' },
+              { texto: 'Guardar', valor: true, tipo: 'primario' }
+            ]
+          });
+          if (resp) {
+            const valNum = parseFloat(String(inputSueno.value || '').replace(',', '.'));
+            const val = !isNaN(valNum) ? Math.max(0, Math.min(24, Math.round(valNum * 10) / 10)) : null;
+            await ponerAjuste('diario-' + hoyStr, { ...(diarioHoy || {}), suenoH: val });
+            aviso(val != null ? `Sueño registrado: ${val} h` : 'Sueño actualizado', 'ok');
+            await montar(contenedor, params);
+          }
+        }
+      }
+    },
+      h('div', { class: 'chip-nutricion-info' },
+        h('span', {}, `${suenoHoy != null ? suenoHoy + ' h' : '— h'} sueño`),
+        h('span', { class: 'meta-sutil' }, `/ ${suenoMeta} h`)
+      ),
+      h('div', { class: 'progress-bar-track' },
+        h('div', { class: 'progress-bar-fill', style: `width: ${pctSueno}%;` })
+      )
+    )
+  );
+  pantalla.appendChild(filaDiario);
 
   // ==========================================
   // 3. ACCESOS DIRECTOS A #comida Y #camara (Sin emojis)
@@ -468,6 +722,7 @@ export async function montar(contenedor, params = []) {
   //    Y CARRUSEL HORIZONTAL DE LOS DEMÁS
   // ==========================================
   const ejerciciosHoy = Array.isArray(rutinaHoy?.ejercicios) ? rutinaHoy.ejercicios : [];
+  let primerPendiente = null;
 
   if (ejerciciosHoy.length > 0) {
     // Clasificar ejercicios: completados vs pendientes hoy
@@ -475,7 +730,7 @@ export async function montar(contenedor, params = []) {
       const ejInfo = mapaCatalogo.get(item.id) || { id: item.id, nombre: item.id };
       const ejercicioCompleto = { ...ejInfo, ...item };
 
-      // Series históricas
+      // Series históricas ordenadas cronológicamente
       const seriesEsteEj = seriesTotales
         .filter(s => s && s.ejercicioId === item.id)
         .sort((a, b) => (a.fecha > b.fecha ? 1 : a.fecha < b.fecha ? -1 : (a.hora || 0) - (b.hora || 0)));
@@ -496,16 +751,19 @@ export async function montar(contenedor, params = []) {
 
       const sugerencia = pesoSugerido(seriesUltima, ejercicioCompleto);
 
-      // Resumen de la última sesión para la píldora
+      // Resumen de la última sesión para la píldora papel
       let resumenUltima = 'Primera sesión';
       if (seriesUltima.length > 0) {
-        const pSerie = seriesUltima[0];
+        const pSerie = seriesUltima[seriesUltima.length - 1];
         const cargaTxt = formatearCargaSerie(pSerie);
         const repsLista = seriesUltima.map(s => s.reps).join(', ');
         resumenUltima = `${cargaTxt} · ${repsLista}`;
-      } else if (sugerencia.kg != null) {
-        resumenUltima = `Objetivo: ${formatearCargaSerie(sugerencia)} × ${sugerencia.reps}`;
       }
+
+      // Resumen de peso sugerido con doble progresión
+      const textoSugerido = sugerencia.kg != null
+        ? `Hoy: ${formatearCargaSerie(sugerencia)} × ${sugerencia.reps}`
+        : `Objetivo: ${sugerencia.reps} reps`;
 
       return {
         item,
@@ -515,32 +773,35 @@ export async function montar(contenedor, params = []) {
         completadoHoy,
         seriesUltima,
         sugerencia,
-        resumenUltima
+        resumenUltima,
+        textoSugerido
       };
     });
 
     // Encontrar el primer ejercicio que aún falta hoy
-    let primerPendiente = datosEjerciciosHoy.find(d => !d.completadoHoy);
-    if (!primerPendiente) {
-      primerPendiente = datosEjerciciosHoy[0];
-    }
+    primerPendiente = datosEjerciciosHoy.find(d => !d.completadoHoy) || datosEjerciciosHoy[0];
 
     const restantes = datosEjerciciosHoy.filter(d => d.item.id !== primerPendiente.item.id);
 
     // TARJETA-VIDEO grande (alto 420px, radio 28, degradado oscuro abajo, nombre en serif blanco, píldora con última vez)
-    const ejHeroId = primerPendiente.ejInfo.id;
-    // ejercicios.json ya trae la ruta completa («media/videos/x.mp4»); no se le antepone nada (fix 7-nov).
+    // Corrección A-01: ir directamente a #registrar/<ejercicioId>
+    const ejHeroId = primerPendiente.item.id;
     const rutaVideo = primerPendiente.ejInfo.video || null;
     const rutaFotoHero = primerPendiente.ejInfo.imagen || null;
 
     const tarjetaVideoHero = h('div', {
       class: 'hero-exercise-card',
-      on: { click: () => ir('#registrar') }
+      on: { click: () => ir('#registrar/' + ejHeroId) }
     },
-      // Video en bucle (con la foto de póster); si no hay video, la foto; si no hay nada, el fondo tinta.
       rutaVideo
-        ? h('video', Object.assign({ autoplay: true, muted: true, loop: true, playsinline: true, class: 'media-treated',
-            src: rutaVideo }, rutaFotoHero ? { poster: rutaFotoHero } : {}))
+        ? h('video', Object.assign({
+            autoplay: true,
+            muted: true,
+            loop: true,
+            playsinline: true,
+            class: 'media-treated',
+            src: rutaVideo
+          }, rutaFotoHero ? { poster: rutaFotoHero } : {}))
         : (rutaFotoHero
           ? h('img', { src: rutaFotoHero, class: 'media-treated', alt: primerPendiente.ejInfo.nombre, style: 'object-fit: cover;' })
           : h('div')),
@@ -548,31 +809,35 @@ export async function montar(contenedor, params = []) {
       h('div', { class: 'hero-exercise-content' },
         h('span', { class: 'micro-label' }, primerPendiente.completadoHoy ? 'COMPLETADO HOY' : 'PRIMER EJERCICIO'),
         h('h3', { class: 'hero-exercise-title' }, primerPendiente.ejInfo.nombre || ejHeroId),
-        h('div', { class: 'hero-exercise-pill' }, primerPendiente.resumenUltima)
+        h('div', { class: 'hero-exercise-pills' },
+          h('div', { class: 'hero-exercise-pill' }, primerPendiente.resumenUltima),
+          h('div', { class: 'hero-exercise-pill sugerido' }, primerPendiente.textoSugerido)
+        )
       )
     );
     pantalla.appendChild(tarjetaVideoHero);
 
     // CARRUSEL HORIZONTAL de los demás ejercicios del día como fotos verticales
+    // Corrección A-01: cada tarjeta abre su propio ejercicio en #registrar/<id>
     if (restantes.length > 0) {
       pantalla.appendChild(h('h4', { class: 'section-headline' }, 'A continuación'));
 
       const carrusel = h('div', { class: 'horizontal-scroll-list' });
 
       for (const otro of restantes) {
-        const otroId = otro.ejInfo.id;
+        const otroId = otro.item.id;
         const fotoOtro = otro.ejInfo.imagen || null;
 
         const miniCard = h('div', {
           class: 'mini-exercise-card',
-          on: { click: () => ir('#registrar') }
+          on: { click: () => ir('#registrar/' + otroId) }
         },
           fotoOtro ? h('img', { src: fotoOtro, alt: otro.ejInfo.nombre, class: 'media-treated' }) : h('div'),
           h('div', { class: 'mini-exercise-gradient' }),
           h('div', { class: 'mini-exercise-info' },
             h('div', { class: 'mini-exercise-name' }, otro.ejInfo.nombre || otroId),
             h('div', { class: 'mini-exercise-series' },
-              otro.completadoHoy ? '✓ Listo' : `${otro.item.series || 3} series`
+              otro.completadoHoy ? 'Listo hoy' : `${otro.item.series || 3} × ${otro.item.reps || '8-12'}`
             )
           )
         );
@@ -599,11 +864,12 @@ export async function montar(contenedor, params = []) {
   }
 
   // ==========================================
-  // 5. BOTÓN LIMA «EMPEZAR A REGISTRAR»
+  // 5. BOTÓN LIMA «EMPEZAR A REGISTRAR» (A-01)
   // ==========================================
+  const rutaRegistrar = primerPendiente ? `#registrar/${primerPendiente.item.id}` : '#registrar';
   const btnRegistrar = h('button', {
     class: 'btn-primary-lima',
-    on: { click: () => ir('#registrar') }
+    on: { click: () => ir(rutaRegistrar) }
   },
     h('span', {}, 'Empezar a registrar'),
     h('div', { class: 'btn-icon-bubble' },

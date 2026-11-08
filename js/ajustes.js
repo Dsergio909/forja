@@ -1,31 +1,42 @@
 /**
  * ajustes.js - Sección 9: Ajustes y Configuración de Forja (Dirección de Arte v2 «Revista de Sala»)
  *
- * Características v2:
+ * Características v2 y Correcciones de Auditoría:
  * - Titulares en Instrument Serif cursivo (emocionales, limpios, elegantes).
  * - Campos de formulario con fondo papel 2 (#E9E4D8) o papel (#F3F0E8) y radio estricto de 28px.
- * - Botones en píldora canónica (border-radius: 999px) con acento único Lima (#C8F03C).
- * - Cero emojis: reemplazados por iconos vectoriales limpios vía icono() de ./iconos.js.
- * - Sin estilos inline obsoletos ni bordes duros de 1px.
- * - Asistente inicial de 3 pasos (asistenteInicial) completamente adaptado a la dirección de arte v2.
- * - Teclado de PIN de seguridad (pedirPin y configurarNuevoPin) con visor de puntos y diseño editorial.
- * - Gestión de perfil, metas, rutina semanal, copia de seguridad (exportar/importar) e IA local con WebLLM.
- * - Cumple rigurosamente con CONTRATOS.md y correcciones de REVISION.md (3.4 coach.js, 3.5 await).
+ * - Botones en píldora canónica (border-radius: 999px, min-height: 48px) con acento único Lima (#C8F03C).
+ * - Cero emojis y cero backdrop-filter: iconos vectoriales limpios vía icono() de ./iconos.js y contraste accesible (#5D5951).
+ * - Seguridad PIN (Hallazgos 3 y 4):
+ *   1. No exporta ni importa el hash/sal del PIN en copias de seguridad JSON.
+ *   2. Exige ingresar el PIN actual para quitarlo o cambiarlo.
+ *   3. Bloqueo temporal de 30 segundos tras 5 intentos fallidos consecutivos (persistido en localStorage).
+ * - Importación unificada (ALTO-05, CRÍTICO-01 y Seguridad 5):
+ *   1. Usa importarTodo() tanto en copia completa como en historial, aceptando {datos:...} o listas en raíz sin duplicar.
+ *   2. Muestra cuántos registros fueron agregados y actualizados.
+ *   3. En fotos importadas, solo acepta esquemas data:image/ (bloquea URLs externas) y preserva Blobs locales existentes.
+ * - Sincronización de modelos IA (CFG-01): importa WEBLLM_MODELO y WEBLLM_MODELO_RESPALDO desde ./config.js.
  */
 
-import { ajuste, ponerAjuste, guardar, nuevoId, exportarTodo, importarTodo } from './db.js';
+import { ajuste, ponerAjuste, guardar, todos, nuevoId, exportarTodo, importarTodo } from './db.js';
 import { h, aviso, dialogo, confirmar, hoyISO } from './ui.js';
 import { perfil as cargarPerfil, rutina as cargarRutina, rutinaBase, ejercicios as cargarEjercicios } from './datos.js';
 import { grasaNavy } from './calculos.js';
-import { WEBLLM_URL, WEBLLM_MODELO } from './config.js';
+import { WEBLLM_URL, WEBLLM_MODELO, WEBLLM_MODELO_RESPALDO } from './config.js';
 import { descargarModelo, borrarModelo } from './coach.js';
 import { icono } from './iconos.js';
+
+const CLAVE_PIN_INTENTOS = 'forja_pin_intentos';
+const CLAVE_PIN_BLOQUEO = 'forja_pin_bloqueo_hasta';
+const MAX_INTENTOS_PIN = 5;
+const SEGUNDOS_BLOQUEO_PIN = 30;
 
 let contenedorActual = null;
 let perfilDatos = null;
 let rutinaDatos = null;
 let pinActual = null;
 let iaAjustes = null;
+let intentosFallidosMemoria = 0;
+let bloqueadoHastaMemoria = 0;
 
 /**
  * Monta la pantalla de ajustes
@@ -82,23 +93,25 @@ const ICONOS_SVGS = {
   subir: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
   cerrar: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
   check: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
-  alerta: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+  alerta: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  basura: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>'
 };
 
 /**
- * Carga o refresca todos los ajustes en memoria
+ * Carga o refresca todos los ajustes en memoria (sincronizado con config.js - CFG-01)
  */
 async function recargarDatos() {
   perfilDatos = await cargarPerfil();
   rutinaDatos = await cargarRutina();
   pinActual = await ajuste('pin', null);
-  const modeloPorDefecto = WEBLLM_MODELO || 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC';
-  iaAjustes = await ajuste('ia', { activa: false, modelo: modeloPorDefecto });
+  const modeloPrincipal = WEBLLM_MODELO || 'Qwen3.5-2B-q4f16_1-MLC';
+  const modeloRespaldo = WEBLLM_MODELO_RESPALDO || 'Qwen3.5-0.8B-q4f16_1-MLC';
+  iaAjustes = await ajuste('ia', { activa: false, modelo: modeloPrincipal });
   if (!iaAjustes || typeof iaAjustes !== 'object') {
-    iaAjustes = { activa: false, modelo: modeloPorDefecto };
+    iaAjustes = { activa: false, modelo: modeloPrincipal };
   }
-  if (!iaAjustes.modelo) {
-    iaAjustes.modelo = modeloPorDefecto;
+  if (iaAjustes.modelo !== modeloPrincipal && iaAjustes.modelo !== modeloRespaldo) {
+    iaAjustes.modelo = modeloPrincipal;
   }
 }
 
@@ -121,9 +134,31 @@ async function hashSha256(texto, sal) {
   return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+function leerEstadoBloqueoPin() {
+  try {
+    const intGuardados = Number(localStorage.getItem(CLAVE_PIN_INTENTOS) || 0);
+    const bloqGuardado = Number(localStorage.getItem(CLAVE_PIN_BLOQUEO) || 0);
+    intentosFallidosMemoria = Math.max(intentosFallidosMemoria, isNaN(intGuardados) ? 0 : intGuardados);
+    bloqueadoHastaMemoria = Math.max(bloqueadoHastaMemoria, isNaN(bloqGuardado) ? 0 : bloqGuardado);
+  } catch (_) {}
+  return {
+    intentos: intentosFallidosMemoria,
+    bloqueadoHasta: bloqueadoHastaMemoria
+  };
+}
+
+function guardarEstadoBloqueoPin(intentos, bloqueadoHasta) {
+  intentosFallidosMemoria = intentos;
+  bloqueadoHastaMemoria = bloqueadoHasta;
+  try {
+    localStorage.setItem(CLAVE_PIN_INTENTOS, String(intentos));
+    localStorage.setItem(CLAVE_PIN_BLOQUEO, String(bloqueadoHasta));
+  } catch (_) {}
+}
+
 /**
  * CONTRATO: Asistente inicial de 3 pasos al abrir la app por primera vez
- * Adaptado a la estética Forja v2 (titulares serif, campos papel 2 y radio 28, botones píldora)
+ * Adaptado a la estética Forja v2 (titulares serif, campos papel 2 y radio 28, botones píldora, sin backdrop-filter)
  * @returns {Promise<boolean>}
  */
 export function asistenteInicial() {
@@ -146,7 +181,7 @@ export function asistenteInicial() {
 
     const modal = h('div', {
       class: 'v2-asistente-overlay',
-      style: 'position: fixed; inset: 0; background: rgba(23,23,26,0.75); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 16px;'
+      style: 'position: fixed; inset: 0; background: rgba(23, 23, 26, 0.76); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 16px;'
     });
 
     function actualizarPaso() {
@@ -176,19 +211,19 @@ export function asistenteInicial() {
         });
 
         contenedorPaso.append(
-          h('div', { style: 'font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; color: #6B675F;' }, 'PASO 1 DE 3 · BIENVENIDO'),
+          h('div', { style: 'font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; color: #5D5951;' }, 'PASO 1 DE 3 · BIENVENIDO'),
           h('h2', { style: 'font-family: "Instrument Serif", Georgia, serif; font-size: 32px; font-weight: 400; line-height: 1.1;' }, 'Comencemos tu ', h('em', {}, 'Forja')),
-          h('p', { style: 'font-size: 14px; color: #6B675F; line-height: 1.4;' }, 'Tu diario personal de entrenamiento y nutrición 100% privado en tu teléfono.'),
-          h('label', { style: 'font-size: 13px; font-weight: 600; color: #6B675F; margin-top: 4px;' }, '¿Cómo te llamas?'),
+          h('p', { style: 'font-size: 14px; color: #5D5951; line-height: 1.4;' }, 'Tu diario personal de entrenamiento y nutrición 100% privado en tu teléfono.'),
+          h('label', { style: 'font-size: 13px; font-weight: 600; color: #5D5951; margin-top: 4px;' }, '¿Cómo te llamas?'),
           inputNombre,
-          h('label', { style: 'font-size: 13px; font-weight: 600; color: #6B675F; margin-top: 4px;' }, 'Meta principal:'),
+          h('label', { style: 'font-size: 13px; font-weight: 600; color: #5D5951; margin-top: 4px;' }, 'Meta principal:'),
           inputMetaNom,
-          h('label', { style: 'font-size: 13px; font-weight: 600; color: #6B675F; margin-top: 4px;' }, 'Fecha objetivo:'),
+          h('label', { style: 'font-size: 13px; font-weight: 600; color: #5D5951; margin-top: 4px;' }, 'Fecha objetivo:'),
           inputMetaFec,
           h('div', { style: 'display: flex; justify-content: flex-end; margin-top: 10px;' },
             h('button', {
               class: 'v2-btn-pildora v2-btn-lima',
-              style: 'width: auto; padding: 0 28px;',
+              style: 'width: auto; min-height: 48px; padding: 0 28px;',
               on: {
                 click: () => {
                   datosAsistente.nombre = inputNombre.value.trim() || '';
@@ -209,24 +244,24 @@ export function asistenteInicial() {
         const inCuello = h('input', { class: 'v2-input-redondo', type: 'number', step: '0.5', value: datosAsistente.cuello });
 
         contenedorPaso.append(
-          h('div', { style: 'font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; color: #6B675F;' }, 'PASO 2 DE 3 · CUERPO'),
+          h('div', { style: 'font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; color: #5D5951;' }, 'PASO 2 DE 3 · CUERPO'),
           h('h2', { style: 'font-family: "Instrument Serif", Georgia, serif; font-size: 32px; font-weight: 400; line-height: 1.1;' }, 'Tu punto de ', h('em', {}, 'partida')),
-          h('p', { style: 'font-size: 14px; color: #6B675F; line-height: 1.4;' }, 'Tus medidas se almacenan únicamente en la memoria local de este dispositivo.'),
+          h('p', { style: 'font-size: 14px; color: #5D5951; line-height: 1.4;' }, 'Tus medidas se almacenan únicamente en la memoria local de este dispositivo.'),
           h('div', { style: 'display: grid; grid-template-columns: 1fr 1fr; gap: 10px;' },
-            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #6B675F;' }, 'Estatura (cm)'), inEstatura),
-            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #6B675F;' }, 'Peso (kg)'), inPeso),
-            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #6B675F;' }, 'Cintura (cm)'), inCintura),
-            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #6B675F;' }, 'Cuello (cm)'), inCuello)
+            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #5D5951;' }, 'Estatura (cm)'), inEstatura),
+            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #5D5951;' }, 'Peso (kg)'), inPeso),
+            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #5D5951;' }, 'Cintura (cm)'), inCintura),
+            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #5D5951;' }, 'Cuello (cm)'), inCuello)
           ),
           h('div', { style: 'display: flex; justify-content: space-between; margin-top: 10px;' },
             h('button', {
               class: 'v2-btn-pildora',
-              style: 'background-color: #E9E4D8;',
+              style: 'background-color: #E9E4D8; min-height: 48px;',
               on: { click: () => { pasoActual = 1; actualizarPaso(); } }
             }, 'Atrás'),
             h('button', {
               class: 'v2-btn-pildora v2-btn-lima',
-              style: 'width: auto; padding: 0 28px;',
+              style: 'width: auto; min-height: 48px; padding: 0 28px;',
               on: {
                 click: () => {
                   datosAsistente.estaturaCm = Number(inEstatura.value) || 175;
@@ -248,24 +283,24 @@ export function asistenteInicial() {
         const inPasos = h('input', { class: 'v2-input-redondo', type: 'number', value: datosAsistente.pasos });
 
         contenedorPaso.append(
-          h('div', { style: 'font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; color: #6B675F;' }, 'PASO 3 DE 3 · OBJETIVOS'),
+          h('div', { style: 'font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; color: #5D5951;' }, 'PASO 3 DE 3 · OBJETIVOS'),
           h('h2', { style: 'font-family: "Instrument Serif", Georgia, serif; font-size: 32px; font-weight: 400; line-height: 1.1;' }, 'Tus metas ', h('em', {}, 'diarias')),
-          h('p', { style: 'font-size: 14px; color: #6B675F; line-height: 1.4;' }, 'Podrás modificar estas metas cuando quieras desde Ajustes.'),
+          h('p', { style: 'font-size: 14px; color: #5D5951; line-height: 1.4;' }, 'Podrás modificar estas metas cuando quieras desde Ajustes.'),
           h('div', { style: 'display: grid; grid-template-columns: 1fr 1fr; gap: 10px;' },
-            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #6B675F;' }, 'Calorías (kcal)'), inKcal),
-            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #6B675F;' }, 'Proteína (g)'), inProt),
-            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #6B675F;' }, 'Agua (vasos)'), inAgua),
-            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #6B675F;' }, 'Pasos diarios'), inPasos)
+            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #5D5951;' }, 'Calorías (kcal)'), inKcal),
+            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #5D5951;' }, 'Proteína (g)'), inProt),
+            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #5D5951;' }, 'Agua (vasos)'), inAgua),
+            h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #5D5951;' }, 'Pasos diarios'), inPasos)
           ),
           h('div', { style: 'display: flex; justify-content: space-between; margin-top: 10px;' },
             h('button', {
               class: 'v2-btn-pildora',
-              style: 'background-color: #E9E4D8;',
+              style: 'background-color: #E9E4D8; min-height: 48px;',
               on: { click: () => { pasoActual = 2; actualizarPaso(); } }
             }, 'Atrás'),
             h('button', {
               class: 'v2-btn-pildora v2-btn-lima',
-              style: 'width: auto; padding: 0 28px;',
+              style: 'width: auto; min-height: 48px; padding: 0 28px;',
               on: {
                 click: async () => {
                   datosAsistente.kcal = Number(inKcal.value) || 2200;
@@ -326,14 +361,17 @@ export function asistenteInicial() {
 
 /**
  * CONTRATO: Pide el PIN si está configurado. Retorna Promise<boolean>
- * Adaptado a la estética Forja v2 (titulares serif, teclado en píldoras, visor de puntos)
+ * Incluye límite de 5 intentos fallidos con espera de 30 segundos (Seguridad Hallazgo 4).
+ * @param {Object} opciones - Opciones internas ({ cancelar: boolean, subtitulo: string })
  */
-export async function pedirPin() {
+export async function pedirPin(opciones = {}) {
   const pinGuardado = await ajuste('pin', null);
   if (!pinGuardado || !pinGuardado.hash) return true;
 
   return new Promise((resolve) => {
     let pinEntrada = '';
+    let timerBloqueo = null;
+    const botonesTeclado = [];
 
     const overlay = h('div', {
       class: 'v2-pin-overlay',
@@ -347,30 +385,84 @@ export async function pedirPin() {
       style: 'width: 20px; height: 20px; border-radius: 999px; border: 2px solid #17171A; background-color: transparent; transition: background-color 160ms ease;'
     })));
 
-    const mensajeError = h('div', { style: 'min-height: 24px; color: #E2553A; font-size: 14px; font-weight: 500;' });
+    const mensajeError = h('div', {
+      style: 'min-height: 24px; color: #A02B14; font-size: 14px; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums;'
+    });
+
+    function establecerEstadoTeclado(deshabilitado) {
+      botonesTeclado.forEach(btn => {
+        btn.disabled = deshabilitado;
+        btn.style.opacity = deshabilitado ? '0.45' : '1';
+        btn.style.cursor = deshabilitado ? 'not-allowed' : 'pointer';
+      });
+    }
+
+    function iniciarCuentaRegresivaBloqueo(hastaMs) {
+      if (timerBloqueo) clearInterval(timerBloqueo);
+      pinEntrada = '';
+      actualizarVisor();
+      establecerEstadoTeclado(true);
+
+      const tick = () => {
+        const restantes = Math.ceil((hastaMs - Date.now()) / 1000);
+        if (restantes <= 0) {
+          clearInterval(timerBloqueo);
+          timerBloqueo = null;
+          guardarEstadoBloqueoPin(0, 0);
+          establecerEstadoTeclado(false);
+          mensajeError.textContent = '';
+        } else {
+          mensajeError.textContent = `Demasiados intentos fallidos. Espera ${restantes} s.`;
+        }
+      };
+
+      tick();
+      timerBloqueo = setInterval(tick, 500);
+    }
 
     async function teclear(num) {
+      const { bloqueadoHasta } = leerEstadoBloqueoPin();
+      if (Date.now() < bloqueadoHasta) {
+        iniciarCuentaRegresivaBloqueo(bloqueadoHasta);
+        return;
+      }
+
       if (pinEntrada.length < 4) {
         pinEntrada += num;
         actualizarVisor();
       }
       if (pinEntrada.length === 4) {
-        const hashIntento = await hashSha256(pinEntrada, pinGuardado.sal);
+        const intentoActual = pinEntrada;
+        pinEntrada = '';
+        const hashIntento = await hashSha256(intentoActual, pinGuardado.sal);
         if (hashIntento === pinGuardado.hash) {
+          if (timerBloqueo) clearInterval(timerBloqueo);
+          guardarEstadoBloqueoPin(0, 0);
           overlay.remove();
           resolve(true);
         } else {
-          mensajeError.textContent = 'PIN incorrecto. Intenta de nuevo.';
-          pinEntrada = '';
-          setTimeout(() => {
-            actualizarVisor();
-            mensajeError.textContent = '';
-          }, 600);
+          const estadoPrevio = leerEstadoBloqueoPin();
+          const nuevosIntentos = estadoPrevio.intentos + 1;
+
+          if (nuevosIntentos >= MAX_INTENTOS_PIN) {
+            const hasta = Date.now() + SEGUNDOS_BLOQUEO_PIN * 1000;
+            guardarEstadoBloqueoPin(0, hasta);
+            iniciarCuentaRegresivaBloqueo(hasta);
+          } else {
+            guardarEstadoBloqueoPin(nuevosIntentos, 0);
+            mensajeError.textContent = `PIN incorrecto (${nuevosIntentos}/${MAX_INTENTOS_PIN}). Intenta de nuevo.`;
+            setTimeout(() => {
+              actualizarVisor();
+              if (!timerBloqueo) mensajeError.textContent = '';
+            }, 900);
+          }
         }
       }
     }
 
     function borrarDigito() {
+      const { bloqueadoHasta } = leerEstadoBloqueoPin();
+      if (Date.now() < bloqueadoHasta) return;
       if (pinEntrada.length > 0) {
         pinEntrada = pinEntrada.slice(0, -1);
         actualizarVisor();
@@ -386,36 +478,61 @@ export async function pedirPin() {
       }
     }
 
+    const crearBotonTecla = (contenido, accion, titulo = '') => {
+      const btn = h('button', {
+        type: 'button',
+        class: 'v2-btn-pildora',
+        title: titulo,
+        style: 'min-height: 60px; height: 60px; font-size: 24px; font-weight: 700; background-color: #E9E4D8; color: #17171A; border-radius: 999px; border: none;',
+        on: { click: accion }
+      }, contenido);
+      botonesTeclado.push(btn);
+      return btn;
+    };
+
     const tecladoGrid = h('div', {
       style: 'display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; width: 100%; max-width: 280px; margin-top: 12px;'
     },
-      ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => h('button', {
-        class: 'v2-btn-pildora',
-        style: 'height: 60px; font-size: 24px; font-weight: 700; background-color: #E9E4D8; color: #17171A; border-radius: 999px;',
-        on: { click: () => teclear(n.toString()) }
-      }, n.toString())),
+      ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => crearBotonTecla(n.toString(), () => teclear(n.toString()))),
       h('div', {}),
-      h('button', {
-        class: 'v2-btn-pildora',
-        style: 'height: 60px; font-size: 24px; font-weight: 700; background-color: #E9E4D8; color: #17171A; border-radius: 999px;',
-        on: { click: () => teclear('0') }
-      }, '0'),
-      h('button', {
-        class: 'v2-btn-pildora',
-        style: 'height: 60px; background-color: #E9E4D8; color: #17171A; border-radius: 999px;',
-        title: 'Borrar',
-        on: { click: borrarDigito }
-      }, iconoNodo('retroceso', ICONOS_SVGS.retroceso))
+      crearBotonTecla('0', () => teclear('0')),
+      crearBotonTecla(iconoNodo('retroceso', ICONOS_SVGS.retroceso), borrarDigito, 'Borrar')
     );
+
+    const btnCancelar = opciones && opciones.cancelar
+      ? h('button', {
+          type: 'button',
+          class: 'v2-btn-pildora',
+          style: 'margin-top: 18px; min-height: 48px; height: 48px; padding: 0 24px; background-color: #E9E4D8; color: #17171A; border-radius: 999px; border: none; font-weight: 600; cursor: pointer;',
+          on: {
+            click: () => {
+              if (timerBloqueo) clearInterval(timerBloqueo);
+              overlay.remove();
+              resolve(false);
+            }
+          }
+        }, 'Cancelar')
+      : null;
 
     overlay.append(
       h('div', { style: 'margin-bottom: 8px;' }, iconoNodo('candado', ICONOS_SVGS.candado)),
-      h('h2', { style: 'font-family: "Instrument Serif", Georgia, serif; font-size: 34px; font-weight: 400; text-align: center;' }, 'Ingresa tu ', h('em', {}, 'PIN')),
-      h('p', { style: 'font-size: 14px; color: #6B675F;' }, 'Acceso seguro a tu diario de entrenamiento'),
+      h('h2', { style: 'font-family: "Instrument Serif", Georgia, serif; font-size: 34px; font-weight: 400; text-align: center;' },
+        opciones && opciones.subtitulo ? 'Verifica tu ' : 'Ingresa tu ',
+        h('em', {}, 'PIN')
+      ),
+      h('p', { style: 'font-size: 14px; color: #5D5951; text-align: center;' },
+        (opciones && opciones.subtitulo) || 'Acceso seguro a tu diario de entrenamiento'
+      ),
       visor,
       mensajeError,
-      tecladoGrid
+      tecladoGrid,
+      btnCancelar
     );
+
+    const estadoInicial = leerEstadoBloqueoPin();
+    if (Date.now() < estadoInicial.bloqueadoHasta) {
+      iniciarCuentaRegresivaBloqueo(estadoInicial.bloqueadoHasta);
+    }
 
     document.body.appendChild(overlay);
   });
@@ -461,15 +578,16 @@ async function renderizar() {
     .v2-serif-title em {
       font-style: italic;
     }
-    .v2-micro-label {
-      font-size: 10px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      font-weight: 700;
-      color: #6B675F;
-      line-height: 1;
+    .v2-subtitulo-card {
+      font-size: 13px;
+      font-weight: 600;
+      color: #5D5951;
+      text-transform: none;
+      letter-spacing: normal;
+      line-height: 1.2;
     }
     .v2-btn-pildora {
+      min-height: 48px;
       height: 48px;
       border-radius: 999px;
       border: none;
@@ -495,6 +613,7 @@ async function renderizar() {
       color: #17171A;
       font-size: 16px;
       font-weight: 600;
+      min-height: 52px;
       height: 52px;
       width: 100%;
     }
@@ -545,7 +664,7 @@ async function renderizar() {
       h('h1', { style: 'font-family: "Instrument Serif", Georgia, serif; font-size: 36px; font-weight: 400; color: #17171A;' },
         'Ajustes de ', h('em', {}, 'Forja')
       ),
-      h('p', { style: 'font-size: 14px; color: #6B675F; margin-top: 4px;' },
+      h('p', { style: 'font-size: 14px; color: #5D5951; margin-top: 4px;' },
         'Configuración personal, metas físicas y seguridad local.'
       )
     ),
@@ -581,22 +700,22 @@ function renderizarSeccionPerfil() {
       'Perfil y ', h('em', {}, 'metas')
     ),
     h('div', { style: 'display: grid; grid-template-columns: 1fr 1fr; gap: 10px;' },
-      h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #6B675F; display: block; margin-bottom: 4px;' }, 'Nombre'), inNombre),
-      h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #6B675F; display: block; margin-bottom: 4px;' }, 'Estatura (cm)'), inEstatura),
-      h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #6B675F; display: block; margin-bottom: 4px;' }, 'Meta Principal'), inMetaNom),
-      h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #6B675F; display: block; margin-bottom: 4px;' }, 'Fecha Meta'), inMetaFec)
+      h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #5D5951; display: block; margin-bottom: 4px;' }, 'Nombre'), inNombre),
+      h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #5D5951; display: block; margin-bottom: 4px;' }, 'Estatura (cm)'), inEstatura),
+      h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #5D5951; display: block; margin-bottom: 4px;' }, 'Meta Principal'), inMetaNom),
+      h('div', {}, h('label', { style: 'font-size: 12px; font-weight: 600; color: #5D5951; display: block; margin-bottom: 4px;' }, 'Fecha Meta'), inMetaFec)
     ),
     h('div', {},
-      h('label', { style: 'font-size: 12px; font-weight: 600; color: #6B675F; display: block; margin-bottom: 4px;' }, 'Meta del mes:'),
+      h('label', { style: 'font-size: 12px; font-weight: 600; color: #5D5951; display: block; margin-bottom: 4px;' }, 'Meta del mes:'),
       inMetaMes
     ),
     h('div', { style: 'margin-top: 4px;' },
-      h('span', { class: 'v2-micro-label' }, 'OBJETIVOS DIARIOS'),
+      h('span', { class: 'v2-subtitulo-card' }, 'Objetivos diarios'),
       h('div', { style: 'display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px;' },
-        h('div', {}, h('label', { style: 'font-size: 11px; font-weight: 600; color: #6B675F;' }, 'Kcal'), inKcal),
-        h('div', {}, h('label', { style: 'font-size: 11px; font-weight: 600; color: #6B675F;' }, 'Prot (g)'), inProt),
-        h('div', {}, h('label', { style: 'font-size: 11px; font-weight: 600; color: #6B675F;' }, 'Agua (v)'), inAgua),
-        h('div', {}, h('label', { style: 'font-size: 11px; font-weight: 600; color: #6B675F;' }, 'Pasos'), inPasos)
+        h('div', {}, h('label', { style: 'font-size: 11px; font-weight: 600; color: #5D5951;' }, 'Kcal'), inKcal),
+        h('div', {}, h('label', { style: 'font-size: 11px; font-weight: 600; color: #5D5951;' }, 'Prot (g)'), inProt),
+        h('div', {}, h('label', { style: 'font-size: 11px; font-weight: 600; color: #5D5951;' }, 'Agua (v)'), inAgua),
+        h('div', {}, h('label', { style: 'font-size: 11px; font-weight: 600; color: #5D5951;' }, 'Pasos'), inPasos)
       )
     ),
     h('button', {
@@ -651,7 +770,7 @@ function renderizarSeccionRutina() {
       iconoNodo('calendario', ICONOS_SVGS.calendario),
       'Días de gym y ', h('em', {}, 'rutina')
     ),
-    h('p', { style: 'font-size: 13px; color: #6B675F;' }, 'Rutina activa programada en la memoria del teléfono:'),
+    h('p', { style: 'font-size: 13px; color: #5D5951;' }, 'Rutina activa programada en la memoria del teléfono:'),
     contenedorDias,
     h('div', { style: 'display: flex; gap: 8px;' },
       h('button', {
@@ -679,7 +798,7 @@ function renderizarSeccionRutina() {
 }
 
 /**
- * Editor modal de la rutina semanal
+ * Editor modal de la rutina semanal (sin backdrop-filter)
  */
 async function abrirEditorRutina() {
   const baseDias = rutinaDatos?.dias || {};
@@ -687,7 +806,7 @@ async function abrirEditorRutina() {
 
   const modal = h('div', {
     class: 'v2-modal-overlay',
-    style: 'position: fixed; inset: 0; background: rgba(23,23,26,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;'
+    style: 'position: fixed; inset: 0; background: rgba(23, 23, 26, 0.76); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;'
   });
 
   const listaInputs = {};
@@ -699,7 +818,7 @@ async function abrirEditorRutina() {
       h('h3', { style: 'font-family: "Instrument Serif", Georgia, serif; font-size: 26px; font-weight: 400;' }, 'Personalizar ', h('em', {}, 'rutina')),
       h('button', {
         class: 'v2-btn-pildora',
-        style: 'width: 40px; height: 40px; padding: 0;',
+        style: 'width: 48px; height: 48px; min-width: 48px; min-height: 48px; padding: 0; background-color: #E9E4D8;',
         on: { click: () => modal.remove() }
       }, iconoNodo('cerrar', ICONOS_SVGS.cerrar))
     ),
@@ -707,13 +826,13 @@ async function abrirEditorRutina() {
       dias.map(dia => {
         const activo = !!baseDias[dia];
         const nom = baseDias[dia]?.nombre || '';
-        const chk = h('input', { type: 'checkbox', checked: activo, style: 'width: 20px; height: 20px; accent-color: #C8F03C; cursor: pointer;' });
+        const chk = h('input', { type: 'checkbox', checked: activo, style: 'width: 22px; height: 22px; accent-color: #C8F03C; cursor: pointer;' });
         const txt = h('input', {
           class: 'v2-input-redondo',
           type: 'text',
           value: nom,
           placeholder: 'Nombre sesión (ej. Pierna)',
-          style: 'flex: 1; height: 44px; padding: 10px 16px; background-color: #E9E4D8;'
+          style: 'flex: 1; height: 48px; padding: 10px 16px; background-color: #E9E4D8;'
         });
         listaInputs[dia] = { chk, txt, ejer: baseDias[dia]?.ejercicios || [] };
 
@@ -754,7 +873,8 @@ async function abrirEditorRutina() {
 }
 
 /**
- * 3. Sección PIN de Seguridad
+ * 3. Sección PIN de Seguridad (Seguridad Hallazgos 3 y 4)
+ * Pide el PIN actual antes de permitir quitarlo o cambiarlo.
  */
 function renderizarSeccionSeguridad() {
   const tienePin = !!(pinActual && pinActual.hash);
@@ -764,43 +884,92 @@ function renderizarSeccionSeguridad() {
       iconoNodo('candado', ICONOS_SVGS.candado),
       'PIN de ', h('em', {}, 'seguridad')
     ),
-    h('div', { style: 'display: flex; justify-content: space-between; align-items: center; background-color: #F3F0E8; border-radius: 28px; padding: 14px 20px;' },
-      h('div', {},
+    h('div', { style: 'display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background-color: #F3F0E8; border-radius: 28px; padding: 16px 20px;' },
+      h('div', { style: 'flex: 1; min-width: 160px;' },
         h('div', { style: 'font-weight: 600; font-size: 15px;' }, tienePin ? 'PIN activado' : 'Sin PIN'),
-        h('div', { style: 'font-size: 12px; color: #6B675F; margin-top: 2px;' },
-          tienePin ? 'Se pide un código de 4 dígitos al abrir.' : 'La app abre directamente sin solicitar clave.'
+        h('div', { style: 'font-size: 12px; color: #5D5951; margin-top: 2px;' },
+          tienePin
+            ? 'Se pide un código de 4 dígitos al abrir. Bloqueo de 30 s tras 5 fallos.'
+            : 'La app abre directamente sin solicitar clave.'
         )
       ),
-      h('button', {
-        class: `v2-btn-pildora ${tienePin ? 'v2-btn-peligro' : 'v2-btn-lima'}`,
-        style: 'height: 42px; width: auto; padding: 0 18px;',
-        on: {
-          click: async () => {
-            if (tienePin) {
-              const quitar = await confirmar('¿Deseas quitar el PIN de seguridad?');
-              if (quitar) {
-                await ponerAjuste('pin', null);
-                pinActual = null;
-                aviso('PIN desactivado', 'info');
-                await renderizar();
+      tienePin
+        ? h('div', { style: 'display: flex; gap: 8px; flex-wrap: wrap;' },
+            h('button', {
+              class: 'v2-btn-pildora',
+              style: 'min-height: 48px; height: 48px; width: auto; padding: 0 18px; background-color: #E9E4D8;',
+              on: {
+                click: async () => {
+                  const verificado = await pedirPin({
+                    cancelar: true,
+                    subtitulo: 'Ingresa tu PIN actual para cambiarlo'
+                  });
+                  if (!verificado) {
+                    aviso('Debes verificar tu PIN actual para cambiarlo', 'error');
+                    return;
+                  }
+                  await configurarNuevoPin(true);
+                }
               }
-            } else {
-              configurarNuevoPin();
+            }, 'Cambiar PIN'),
+            h('button', {
+              class: 'v2-btn-pildora v2-btn-peligro',
+              style: 'min-height: 48px; height: 48px; width: auto; padding: 0 18px;',
+              on: {
+                click: async () => {
+                  const verificado = await pedirPin({
+                    cancelar: true,
+                    subtitulo: 'Ingresa tu PIN actual para desactivarlo'
+                  });
+                  if (!verificado) {
+                    aviso('PIN actual no verificado. No se desactivó el PIN.', 'error');
+                    return;
+                  }
+                  await ponerAjuste('pin', null);
+                  pinActual = null;
+                  guardarEstadoBloqueoPin(0, 0);
+                  aviso('PIN desactivado correctamente', 'info');
+                  await renderizar();
+                }
+              }
+            }, 'Quitar PIN')
+          )
+        : h('button', {
+            class: 'v2-btn-pildora v2-btn-lima',
+            style: 'min-height: 48px; height: 48px; width: auto; padding: 0 20px;',
+            on: {
+              click: async () => {
+                await configurarNuevoPin(false);
+              }
             }
-          }
-        }
-      }, tienePin ? 'Quitar PIN' : 'Configurar PIN')
+          }, 'Configurar PIN')
+    ),
+    h('p', { style: 'font-size: 12px; color: #5D5951; margin: 0 4px;' },
+      'Nota: El PIN es un bloqueo de pantalla local de la aplicación y no cifra el almacenamiento físico del dispositivo.'
     )
   );
 }
 
 /**
  * Modal para configurar un nuevo PIN de 4 dígitos
+ * Si ya existe un PIN y no ha sido verificado previamente, exige ingresar el PIN actual primero.
  */
-function configurarNuevoPin() {
+async function configurarNuevoPin(yaVerificado = false) {
+  if (pinActual && pinActual.hash && !yaVerificado) {
+    const ok = await pedirPin({
+      cancelar: true,
+      subtitulo: 'Ingresa tu PIN actual para continuar'
+    });
+    if (!ok) {
+      aviso('PIN actual incorrecto o cancelado', 'error');
+      return;
+    }
+  }
+
   const inputPin1 = h('input', {
     class: 'v2-input-redondo',
     type: 'password',
+    inputMode: 'numeric',
     maxLength: '4',
     placeholder: '••••',
     style: 'font-size: 24px; text-align: center; letter-spacing: 0.3em; background-color: #E9E4D8;'
@@ -808,6 +977,7 @@ function configurarNuevoPin() {
   const inputPin2 = h('input', {
     class: 'v2-input-redondo',
     type: 'password',
+    inputMode: 'numeric',
     maxLength: '4',
     placeholder: 'Confirma el PIN',
     style: 'font-size: 16px; text-align: center; letter-spacing: 0.1em; background-color: #E9E4D8;'
@@ -815,13 +985,16 @@ function configurarNuevoPin() {
 
   const modal = h('div', {
     class: 'v2-modal-overlay',
-    style: 'position: fixed; inset: 0; background: rgba(23,23,26,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;'
+    style: 'position: fixed; inset: 0; background: rgba(23, 23, 26, 0.76); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;'
   },
     h('div', {
       style: 'width: 100%; max-width: 360px; background-color: #F3F0E8; border-radius: 28px; padding: 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 10px 30px rgba(23,23,26,.2); font-family: "Bricolage Grotesque", sans-serif;'
     },
-      h('h3', { style: 'font-family: "Instrument Serif", Georgia, serif; font-size: 28px; font-weight: 400;' }, 'Crear ', h('em', {}, 'PIN')),
-      h('p', { style: 'font-size: 13px; color: #6B675F;' }, 'Elige 4 números para proteger tu app:'),
+      h('h3', { style: 'font-family: "Instrument Serif", Georgia, serif; font-size: 28px; font-weight: 400;' },
+        pinActual && pinActual.hash ? 'Cambiar ' : 'Crear ',
+        h('em', {}, 'PIN')
+      ),
+      h('p', { style: 'font-size: 13px; color: #5D5951;' }, 'Elige 4 números para proteger tu app:'),
       inputPin1,
       inputPin2,
       h('div', { style: 'display: flex; gap: 8px; margin-top: 6px;' },
@@ -849,6 +1022,7 @@ function configurarNuevoPin() {
               const hash = await hashSha256(p1, sal);
               pinActual = { sal, hash };
               await ponerAjuste('pin', pinActual);
+              guardarEstadoBloqueoPin(0, 0);
               modal.remove();
               aviso('PIN configurado con éxito', 'ok');
               await renderizar();
@@ -864,25 +1038,38 @@ function configurarNuevoPin() {
 
 /**
  * 4. Sección Copia de Seguridad y Datos
+ * Seguridad 3: Excluye el hash y la sal del PIN al exportar el respaldo JSON.
  */
 function renderizarSeccionDatos() {
   const chkFotos = h('input', {
     type: 'checkbox',
-    style: 'width: 18px; height: 18px; accent-color: #C8F03C; cursor: pointer;'
+    style: 'width: 20px; height: 20px; accent-color: #C8F03C; cursor: pointer;'
   });
 
   const inputCopiaFile = h('input', {
     type: 'file',
     accept: '.json',
     style: 'display: none;',
-    on: { change: async (e) => { await procesarArchivoImportar(e.target.files[0], 'todo'); } }
+    on: {
+      change: async (e) => {
+        const archivo = e.target.files && e.target.files[0];
+        await procesarArchivoImportar(archivo, 'todo');
+        e.target.value = '';
+      }
+    }
   });
 
   const inputHistorialFile = h('input', {
     type: 'file',
     accept: '.json',
     style: 'display: none;',
-    on: { change: async (e) => { await procesarArchivoImportar(e.target.files[0], 'historial'); } }
+    on: {
+      change: async (e) => {
+        const archivo = e.target.files && e.target.files[0];
+        await procesarArchivoImportar(archivo, 'historial');
+        e.target.value = '';
+      }
+    }
   });
 
   return h('div', { class: 'v2-tarjeta' },
@@ -892,10 +1079,10 @@ function renderizarSeccionDatos() {
       iconoNodo('disco', ICONOS_SVGS.disco),
       'Copia de ', h('em', {}, 'seguridad')
     ),
-    h('p', { style: 'font-size: 13px; color: #6B675F;' },
-      'Tus datos viven exclusivamente en este dispositivo. Descarga una copia periódicamente.'
+    h('p', { style: 'font-size: 13px; color: #5D5951;' },
+      'Tus datos viven exclusivamente en este dispositivo. Descarga una copia periódicamente (el PIN nunca se exporta).'
     ),
-    h('label', { style: 'display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer;' },
+    h('label', { style: 'display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; min-height: 36px;' },
       chkFotos,
       h('span', {}, 'Incluir fotos de progreso en la copia (pesa más)')
     ),
@@ -907,6 +1094,13 @@ function renderizarSeccionDatos() {
           click: async () => {
             aviso('Generando copia de seguridad...', 'info');
             const copia = await exportarTodo({ conFotos: chkFotos.checked });
+            // Seguridad 3: Excluir estrictamente el hash y sal del PIN de la exportación
+            if (copia && copia.datos && Array.isArray(copia.datos.ajustes)) {
+              copia.datos.ajustes = copia.datos.ajustes.filter(aj => aj && aj.id !== 'pin');
+            }
+            if (copia && copia.datos && copia.datos.pin) {
+              delete copia.datos.pin;
+            }
             const blob = new Blob([JSON.stringify(copia, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = h('a', { href: url, download: `forja-backup-${hoyISO()}.json` });
@@ -933,38 +1127,128 @@ function renderizarSeccionDatos() {
 }
 
 /**
- * Lee y procesa un archivo JSON para importación
+ * Lee, valida y procesa un archivo JSON para importación usando importarTodo()
+ * - Acepta formato { datos: {...} } y también colecciones en la raíz { sesiones: [...], series: [...] } (ALTO-05).
+ * - Asigna IDs determinísticos o enlaza con registros existentes cuando el historial no trae 'id' para no duplicar al reintentar.
+ * - Seguridad 3: Filtra cualquier clave 'pin' en ajustes importados.
+ * - Seguridad 5: En fotos, solo permite cadenas data:image/ y bloquea cualquier URL externa (http/https/etc.).
+ * - CRÍTICO-01: Preserva el Blob de fotos locales existentes si el respaldo importado viene sin foto.
  */
 async function procesarArchivoImportar(archivo, tipo) {
   if (!archivo) return;
   try {
     const texto = await archivo.text();
     const obj = JSON.parse(texto);
-
-    if (tipo === 'todo') {
-      const res = await importarTodo(obj);
-      aviso(`Copia importada: ${res.agregados || 0} nuevos, ${res.actualizados || 0} actualizados`, 'ok');
-      await recargarDatos();
-      await renderizar();
-    } else {
-      let contSesiones = 0;
-      let contSeries = 0;
-
-      if (obj.sesiones && Array.isArray(obj.sesiones)) {
-        for (const s of obj.sesiones) {
-          await guardar('sesiones', s);
-          contSesiones++;
-        }
-      }
-      if (obj.series && Array.isArray(obj.series)) {
-        for (const se of obj.series) {
-          await guardar('series', se);
-          contSeries++;
-        }
-      }
-
-      aviso(`Historial importado: ${contSesiones} sesiones y ${contSeries} series`, 'ok');
+    if (!obj || typeof obj !== 'object') {
+      throw new Error('Estructura JSON inválida');
     }
+
+    const storesconocidos = ['sesiones', 'series', 'medidas', 'fotos', 'comidas', 'ajustes', 'chat', 'camara'];
+    const datosNormalizados = {};
+
+    // 1. Extraer tanto de obj.datos como del nivel raíz de obj
+    const fuenteDatos = (obj.datos && typeof obj.datos === 'object') ? obj.datos : {};
+    for (const store of storesconocidos) {
+      if (Array.isArray(fuenteDatos[store])) {
+        datosNormalizados[store] = fuenteDatos[store].map(item => (item && typeof item === 'object' ? { ...item } : item));
+      } else if (Array.isArray(obj[store])) {
+        datosNormalizados[store] = obj[store].map(item => (item && typeof item === 'object' ? { ...item } : item));
+      }
+    }
+
+    // Si es un array directo de series o sesiones
+    if (Array.isArray(obj) && obj.length > 0) {
+      if (obj[0].ejercicioId !== undefined || obj[0].reps !== undefined) {
+        datosNormalizados.series = obj.map(item => ({ ...item }));
+      } else if (obj[0].fecha !== undefined) {
+        datosNormalizados.sesiones = obj.map(item => ({ ...item }));
+      }
+    }
+
+    // 2. Seguridad 3: Nunca importar ni sobrescribir el ajuste 'pin'
+    if (Array.isArray(datosNormalizados.ajustes)) {
+      datosNormalizados.ajustes = datosNormalizados.ajustes.filter(aj => aj && aj.id !== 'pin');
+    }
+
+    // 3. Evitar duplicados en sesiones sin id (ALTO-05)
+    if (Array.isArray(datosNormalizados.sesiones)) {
+      const sesionesExistentes = await todos('sesiones');
+      datosNormalizados.sesiones.forEach((s, idx) => {
+        if (!s || typeof s !== 'object') return;
+        if (!s.id) {
+          const existente = sesionesExistentes.find(e => e.fecha && s.fecha && e.fecha === s.fecha);
+          s.id = existente ? existente.id : `sesion-${s.fecha || idx}`;
+        }
+      });
+    }
+
+    // 4. Evitar duplicados en series sin id (ALTO-05)
+    if (Array.isArray(datosNormalizados.series)) {
+      const seriesExistentes = await todos('series');
+      datosNormalizados.series.forEach((se, idx) => {
+        if (!se || typeof se !== 'object') return;
+        if (!se.id) {
+          const existente = seriesExistentes.find(e =>
+            e.fecha === se.fecha &&
+            e.ejercicioId === se.ejercicioId &&
+            ((e.hora && se.hora && Math.abs(e.hora - se.hora) < 2000) ||
+             (!se.hora && Number(e.kg || 0) === Number(se.kg || 0) && Number(e.reps || 0) === Number(se.reps || 0) && (e.nota || '') === (se.nota || '')))
+          );
+          se.id = existente
+            ? existente.id
+            : `serie-${se.fecha || 'f'}-${se.ejercicioId || 'ej'}-${se.hora || idx}-${se.kg ?? 'bw'}-${se.reps ?? 0}`;
+        }
+      });
+    }
+
+    // 5. Seguridad 5 y CRÍTICO-01 en fotos: validar solo data:image/ y preservar Blob existente si falta
+    let urlsExternasRechazadas = 0;
+    if (Array.isArray(datosNormalizados.fotos)) {
+      const fotosLocales = await todos('fotos');
+      const mapaFotosLocales = new Map(fotosLocales.map(f => [f.id, f]));
+
+      for (const foto of datosNormalizados.fotos) {
+        if (!foto || typeof foto !== 'object') continue;
+
+        if (foto.dataUrl !== undefined && foto.dataUrl !== null) {
+          const urlStr = typeof foto.dataUrl === 'string' ? foto.dataUrl.trim() : '';
+          if (!urlStr.startsWith('data:image/')) {
+            // Bloquear cualquier URL externa (http:, https:, javascript:, etc.)
+            delete foto.dataUrl;
+            urlsExternasRechazadas++;
+          }
+        }
+
+        // Preservar el Blob local si el registro importado no trae imagen
+        if (!foto.blob && !foto.dataUrl && foto.id && mapaFotosLocales.has(foto.id)) {
+          const fotoPrevia = mapaFotosLocales.get(foto.id);
+          if (fotoPrevia && fotoPrevia.blob) {
+            foto.blob = fotoPrevia.blob;
+          }
+        }
+      }
+    }
+
+    // 6. Ejecutar importarTodo con estructura canónica { version, fecha, datos }
+    const payload = {
+      version: obj.version || 1,
+      fecha: obj.fecha || new Date().toISOString(),
+      datos: datosNormalizados
+    };
+
+    const res = await importarTodo(payload);
+    const agregados = res?.agregados || 0;
+    const actualizados = res?.actualizados || 0;
+
+    if (urlsExternasRechazadas > 0) {
+      aviso(`Se bloquearon ${urlsExternasRechazadas} URL(s) externas en fotos (solo se acepta data:image/)`, 'error');
+    } else {
+      const prefijo = tipo === 'historial' ? 'Historial importado' : 'Copia importada';
+      aviso(`${prefijo}: ${agregados} agregados, ${actualizados} actualizados`, 'ok');
+    }
+
+    await recargarDatos();
+    await renderizar();
   } catch (err) {
     console.error('Error al importar:', err);
     aviso('Error al leer el archivo JSON: formato inválido', 'error');
@@ -973,12 +1257,13 @@ async function procesarArchivoImportar(archivo, tipo) {
 
 /**
  * 5. Sección IA Local (WebLLM)
+ * Sincronizado con WEBLLM_MODELO y WEBLLM_MODELO_RESPALDO de config.js (CFG-01)
  */
 function renderizarSeccionIA() {
   const tieneWebGPU = typeof navigator !== 'undefined' && 'gpu' in navigator && !!navigator.gpu;
   const activa = !!iaAjustes?.activa;
-  const modeloPrincipal = WEBLLM_MODELO || 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC';
-  const modeloRespaldo = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
+  const modeloPrincipal = WEBLLM_MODELO || 'Qwen3.5-2B-q4f16_1-MLC';
+  const modeloRespaldo = WEBLLM_MODELO_RESPALDO || 'Qwen3.5-0.8B-q4f16_1-MLC';
 
   if (iaAjustes.modelo !== modeloPrincipal && iaAjustes.modelo !== modeloRespaldo) {
     iaAjustes.modelo = modeloPrincipal;
@@ -987,7 +1272,7 @@ function renderizarSeccionIA() {
   const barraProg = h('div', { class: 'v2-barra-track', style: 'display: none; margin-top: 8px;' },
     h('div', { class: 'v2-barra-lima', style: 'width: 0%;' })
   );
-  const textoProgreso = h('div', { style: 'font-size: 12px; color: #6B675F; margin-top: 4px; display: none;' });
+  const textoProgreso = h('div', { style: 'font-size: 12px; color: #5D5951; margin-top: 4px; display: none;' });
 
   const selectModelo = h('select', {
     class: 'v2-input-redondo',
@@ -1001,10 +1286,10 @@ function renderizarSeccionIA() {
     }
   },
     h('option', { value: modeloPrincipal, selected: iaAjustes.modelo === modeloPrincipal },
-      `1.5B ≈ 1,1 GB (Recomendado: ${modeloPrincipal})`
+      `2B ≈ 1,3 GB (Recomendado: ${modeloPrincipal})`
     ),
     h('option', { value: modeloRespaldo, selected: iaAjustes.modelo === modeloRespaldo },
-      `0.5B ≈ 0,4 GB (Ligero: ${modeloRespaldo})`
+      `0.8B ≈ 0,5 GB (Ligero: ${modeloRespaldo})`
     )
   );
 
@@ -1013,12 +1298,12 @@ function renderizarSeccionIA() {
       iconoNodo('ia', ICONOS_SVGS.ia),
       'IA local en el ', h('em', {}, 'teléfono')
     ),
-    h('p', { style: 'font-size: 13px; color: #6B675F;' },
+    h('p', { style: 'font-size: 13px; color: #5D5951;' },
       'Entrenador inteligente que analiza tus datos sin internet mediante WebGPU.'
     ),
     !tieneWebGPU
       ? h('div', {
-          style: 'background-color: #F3F0E8; border-radius: 999px; padding: 10px 16px; font-size: 13px; color: #E2553A; display: flex; align-items: center; gap: 8px;'
+          style: 'background-color: #F3F0E8; border-radius: 999px; padding: 10px 16px; font-size: 13px; color: #A02B14; font-weight: 600; display: flex; align-items: center; gap: 8px;'
         },
           iconoNodo('alerta', ICONOS_SVGS.alerta),
           'Tu navegador o dispositivo no tiene WebGPU activo. El Coach responderá con reglas sin internet.'
@@ -1030,17 +1315,17 @@ function renderizarSeccionIA() {
           'WebGPU disponible en este dispositivo'
         ),
     h('div', {},
-      h('label', { style: 'font-size: 12px; font-weight: 600; color: #6B675F;' }, 'Modelo de IA local:'),
+      h('label', { style: 'font-size: 12px; font-weight: 600; color: #5D5951;' }, 'Modelo de IA local:'),
       selectModelo
     ),
     h('div', { style: 'display: flex; justify-content: space-between; align-items: center; background-color: #F3F0E8; border-radius: 28px; padding: 14px 20px;' },
       h('div', {},
         h('div', { style: 'font-weight: 600; font-size: 15px;' }, 'Activar IA en Coach'),
-        h('div', { style: 'font-size: 12px; color: #6B675F;' }, `Estado: ${activa ? 'Activada' : 'Desactivada'}`)
+        h('div', { style: 'font-size: 12px; color: #5D5951;' }, `Estado: ${activa ? 'Activada' : 'Desactivada'}`)
       ),
       h('button', {
         class: `v2-btn-pildora ${activa ? 'v2-btn-lima' : ''}`,
-        style: 'height: 42px; width: auto; padding: 0 18px;',
+        style: 'min-height: 48px; height: 48px; width: auto; padding: 0 18px; background-color: ' + (activa ? '#C8F03C' : '#E9E4D8') + ';',
         on: {
           click: async () => {
             iaAjustes.activa = !activa;
@@ -1090,7 +1375,7 @@ function renderizarSeccionIA() {
       }, iconoNodo('descargar', ICONOS_SVGS.descargar), 'Descargar modelo'),
       h('button', {
         class: 'v2-btn-pildora',
-        style: 'flex: 1; color: #E2553A;',
+        style: 'flex: 1; color: #A02B14;',
         on: {
           click: async () => {
             const conf = await confirmar('¿Borrar los archivos del modelo IA del caché para liberar espacio?');

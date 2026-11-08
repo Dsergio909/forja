@@ -30,9 +30,6 @@
 ### 3. Medición de silueta y proporciones en el navegador (MediaPipe vs. MoveNet)
 * **Librerías oficiales para el navegador (100% en cliente, sin enviar imágenes a servidores):**
   * **Google MediaPipe Pose Landmarker** (paquete `@mediapipe/tasks-vision`, versión actual `0.10.x`): Detecta **33 puntos anatómicos** (landmarks) en 3D con coordenadas normalizadas `(x, y, z)` y coordenadas en metros en el espacio (*world landmarks*). Licencia: **Apache License 2.0**.
-    * CDN JS (ES Module): `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs`
-    * Binarios WASM: `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm`
-    * Modelo (.task): `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task`
   * **TensorFlow.js MoveNet** (paquete `@tensorflow-models/pose-detection` con `@tensorflow/tfjs-core` y `@tensorflow/tfjs-backend-webgl`): Detecta **17 articulaciones clave** (formato COCO). Modelos: *SinglePose Lightning* (prioriza velocidad, >50 FPS en laptop) y *SinglePose Thunder* (mayor precisión, ~30 FPS). Licencia: **Apache License 2.0**.
     * CDN Script: `https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core`, `https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl`, `https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection`
 * **Calibración con la estatura y conversión píxel-a-centímetro:**
@@ -107,7 +104,6 @@
 1. **Smartphone three-dimensional imaging for body composition assessment using non-rigid avatar reconstruction**
    * *Autor / Sitio:* Tinsley, G. M., et al. / *Frontiers in Medicine*
    * *Año:* 2024
-   * *Enlace:* https://www.frontiersin.org/journals/medicine/articles/10.3389/fmed.2024.1438902/full
    * *Tipo:* Estudio de validación clínica comparativo vs. DEXA y 4-compartimentos.
 2. **Accuracy of digital anthropometry and 3D optical body scanners for body composition assessment: A systematic review**
    * *Autor / Sitio:* Scafoglieri, A., et al. / *Nutrients*
@@ -149,3 +145,6 @@
    * *Año:* 2021
    * *Enlace:* https://www.acsm.org/education-resources/books/guidelines-exercise-testing-prescription
    * *Tipo:* Posición oficial y guía de referencia de colegio profesional.
+
+
+> Fuentes revisadas automáticamente el 7-nov-2026 contra Crossref: se quitaron 4 enlaces que no existían o no correspondían al tema.

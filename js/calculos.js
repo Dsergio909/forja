@@ -280,7 +280,7 @@ export function epley(kg, reps) {
  * Estima el 1RM usando la fórmula de Brzycki:
  * 1RM = kg * (36 / (37 - reps))
  * Si reps === 1, retorna el mismo peso.
- * Si reps >= 37, limita el denominador a 1 para evitar divisiones inválidas.
+ * Si reps >= 36, utiliza la proyección lineal de Epley para evitar asíntotas irreales.
  * Redondea a 1 decimal.
  *
  * @param {number|null} kg - Peso levantado en kg
@@ -292,8 +292,8 @@ export function brzycki(kg, reps) {
   const r = Number(reps);
   if (isNaN(r) || r <= 0) return 0;
   if (r === 1) return Math.round(Number(kg) * 10) / 10;
-  const divisor = Math.max(1, 37 - r);
-  const resultado = Number(kg) * (36 / divisor);
+  if (r >= 36) return epley(kg, r);
+  const resultado = Number(kg) * (36 / (37 - r));
   return Math.round(resultado * 10) / 10;
 }
 
@@ -356,15 +356,15 @@ export function rangoReps(texto) {
 /**
  * Calcula el peso y repeticiones sugeridas para la próxima sesión mediante doble progresión:
  * - Sin historial: kg: null y motivo 'Elige un peso con el que llegues a X reps dejando 1-2 en reserva'.
- * - Si en la última sesión NO llegó al tope del rango de reps en TODAS las series:
+ * - Si en la última sesión NO llegó al tope del rango de reps en TODAS las series prescritas:
  *     El kg sugerido es el MISMO de la última sesión y el motivo dice 'Mismo peso: busca +1 rep'.
- * - Solo sube si todas las series llegaron al tope:
+ * - Solo sube si se completaron todas las series prescritas y todas llegaron al tope:
  *     En placas sube de a 1 placa.
  *     En kg sube 2.5 kg (o 1-2 kg en mancuernas) y reinicia al piso de reps.
  * - Respeta el campo unidad ('kg'|'placa') y nunca mezcla series de distinta unidad o distinta máquina.
  *
  * @param {Array<object>} seriesUltimaSesion - Series de la última sesión [{kg, reps, porLado, unidad, maquina, ...}]
- * @param {object} ejercicio - Datos del ejercicio o rutina (equipo, reps, series_reps_hipertrofia, etc.)
+ * @param {object} ejercicio - Datos del ejercicio o rutina (equipo, reps, series, series_reps_hipertrofia, etc.)
  * @returns {{kg: number|null, reps: number, motivo: string, porLado?: boolean, unidad?: string}}
  */
 export function pesoSugerido(seriesUltimaSesion, ejercicio = {}) {
@@ -384,13 +384,16 @@ export function pesoSugerido(seriesUltimaSesion, ejercicio = {}) {
     };
   }
 
+  // Asegurar orden cronológico ascendente si las series incluyen marca de hora
+  const seriesOrdenadas = seriesUltimaSesion.slice().sort((a, b) => (a?.hora || 0) - (b?.hora || 0));
+
   // Tomamos como referencia la última serie realizada para determinar configuración (unidad y máquina)
-  const ultima = seriesUltimaSesion[seriesUltimaSesion.length - 1];
+  const ultima = seriesOrdenadas[seriesOrdenadas.length - 1];
   const unidadReferencia = (ultima.unidad === 'placa') ? 'placa' : 'kg';
   const maquinaReferencia = (ultima.maquina || '').trim();
 
   // Filtrar series de la última sesión para nunca mezclar series de distinta unidad o distinta máquina
-  const seriesValidas = seriesUltimaSesion.filter(s => {
+  const seriesValidas = seriesOrdenadas.filter(s => {
     const u = (s.unidad === 'placa') ? 'placa' : 'kg';
     const m = (s.maquina || '').trim();
     return u === unidadReferencia && m === maquinaReferencia;
@@ -403,10 +406,12 @@ export function pesoSugerido(seriesUltimaSesion, ejercicio = {}) {
   const porLado = !!serieRef.porLado;
   const unidad = unidadReferencia;
 
-  // Revisar si en TODAS las series de la sesión previa se alcanzó o superó el tope del rango de reps
-  const todasAlTope = seriesAEvaluar.every(s => Number(s.reps || 0) >= rango.max);
+  // Exigir que se hayan completado todas las series prescritas (ALTO-06) y que TODAS llegaran al tope
+  const seriesPrescritas = Number(ejercicio?.series) || 3;
+  const tieneVolumenCompleto = seriesAEvaluar.length >= seriesPrescritas;
+  const todasAlTope = tieneVolumenCompleto && seriesAEvaluar.every(s => Number(s.reps || 0) >= rango.max);
 
-  // Si NO llegó al tope en TODAS las series: mantener el mismo peso y buscar +1 rep
+  // Si NO llegó al tope en TODAS las series prescritas: mantener el mismo peso y buscar +1 rep
   if (!todasAlTope) {
     return {
       kg: kgActual,
@@ -493,8 +498,8 @@ export function seriesPorMusculo(series, ejercicios, desdeISO) {
 
   for (const s of series) {
     if (!s || !s.ejercicioId) continue;
-    // Filtro por fecha si se especificó (comparación directa de cadenas ISO)
-    if (desdeISO && s.fecha && s.fecha < desdeISO) continue;
+    // Filtro por fecha si se especificó (descarta también series sin fecha: BAJO-02)
+    if (desdeISO && (!s.fecha || s.fecha < desdeISO)) continue;
 
     // Filtro de serie dura: rir <= 3 o fallo === true o rir null/indefinido
     const esDura =
@@ -674,7 +679,8 @@ export function grasaNavy(cinturaCm, cuelloCm, estaturaCm) {
 
 /**
  * Obtiene los récords personales (PR) históricos de cada ejercicio a partir de las series.
- * Determina el PR en base al mayor 1RM estimado (o mayor peso si 1RM es igual).
+ * Determina el PR en base al mayor 1RM estimado, mayor peso si el 1RM es igual,
+ * o mayor número de repeticiones cuando el peso es igual o nulo (peso corporal: CRÍTICO-02).
  *
  * @param {Array<object>} series - Lista de series de la base de datos
  * @returns {Record<string, {kg: number|null, porLado?: boolean, unidad?: string, reps: number, unoRM: number, fecha: string}>}
@@ -697,7 +703,13 @@ export function prs(series) {
     const estimado = unoRM(kgPara1RM, reps);
 
     const actual = mapaPRs[s.ejercicioId];
-    if (!actual || estimado > actual.unoRM || (estimado === actual.unoRM && (kg || 0) > (actual.kg || 0))) {
+    const esMejor1RM = estimado > (actual?.unoRM || 0);
+    const mismo1RM = actual && estimado === actual.unoRM;
+    const masKilos = (kg || 0) > (actual?.kg || 0);
+    const mismosKilos = (kg || 0) === (actual?.kg || 0);
+    const masReps = reps > (actual?.reps || 0);
+
+    if (!actual || esMejor1RM || (mismo1RM && masKilos) || (mismo1RM && mismosKilos && masReps)) {
       mapaPRs[s.ejercicioId] = {
         kg,
         porLado,

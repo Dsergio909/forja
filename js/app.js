@@ -26,6 +26,28 @@ let moduloActual = null;
 let contadorNavegacion = 0;
 
 /**
+ * Sanitiza un segmento de ruta proveniente de window.location.hash
+ * para prevenir ataques de XSS reflejado (Hallazgo Seguridad 1) en las pantallas
+ * que interpolan parámetros de URL en plantillas HTML.
+ * @param {string} segmento
+ * @returns {string}
+ */
+function sanitizarParametroRuta(segmento) {
+  let texto = String(segmento || '');
+  try {
+    texto = decodeURIComponent(texto);
+  } catch (_) {
+    // Conservar cadena original si contiene secuencias % malformadas
+  }
+  return texto
+    .replace(/[<>"'`]/g, '')
+    .replace(/javascript:/gi, '')
+    .replace(/data:/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    .trim();
+}
+
+/**
  * Navega a una ruta mediante su hash.
  * @param {string} hash Hash destino (ej. '#hoy', '#progreso/press_banca', '#camara')
  */
@@ -71,7 +93,7 @@ async function cargarRuta() {
 
   const hashCompleto = window.location.hash || '#hoy';
   const limpio = hashCompleto.replace(/^#\/?/, '');
-  const partes = limpio.split('/').filter(Boolean);
+  const partes = limpio.split('/').map(sanitizarParametroRuta).filter(Boolean);
   const nombreRuta = partes[0] || 'hoy';
   const params = partes.slice(1);
 
@@ -197,7 +219,7 @@ async function cargarRuta() {
 
 /**
  * Muestra una tarjeta de error en la vista sin romper la barra inferior ni la cabecera.
- * Utiliza icono vectorial SVG en lugar de emojis.
+ * Utiliza icono vectorial SVG y tipografía Bricolage Grotesque (cero monospace).
  */
 function mostrarErrorEnVista(vista, rutaConfig, error) {
   vista.innerHTML = '';
@@ -206,8 +228,8 @@ function mostrarErrorEnVista(vista, rutaConfig, error) {
       ui.h('div', { class: 'icono-error' }, icono('info', 36)),
       ui.h('h2', { class: 'titulo-seccion' }, `${rutaConfig.titulo} no disponible`),
       ui.h('p', { class: 'sutil' }, 'Este módulo está siendo preparado por otro componente o presentó un problema al inicializarse.'),
-      ui.h('pre', {
-        style: 'font-size: 0.75rem; color: var(--alerta); white-space: pre-wrap; word-break: break-all; max-width: 100%; text-align: left; background: var(--papel2); padding: 12px; border-radius: 28px;'
+      ui.h('div', {
+        style: 'font-family: var(--fuente); font-variant-numeric: tabular-nums; font-size: 0.75rem; color: var(--alerta-texto, var(--alerta)); white-space: pre-wrap; word-break: break-all; max-width: 100%; text-align: left; background: var(--papel2); padding: 12px 16px; border-radius: 28px;'
       }, error?.message || String(error)),
       ui.h('div', { class: 'fila', style: 'margin-top: 10px; justify-content: center; width: 100%; gap: 10px;' },
         ui.h('button', {

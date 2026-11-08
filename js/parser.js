@@ -4,8 +4,8 @@
  *
  * Cumple con todos los contratos de CONTRATOS.md y los ejemplos de ENCARGO_APP.md (Sección 2):
  * - jalon 45 6 6 5 -> jalón al pecho, 45 kg, 3 series de 6, 6 y 5
- * - dominadas x6 x6 x4 / dominadas 6,6,4 -> peso corporal
- * - bayesiano 10kg 6 6, 7.5kg 7 -> dos pesos distintos en el mismo ejercicio
+ * - dominadas x6 x6 x4 / dominadas 6,6,4 / dominadas 8 8 -> peso corporal
+ * - bayesiano 10kg 6 6, 7.5kg 7 / bayesiano 7,5 8 8 -> dos pesos distintos y coma decimal
  * - dorian 40/lado 6 6 5, hoy solo hice 4 en martillo con 10 -> múltiples ejercicios en un mensaje
  * - hice dominadas 7 6 5 y luego jalon con 50 kilos 8 8 -> separación por conectores
  * - tricep polea torre 2 40 9 -> nota de máquina «torre 2»
@@ -136,7 +136,24 @@ function esEjercicioCorporal(ej) {
   if (!ej) return false;
   const texto = normalizar(`${ej.equipo || ''} ${ej.tipo || ''} ${ej.nombre || ''} ${ej.id || ''}`);
   return texto.includes('corporal') || texto.includes('dominada') ||
-         texto.includes('fondo') || texto.includes('flexion') || texto.includes('plancha');
+         texto.includes('fondo') || texto.includes('flexion') ||
+         texto.includes('plancha') || texto.includes('colgado') ||
+         texto.includes('calistenia');
+}
+
+/**
+ * Limpia en bucle todas las partículas conversacionales al inicio de un candidato a ejercicio.
+ * @param {string} str
+ * @returns {string}
+ */
+function limpiarPrefijosConversacionales(str) {
+  if (!str) return '';
+  let limpio = str.trim();
+  const regexPrefijo = /^(?:hoy|ayer|hice|hizo|meti|metí|saque|saqué|pude|entrene|entrené|solo|en|con|de|el|la|los|las)\s+/i;
+  while (regexPrefijo.test(limpio)) {
+    limpio = limpio.replace(regexPrefijo, '').trim();
+  }
+  return limpio.replace(/\s+(?:en|con|de)$/i, '').trim();
 }
 
 /**
@@ -190,7 +207,12 @@ function extraerReps(str) {
     let todasReps = true;
     const candidatas = [];
     for (const p of partesComa) {
-      const n = parseInt(p.trim(), 10);
+      const limpioP = p.trim();
+      if (!/^\d+$/.test(limpioP)) {
+        todasReps = false;
+        break;
+      }
+      const n = parseInt(limpioP, 10);
       if (!isNaN(n) && n > 0 && n <= 100) candidatas.push(n);
       else { todasReps = false; break; }
     }
@@ -221,10 +243,8 @@ function empiezaConEjercicio(str, listaEjercicios = []) {
   const regexConv = /(?:hoy\s+)?(?:solo\s+)?(?:hice|hizo|meti|metí|saque|saqué|pude)\s+(\d+)\s*(?:reps?|repeticiones)?\s+(?:en|de)\s+([a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+?)\s+con\s+(\d+(?:[.,]\d+)?)/i;
   if (regexConv.test(limpio)) return true;
 
-  // Limpiar palabras introductorias
-  limpio = limpio
-    .replace(/^(?:hoy|ayer|hice|hizo|meti|metí|saque|saqué|pude|entrene|entrené|solo|en|el|la|los|las)\s+/i, '')
-    .trim();
+  // Limpiar palabras introductorias compuestas en bucle
+  limpio = limpiarPrefijosConversacionales(limpio);
   if (!limpio) return false;
 
   const palabras = limpio.split(/\s+/);
@@ -254,8 +274,14 @@ function empiezaConEjercicio(str, listaEjercicios = []) {
 function separarEnSegmentos(texto, listaEjercicios = []) {
   if (!texto) return [];
 
+  // 0. Normalizar comas decimales claras (ej: "7,5 8 8" -> "7.5 8 8", "7,5kg" -> "7.5kg", "con 7,5" -> "con 7.5")
+  // sin afectar listas de repeticiones enteras separadas por comas ("6,6,4").
+  let t = texto
+    .replace(/(\d+),(\d+)(?=\s*(?:kg|kilos?|k\b|\/lado|por\s+lado|cada\s+lado)|\s+\d)/gi, '$1.$2')
+    .replace(/(\bcon\s+\d+),(\d+)\b/gi, '$1.$2');
+
   // 1. Unificar saltos de línea y punto y coma
-  let t = texto.replace(/[\r\n;]+/g, '\n');
+  t = t.replace(/[\r\n;]+/g, '\n');
 
   // 2. Conectores temporales compuestos: 'y luego', 'luego', 'después'
   t = t.replace(/\s+(?:y\s+luego|luego|y\s+despu[eé]s|despu[eé]s)\s+/gi, '\n');
@@ -279,7 +305,7 @@ function separarEnSegmentos(texto, listaEjercicios = []) {
   t = acumuladoY;
 
   // 4. Comas: separan ejercicios o cambios de peso
-  // NO separar si la coma es un decimal (ej: 7,5kg) o lista de reps (ej: 6,6,4 o 6, 6, 4)
+  // NO separar si la coma es un decimal (ej: 7,5) o lista de reps (ej: 6,6,4 o 6, 6, 4)
   const lineas = t.split('\n');
   const segmentosFinales = [];
 
@@ -305,13 +331,14 @@ function separarEnSegmentos(texto, listaEjercicios = []) {
 
       // Verificar si lo que sigue después de la coma representa un nuevo ejercicio o cambio de peso
       const trimmedResto = resto.trim();
-      const esDecimal = /^\d+(?:kg|kilos?|k\b)/i.test(trimmedResto) && /^\d+$/.test(buffer.trim().slice(-1));
+      const parteSiguiente = subPartes[i + 1] || '';
+      const esDecimal = /^\d/.test(parteSiguiente) && /\d$/.test(parteActual);
       const esNuevoEjercicio = empiezaConEjercicio(trimmedResto, listaEjercicios);
       const esCambioPeso = /\b\d+(?:[.,]\d+)?\s*(?:kg|kilos?|k\b)/i.test(trimmedResto) ||
                            /\b(?:placas?|pines|pin)\b/i.test(trimmedResto) ||
                            /\bcon\s+\d+/i.test(trimmedResto) ||
                            /\d+\/lado/i.test(trimmedResto) ||
-                           /^\s*\d+(?:[.,]\d+)?\s+\d+/i.test(trimmedResto);
+                           (!esDecimal && /^\s*\d+(?:[.,]\d+)?\s+\d+/i.test(trimmedResto));
 
       if ((esNuevoEjercicio || esCambioPeso) && !esDecimal) {
         if (buffer.trim()) segmentosFinales.push(buffer.trim());
@@ -442,24 +469,21 @@ function parsearBloque(linea, listaEjercicios = []) {
     nombreCandidato = texto.trim();
   }
 
-  // Limpiar palabras conectoras al inicio/final del nombre
-  nombreCandidato = nombreCandidato
-    .replace(/^(?:hoy|ayer|hice|hizo|entrene|entrené|en|con|de|el|la|los|las)\s+/i, '')
-    .replace(/\s+(?:en|con|de)$/i, '')
-    .trim();
+  // Limpiar en bucle todas las partículas conversacionales al inicio/final del nombre (BAJO-01)
+  nombreCandidato = limpiarPrefijosConversacionales(nombreCandidato);
 
   // Inversión: "3x8 50kg jalon"
   if (!nombreCandidato && restoDatos) {
     const matchInv = restoDatos.match(/^(.*?)(?:con|de|\s+)?([a-zA-ZáéíóúñÁÉÍÓÚÑ\s]{3,})$/);
     if (matchInv) {
       restoDatos = matchInv[1].trim();
-      nombreCandidato = matchInv[2].trim();
+      nombreCandidato = limpiarPrefijosConversacionales(matchInv[2].trim());
     }
   }
 
   // Si no hay nombre de ejercicio candidato, es un cambio de peso que continúa el ejercicio anterior
   if (!nombreCandidato) {
-    // Si ya teníamos peso o viene peso en restoDatos: ej. "7.5kg 7" o "7.5 7"
+    // Si ya teníamos peso o viene peso en restoDatos: ej. "7.5kg 7" o "7,5 8 8"
     if (kg !== null) {
       const repsArr = extraerReps(restoDatos);
       for (const r of repsArr) {
@@ -522,8 +546,8 @@ function parsearBloque(linea, listaEjercicios = []) {
     for (const r of repsArr) {
       series.push({ kg: null, reps: r, unidad });
     }
-  } else if (/^\d+\s*,\s*\d+/.test(restoDatos)) {
-    // Formato con comas "6,6,4"
+  } else if (/^\d+(?:\s*,\s*\d+)+$/.test(restoDatos.trim())) {
+    // Formato de lista de reps con comas "6,6,4" o "6, 6, 4"
     const repsArr = extraerReps(restoDatos);
     for (const r of repsArr) {
       series.push({ kg: null, reps: r, unidad });
@@ -540,7 +564,7 @@ function parsearBloque(linea, listaEjercicios = []) {
       }
     }
   } else {
-    // Números separados por espacios: "45 6 6 5", "40 9" o "dominadas 7 6 5"
+    // Números separados por espacios: "45 6 6 5", "7,5 8 8", "40 9", "dominadas 8 8" o "dominadas 7 6 5"
     const tokens = restoDatos.split(/\s+/).filter(Boolean);
     const numeros = [];
     const palabras = [];
@@ -562,10 +586,16 @@ function parsearBloque(linea, listaEjercicios = []) {
         series.push({ kg: null, reps: numeros[0], unidad });
       }
     } else if (numeros.length === 2) {
-      kg = numeros[0];
-      series.push({ kg, reps: numeros[1], unidad });
+      // ALTO-03: En ejercicios corporales, 2 números ("dominadas 8 8") son 2 series de peso corporal
+      if (esCorporal && numeros[0] <= 40 && numeros[1] <= 40 && Number.isInteger(numeros[0])) {
+        series.push({ kg: null, reps: numeros[0], unidad });
+        series.push({ kg: null, reps: numeros[1], unidad });
+      } else {
+        kg = numeros[0];
+        series.push({ kg, reps: numeros[1], unidad });
+      }
     } else if (numeros.length >= 3) {
-      if (esCorporal && numeros[0] <= 30) {
+      if (esCorporal && numeros[0] <= 30 && Number.isInteger(numeros[0])) {
         for (const n of numeros) series.push({ kg: null, reps: n, unidad });
       } else {
         kg = numeros[0];

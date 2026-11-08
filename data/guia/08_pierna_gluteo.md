@@ -61,7 +61,6 @@
    *Tipo:* Estudio controlado aleatorizado con MRI (*within-subject design*).
 2. **Hip thrust and back squat training elicit similar gluteus muscle hypertrophy and transfer similarly to the deadlift**  
    *Autor / Revista:* Plotkin, D. L., Rodas, M. A., Vigotsky, A. D., Schoenfeld, B. J., et al. (*Frontiers in Physiology*), 2023.  
-   *Enlace:* https://www.frontiersin.org/articles/10.3389/fphys.2023.1197920/full  
    *Tipo:* Estudio experimental controlado longitudinal (9 semanas, evaluación con MRI y EMG).
 3. **Partial range of motion training in the early phase of movement elicits greater quadriceps muscle hypertrophy**  
    *Autor / Revista:* Pedrosa, G. F., Lima, F. V., Schoenfeld, B. J., et al. (*European Journal of Sport Science*), 2022.  
@@ -89,3 +88,6 @@
    *Tipo:* Revisión sistemática de literatura y posicionamiento de expertos.
 
 ---
+
+
+> Fuentes revisadas automáticamente el 7-nov-2026 contra Crossref: se quitaron 1 enlaces que no existían o no correspondían al tema.

@@ -14,6 +14,7 @@ import { icono } from './iconos.js';
 
 let contenedorRaiz = null;
 let urlsFotosCreadas = [];
+let fnResizeComparador = null;
 let perfilUsuario = null;
 let datosMedidas = [];
 let datosFotos = [];
@@ -23,22 +24,12 @@ let fotoIdAntes = null;
 let fotoIdDespues = null;
 
 /**
- * Función auxiliar para renderizar de manera segura un icono SVG proveniente de ./iconos.js.
- * Admite retornos en forma de string SVG o de nodo DOM (Node).
- *
- * @param {string} nombre - Nombre del icono ('camara', 'mas', 'alerta', etc.)
- * @param {string} [clase=''] - Clases CSS adicionales
- * @returns {string} Código HTML del icono SVG
+ * Convierte un valor a número finito o devuelve null si no es válido.
  */
-function renderIcono(nombre, clase = '') {
-  try {
-    const res = icono(nombre, { class: clase });
-    if (typeof res === 'string') return res;
-    if (res instanceof Node) return res.outerHTML || '';
-    return String(res || '');
-  } catch (e) {
-    return '';
-  }
+function numValido(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 /**
@@ -70,10 +61,14 @@ export async function montar(contenedor, params = []) {
 }
 
 /**
- * Desmonta la pantalla y libera recursos en memoria.
+ * Desmonta la pantalla y libera recursos en memoria y listeners de ventana.
  */
 export function desmontar() {
   limpiarUrlsFotos();
+  if (fnResizeComparador) {
+    window.removeEventListener('resize', fnResizeComparador);
+    fnResizeComparador = null;
+  }
   contenedorRaiz = null;
 }
 
@@ -91,10 +86,10 @@ async function cargarDatos() {
     datosMedidas = await todos('medidas');
     datosMedidas.sort((a, b) => {
       if (b.fecha !== a.fecha) return b.fecha > a.fecha ? 1 : -1;
-      // Priorizar registro manual sobre registro automático de cámara en la misma fecha
+      // Priorizar siempre registro manual sobre registro óptico de cámara en la misma fecha
       if (a.origen === 'manual' && b.origen !== 'manual') return -1;
       if (b.origen === 'manual' && a.origen !== 'manual') return 1;
-      return 0;
+      return (b.actualizado || 0) - (a.actualizado || 0);
     });
   } catch (e) {
     datosMedidas = [];
@@ -116,475 +111,564 @@ async function cargarDatos() {
 
   // Preseleccionar fotos para el comparador si existen registros
   if (datosFotos.length >= 2) {
-    fotoIdDespues = datosFotos[0].id;
-    fotoIdAntes = datosFotos[datosFotos.length - 1].id;
+    if (!fotoIdDespues || !datosFotos.some((f) => f.id === fotoIdDespues)) {
+      fotoIdDespues = datosFotos[0].id;
+    }
+    if (!fotoIdAntes || !datosFotos.some((f) => f.id === fotoIdAntes)) {
+      fotoIdAntes = datosFotos[datosFotos.length - 1].id;
+    }
   } else if (datosFotos.length === 1) {
     fotoIdDespues = datosFotos[0].id;
     fotoIdAntes = null;
   }
 }
 
+const ESTILOS_CUERPO = `
+  /* --- Estilos canónicos Forja v2 (Revista de sala) para Cuerpo --- */
+  .cuerpo-v2-contenedor {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 8px 16px 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    font-family: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
+    color: #17171A;
+  }
+  .cuerpo-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 4px 4px 0;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .cuerpo-header-titular {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-size: 40px;
+    font-weight: 400;
+    color: #17171A;
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .cuerpo-header-titular em {
+    font-style: italic;
+  }
+  .cuerpo-header-sub {
+    font-size: 14px;
+    color: #5D5951;
+    font-weight: 500;
+    margin-top: 3px;
+  }
+  .cuerpo-acciones-top {
+    display: flex;
+    gap: 8px;
+  }
+  .cuerpo-btn-pildora {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    height: 48px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: none;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 140ms cubic-bezier(.2,.8,.2,1);
+  }
+  .cuerpo-btn-pildora:active {
+    transform: scale(0.96);
+  }
+  .cuerpo-btn-lima {
+    background-color: #C8F03C;
+    color: #17171A;
+  }
+  .cuerpo-btn-papel {
+    background-color: #E9E4D8;
+    color: #17171A;
+  }
+  .cuerpo-tarjeta-v2 {
+    background-color: #E9E4D8;
+    border-radius: 28px;
+    border: none;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .cuerpo-kicker-unico {
+    font-size: 10px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: #5D5951;
+    line-height: 1;
+  }
+  .cuerpo-subtitulo-card {
+    font-size: 14px;
+    font-weight: 600;
+    color: #5D5951;
+    text-transform: none;
+    letter-spacing: normal;
+    line-height: 1.2;
+  }
+  .cuerpo-numero-heroe {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: clamp(64px, 16vw, 84px);
+    font-weight: 800;
+    line-height: 0.95;
+    color: #17171A;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+  }
+  .cuerpo-numero-unidad {
+    font-size: 24px;
+    font-weight: 500;
+    color: #5D5951;
+    margin-left: 4px;
+  }
+  .cuerpo-chip-diferencia {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .cuerpo-chip-ok {
+    background-color: #C8F03C;
+    color: #17171A;
+  }
+  .cuerpo-chip-alerta {
+    background-color: #E2553A;
+    color: #F3F0E8;
+  }
+  .cuerpo-fila-resumen {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #F3F0E8;
+    border-radius: 999px;
+    padding: 12px 20px;
+    font-size: 13px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .cuerpo-grid-medidas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .cuerpo-celda-medida {
+    background-color: #F3F0E8;
+    border-radius: 28px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .cuerpo-celda-valor {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: #17171A;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .cuerpo-comparador-marco {
+    position: relative;
+    width: 100%;
+    height: 340px;
+    border-radius: 28px;
+    overflow: hidden;
+    background-color: #17171A;
+    user-select: none;
+  }
+  .cuerpo-comparador-img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: contrast(1.05) saturate(0.9);
+  }
+  .cuerpo-comparador-capa-split {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 100%;
+    overflow: hidden;
+    border-right: 2.5px solid #C8F03C;
+    box-shadow: 0 0 16px rgba(0, 0, 0, 0.4);
+  }
+  .cuerpo-comparador-manija {
+    position: absolute;
+    top: 50%;
+    right: -17px;
+    transform: translateY(-50%);
+    width: 34px;
+    height: 34px;
+    background-color: #C8F03C;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #17171A;
+    box-shadow: 0 2px 10px rgba(23, 23, 26, 0.3);
+    z-index: 6;
+  }
+  .cuerpo-comparador-badge {
+    position: absolute;
+    bottom: 14px;
+    border-radius: 999px;
+    background-color: rgba(23, 23, 26, 0.88);
+    color: #F3F0E8;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    z-index: 5;
+  }
+  .cuerpo-slider-rango {
+    width: 100%;
+    accent-color: #C8F03C;
+    height: 6px;
+    border-radius: 999px;
+    cursor: ew-resize;
+    margin: 12px 0 4px;
+  }
+  .cuerpo-foto-card {
+    position: relative;
+    border-radius: 28px;
+    overflow: hidden;
+    background-color: #F3F0E8;
+    cursor: pointer;
+    transition: transform 140ms ease;
+  }
+  .cuerpo-foto-card:active {
+    transform: scale(0.97);
+  }
+  .cuerpo-foto-card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    display: block;
+    filter: contrast(1.05) saturate(0.9);
+  }
+  .cuerpo-item-historial {
+    background-color: #F3F0E8;
+    border-radius: 999px;
+    padding: 10px 14px 10px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .cuerpo-btn-eliminar-pildora {
+    min-width: 48px;
+    min-height: 48px;
+    width: 48px;
+    height: 48px;
+    border-radius: 999px;
+    border: none;
+    background-color: transparent;
+    color: #E2553A;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 140ms ease;
+    flex-shrink: 0;
+  }
+  .cuerpo-btn-eliminar-pildora:active {
+    background-color: rgba(226, 85, 58, 0.12);
+  }
+`;
+
 /**
- * Renderiza la interfaz de usuario completa de Cuerpo aplicando la dirección Forja v2:
- * tipografías Instrument Serif y Bricolage Grotesque, paleta papel2 (#E9E4D8) sin bordes,
- * números héroe enormes y botones píldora.
+ * Renderiza la interfaz de usuario completa de Cuerpo aplicando la dirección Forja v2
+ * mediante creación segura de nodos DOM con h() (cero innerHTML con datos).
  */
 function renderizarPantalla() {
   if (!contenedorRaiz) return;
   limpiarUrlsFotos();
 
-  const ultimaMedida = datosMedidas[0] || null;
-  const medidaAnterior = datosMedidas[1] || null;
+  // Medidas manuales separadas de las estimaciones ópticas de cámara
+  const medidasManuales = datosMedidas.filter((m) => m.origen !== 'camara');
 
-  // Búsqueda de mediciones con peso en ayunas válido
-  const ultimaConPeso = datosMedidas.find((m) => m.peso !== null && m.peso !== undefined && !isNaN(m.peso)) || null;
-  const medidasConPeso = datosMedidas.filter((m) => m.peso !== null && m.peso !== undefined && !isNaN(m.peso));
+  const medidasConPeso = datosMedidas.filter((m) => numValido(m.peso) !== null);
+  const ultimaConPeso = medidasConPeso[0] || null;
   const anteriorConPeso = medidasConPeso[1] || null;
 
-  // 1. Cálculos de peso, promedio móvil y tendencia semanal (regresión lineal)
-  const pesosHistorial = datosMedidas
-    .filter((m) => m.peso !== null && m.peso !== undefined && !isNaN(m.peso))
-    .map((m) => ({ fecha: m.fecha, valor: Number(m.peso) }))
-    .sort((a, b) => (a.fecha > b.fecha ? 1 : -1));
+  // 1. Cálculos de peso, promedio móvil de 7 días por FECHA (ALTO-04) y tendencia semanal
+  const pesosHistorial = medidasConPeso
+    .map((m) => ({ fecha: String(m.fecha || ''), valor: Number(m.peso) }))
+    .sort((a, b) => (a.fecha > b.fecha ? 1 : a.fecha < b.fecha ? -1 : 0));
 
-  const ultimos7 = pesosHistorial.slice(-7);
-  const promedio7dias = ultimos7.length > 0
-    ? (ultimos7.reduce((acc, v) => acc + v.valor, 0) / ultimos7.length).toFixed(1)
-    : null;
+  const hoyMs = new Date(hoyISO() + 'T12:00:00').getTime();
+  const ms7Dias = 7 * 24 * 60 * 60 * 1000;
+  const medidas7d = pesosHistorial.filter((p) => {
+    const t = new Date(p.fecha + 'T12:00:00').getTime();
+    return (hoyMs - t) >= 0 && (hoyMs - t) < ms7Dias;
+  });
+
+  const serieMovil7d = promedioMovil(pesosHistorial, 7);
+  const promedio7dias = medidas7d.length > 0
+    ? (medidas7d.reduce((acc, v) => acc + v.valor, 0) / medidas7d.length).toFixed(1)
+    : (serieMovil7d.length > 0 ? serieMovil7d[serieMovil7d.length - 1].valor.toFixed(1) : null);
 
   const tendencia = tendenciaSemanal(pesosHistorial);
   const textoTendencia = tendencia !== null
     ? `${tendencia > 0 ? '+' : ''}${tendencia.toFixed(2)} kg/sem`
     : 'Datos insuficientes';
 
-  // 2. Cálculo de % Grasa Fórmula Marina EE. UU.
+  // 2. Cálculo de % Grasa Fórmula Marina EE. UU. (priorizando medidas manuales)
   let grasaEstimada = null;
-  const estatura = perfilUsuario?.estaturaCm;
-  const medidaConGrasa = datosMedidas.find((m) => (m.cintura && m.cuello) || m.grasaNavy) || ultimaMedida;
+  const estatura = numValido(perfilUsuario?.estaturaCm);
+  const medidaConGrasa =
+    medidasManuales.find((m) => (numValido(m.cintura) && numValido(m.cuello)) || numValido(m.grasaNavy)) ||
+    datosMedidas.find((m) => (numValido(m.cintura) && numValido(m.cuello)) || numValido(m.grasaNavy)) ||
+    datosMedidas[0] ||
+    null;
 
-  if (medidaConGrasa?.cintura && medidaConGrasa?.cuello && estatura) {
-    grasaEstimada = grasaNavy(medidaConGrasa.cintura, medidaConGrasa.cuello, estatura);
-  } else if (medidaConGrasa?.grasaNavy) {
-    grasaEstimada = medidaConGrasa.grasaNavy;
+  const cintGrasa = numValido(medidaConGrasa?.cintura);
+  const cuelloGrasa = numValido(medidaConGrasa?.cuello);
+  if (cintGrasa && cuelloGrasa && estatura) {
+    grasaEstimada = grasaNavy(cintGrasa, cuelloGrasa, estatura);
+  } else if (numValido(medidaConGrasa?.grasaNavy) !== null) {
+    grasaEstimada = numValido(medidaConGrasa.grasaNavy);
   }
 
-  // 3. Mediciones de cámara (Ratio V)
+  // 3. Mediciones de cámara (Ratio V y proporciones ópticas guardadas aparte)
   const ultimaCamara = datosCamara[0] || null;
 
-  // Valores de circunferencia corporal
-  const valCintura = ultimaMedida?.cintura ?? datosMedidas.find((m) => m.cintura != null)?.cintura ?? null;
-  const valCuello = ultimaMedida?.cuello ?? datosMedidas.find((m) => m.cuello != null)?.cuello ?? null;
-  const valPecho = ultimaMedida?.pecho ?? datosMedidas.find((m) => m.pecho != null)?.pecho ?? null;
-  const valBrazo = ultimaMedida?.brazo ?? datosMedidas.find((m) => m.brazo != null)?.brazo ?? null;
-  const valHombros = ultimaMedida?.hombros ?? datosMedidas.find((m) => m.hombros != null)?.hombros ?? null;
-  const valCadera = ultimaMedida?.cadera ?? datosMedidas.find((m) => m.cadera != null)?.cadera ?? null;
+  // Buscar último valor y penúltimo valor por campo priorizando medidas manuales
+  function obtenerValoresCampo(campo) {
+    const manualesValidas = medidasManuales.filter((m) => numValido(m[campo]) !== null);
+    if (manualesValidas.length > 0) {
+      return {
+        actual: Number(manualesValidas[0][campo]),
+        anterior: manualesValidas.length >= 2 ? Number(manualesValidas[1][campo]) : null
+      };
+    }
+    const todasValidas = datosMedidas.filter((m) => numValido(m[campo]) !== null);
+    return {
+      actual: todasValidas.length > 0 ? Number(todasValidas[0][campo]) : null,
+      anterior: todasValidas.length >= 2 ? Number(todasValidas[1][campo]) : null
+    };
+  }
 
-  contenedorRaiz.innerHTML = `
-    <style>
-      /* --- Estilos canónicos Forja v2 (Revista de sala) para Cuerpo --- */
-      .cuerpo-v2-contenedor {
-        max-width: 520px;
-        margin: 0 auto;
-        padding: 8px 16px 48px;
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-        font-family: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
-        color: #17171A;
-      }
-      .cuerpo-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
-        padding: 4px 4px 0;
-      }
-      .cuerpo-header-titular {
-        font-family: 'Instrument Serif', Georgia, serif;
-        font-size: 40px;
-        font-weight: 400;
-        color: #17171A;
-        line-height: 1.02;
-        letter-spacing: -0.02em;
-        margin: 0;
-      }
-      .cuerpo-header-titular em {
-        font-style: italic;
-      }
-      .cuerpo-header-sub {
-        font-size: 14px;
-        color: #6B675F;
-        font-weight: 500;
-        margin-top: 3px;
-      }
-      .cuerpo-acciones-top {
-        display: flex;
-        gap: 8px;
-      }
-      .cuerpo-btn-pildora {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        height: 46px;
-        padding: 0 18px;
-        border-radius: 999px;
-        border: none;
-        font-family: 'Bricolage Grotesque', sans-serif;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        text-decoration: none;
-        transition: transform 140ms cubic-bezier(.2,.8,.2,1);
-      }
-      .cuerpo-btn-pildora:active {
-        transform: scale(0.96);
-      }
-      .cuerpo-btn-lima {
-        background-color: #C8F03C;
-        color: #17171A;
-      }
-      .cuerpo-btn-papel {
-        background-color: #E9E4D8;
-        color: #17171A;
-      }
-      .cuerpo-tarjeta-v2 {
-        background-color: #E9E4D8;
-        border-radius: 28px;
-        border: none;
-        padding: 22px;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-      .cuerpo-micro-label {
-        font-size: 10px;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        font-weight: 700;
-        color: #6B675F;
-        line-height: 1;
-      }
-      .cuerpo-numero-heroe {
-        font-family: 'Bricolage Grotesque', sans-serif;
-        font-size: clamp(64px, 16vw, 84px);
-        font-weight: 800;
-        line-height: 0.95;
-        color: #17171A;
-        font-variant-numeric: tabular-nums;
-        letter-spacing: -0.03em;
-      }
-      .cuerpo-numero-unidad {
-        font-size: 24px;
-        font-weight: 500;
-        color: #6B675F;
-        margin-left: 4px;
-      }
-      .cuerpo-chip-diferencia {
-        display: inline-flex;
-        align-items: center;
-        padding: 6px 14px;
-        border-radius: 999px;
-        font-size: 13px;
-        font-weight: 600;
-      }
-      .cuerpo-chip-ok {
-        background-color: #C8F03C;
-        color: #17171A;
-      }
-      .cuerpo-chip-alerta {
-        background-color: #E2553A;
-        color: #F3F0E8;
-      }
-      .cuerpo-fila-resumen {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background-color: #F3F0E8;
-        border-radius: 999px;
-        padding: 12px 20px;
-        font-size: 13px;
-      }
-      .cuerpo-grid-medidas {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-      }
-      .cuerpo-celda-medida {
-        background-color: #F3F0E8;
-        border-radius: 28px;
-        padding: 16px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        gap: 6px;
-      }
-      .cuerpo-celda-valor {
-        font-family: 'Bricolage Grotesque', sans-serif;
-        font-size: 28px;
-        font-weight: 800;
-        font-variant-numeric: tabular-nums;
-        color: #17171A;
-        line-height: 1;
-        letter-spacing: -0.02em;
-      }
-      .cuerpo-comparador-marco {
-        position: relative;
-        width: 100%;
-        height: 340px;
-        border-radius: 28px;
-        overflow: hidden;
-        background-color: #17171A;
-        user-select: none;
-      }
-      .cuerpo-comparador-img {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        filter: contrast(1.05) saturate(0.9);
-      }
-      .cuerpo-comparador-capa-split {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 50%;
-        height: 100%;
-        overflow: hidden;
-        border-right: 2.5px solid #C8F03C;
-        box-shadow: 0 0 16px rgba(0, 0, 0, 0.4);
-      }
-      .cuerpo-comparador-manija {
-        position: absolute;
-        top: 50%;
-        right: -17px;
-        transform: translateY(-50%);
-        width: 34px;
-        height: 34px;
-        background-color: #C8F03C;
-        border-radius: 999px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #17171A;
-        box-shadow: 0 2px 10px rgba(23, 23, 26, 0.3);
-        z-index: 6;
-      }
-      .cuerpo-comparador-badge {
-        position: absolute;
-        bottom: 14px;
-        border-radius: 999px;
-        background-color: rgba(23, 23, 26, 0.75);
-        backdrop-filter: blur(8px);
-        color: #F3F0E8;
-        font-size: 12px;
-        font-weight: 600;
-        padding: 6px 14px;
-        z-index: 5;
-      }
-      .cuerpo-slider-rango {
-        width: 100%;
-        accent-color: #C8F03C;
-        height: 6px;
-        border-radius: 999px;
-        cursor: ew-resize;
-        margin: 12px 0 4px;
-      }
-      .cuerpo-foto-card {
-        position: relative;
-        border-radius: 28px;
-        overflow: hidden;
-        background-color: #F3F0E8;
-        cursor: pointer;
-        transition: transform 140ms ease;
-      }
-      .cuerpo-foto-card:active {
-        transform: scale(0.97);
-      }
-      .cuerpo-foto-card img {
-        width: 100%;
-        height: 140px;
-        object-fit: cover;
-        display: block;
-        filter: contrast(1.05) saturate(0.9);
-      }
-      .cuerpo-item-historial {
-        background-color: #F3F0E8;
-        border-radius: 999px;
-        padding: 12px 18px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 8px;
-      }
-      .cuerpo-btn-eliminar-pildora {
-        width: 34px;
-        height: 34px;
-        border-radius: 999px;
-        border: none;
-        background-color: transparent;
-        color: #E2553A;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: background-color 140ms ease;
-      }
-      .cuerpo-btn-eliminar-pildora:active {
-        background-color: rgba(226, 85, 58, 0.12);
-      }
-    </style>
+  const cCintura = obtenerValoresCampo('cintura');
+  const cCuello = obtenerValoresCampo('cuello');
+  const cPecho = obtenerValoresCampo('pecho');
+  const cBrazo = obtenerValoresCampo('brazo');
+  const cHombros = obtenerValoresCampo('hombros');
+  const cCadera = obtenerValoresCampo('cadera');
 
-    <div class="cuerpo-v2-contenedor">
-      <!-- Encabezado editorial con Instrument Serif -->
-      <div class="cuerpo-header">
-        <div>
-          <h2 class="cuerpo-header-titular">Mi <em>cuerpo</em></h2>
-          <div class="cuerpo-header-sub">Seguimiento físico y composición</div>
-        </div>
-        <div class="cuerpo-acciones-top">
-          <button id="btn-abrir-camara" class="cuerpo-btn-pildora cuerpo-btn-papel" title="Abrir cámara y visión artificial">
-            ${renderIcono('camara')}
-            <span>Cámara</span>
-          </button>
-          <button id="btn-nueva-medida" class="cuerpo-btn-pildora cuerpo-btn-lima" title="Registrar nuevas medidas">
-            ${renderIcono('mas')}
-            <span>Medida</span>
-          </button>
-        </div>
-      </div>
+  // Diferencia de peso respecto al pesaje anterior
+  let nodoDiffPeso = null;
+  if (ultimaConPeso && anteriorConPeso) {
+    const diffP = Number(ultimaConPeso.peso) - Number(anteriorConPeso.peso);
+    const claseChip = diffP <= 0 ? 'cuerpo-chip-ok' : 'cuerpo-chip-alerta';
+    nodoDiffPeso = h('div', { class: `cuerpo-chip-diferencia ${claseChip}` },
+      `${diffP > 0 ? '+' : ''}${diffP.toFixed(1)} kg`
+    );
+  }
 
-      <!-- Tarjeta 1: Peso en ayunas (Número héroe gigante en Bricolage Grotesque) -->
-      <div class="cuerpo-tarjeta-v2">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;">
-          <span class="cuerpo-micro-label">PESO EN AYUNAS</span>
-          <span style="font-size:13px;color:#6B675F;font-weight:500;">
-            ${ultimaConPeso ? fechaBonita(ultimaConPeso.fecha) : 'Sin registros'}
-          </span>
-        </div>
+  // Explicación contextual de la Fórmula Marina
+  let nodoDetalleGrasa;
+  if (!estatura) {
+    nodoDetalleGrasa = h('p', { style: 'font-size:13px;color:#5D5951;line-height:1.45;margin:0;' },
+      h('span', { style: 'display:inline-flex;align-items:center;gap:6px;vertical-align:middle;margin-right:4px;' }, icono('alerta', 16)),
+      'No has configurado tu estatura en Ajustes. ',
+      h('a', {
+        href: '#ajustes',
+        style: 'color:#17171A;font-weight:600;text-decoration:underline;',
+        on: { click: (e) => { e.preventDefault(); ir('#ajustes'); } }
+      }, 'Ir a Ajustes')
+    );
+  } else if (!cintGrasa || !cuelloGrasa) {
+    nodoDetalleGrasa = h('p', { style: 'font-size:13px;color:#5D5951;line-height:1.45;margin:0;' },
+      `Requiere cintura (${cintGrasa ?? '?'} cm) y cuello (${cuelloGrasa ?? '?'} cm) con estatura (${estatura} cm). Es un cálculo aproximado.`
+    );
+  } else {
+    nodoDetalleGrasa = h('p', { style: 'font-size:13px;color:#5D5951;line-height:1.45;margin:0;' },
+      `Estimado aproximado a partir de cintura (${cintGrasa} cm), cuello (${cuelloGrasa} cm) y estatura (${estatura} cm).`
+    );
+  }
 
-        <div style="display:flex;align-items:baseline;gap:12px;margin:2px 0;">
-          <div class="cuerpo-numero-heroe">
-            ${ultimaConPeso && ultimaConPeso.peso ? ultimaConPeso.peso : '--'}
-            <span class="cuerpo-numero-unidad">kg</span>
-          </div>
+  // Bloque de proporciones medidas con cámara (guardadas aparte de las medidas manuales)
+  const ratioCamara = numValido(ultimaCamara?.ratioV);
+  const hombrosCam = numValido(ultimaCamara?.hombrosCm);
+  const cinturaCam = numValido(ultimaCamara?.cinturaCm);
+  const margenCam = numValido(ultimaCamara?.margenCm) ?? 3;
 
-          ${anteriorConPeso && ultimaConPeso?.peso && anteriorConPeso.peso
-            ? `<div class="cuerpo-chip-diferencia ${ultimaConPeso.peso - anteriorConPeso.peso <= 0 ? 'cuerpo-chip-ok' : 'cuerpo-chip-alerta'}">
-                ${ultimaConPeso.peso - anteriorConPeso.peso > 0 ? '+' : ''}${(ultimaConPeso.peso - anteriorConPeso.peso).toFixed(1)} kg
-              </div>`
-            : ''
-          }
-        </div>
+  const nodoResumenCamara = ultimaCamara
+    ? h('div', { class: 'cuerpo-fila-resumen', style: 'margin-top:2px;' },
+        h('div', {},
+          h('span', { style: 'color:#5D5951;' }, `Cámara (${fechaBonita(ultimaCamara.fecha)}): `),
+          h('strong', { style: 'color:#17171A;' },
+            `Hombros ${hombrosCam ?? '--'} cm · Cintura óptica ${cinturaCam ?? '--'} cm`
+          )
+        ),
+        h('span', { style: 'font-size:12px;color:#5D5951;font-weight:600;' }, `±${margenCam} cm aprox.`)
+      )
+    : null;
 
-        <div class="cuerpo-fila-resumen">
-          <div>
-            <span style="color:#6B675F;">Promedio 7 días:</span>
-            <strong style="color:#17171A;margin-left:4px;">${promedio7dias ? `${promedio7dias} kg` : 'Calculando...'}</strong>
-          </div>
-          <div>
-            <span style="color:#6B675F;">Tendencia:</span>
-            <strong style="color:#17171A;margin-left:4px;">${textoTendencia}</strong>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tarjeta 2: % Grasa Fórmula Marina EE. UU. -->
-      <div class="cuerpo-tarjeta-v2">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span class="cuerpo-micro-label">FÓRMULA MARINA EE. UU.</span>
-          <span class="cuerpo-chip-diferencia cuerpo-chip-ok" style="font-size:11px;padding:4px 10px;">
-            Margen ±3-4%
-          </span>
-        </div>
-
-        <div style="display:flex;align-items:baseline;gap:12px;">
-          <div class="cuerpo-numero-heroe" style="font-size:clamp(52px, 13vw, 68px);">
-            ${grasaEstimada !== null ? `${grasaEstimada}%` : '--'}
-          </div>
-          <span style="font-size:14px;color:#6B675F;font-weight:500;">
-            ${grasaEstimada !== null ? 'grasa corporal estimada' : 'Registra cintura, cuello y estatura'}
-          </span>
-        </div>
-
-        <p style="font-size:13px;color:#6B675F;line-height:1.45;margin:0;">
-          ${!estatura
-            ? `<span style="display:inline-flex;align-items:center;gap:6px;">${renderIcono('alerta')}</span> No has configurado tu estatura en Ajustes. <a href="#ajustes" style="color:#17171A;font-weight:600;text-decoration:underline;">Ir a Ajustes</a>`
-            : (!medidaConGrasa?.cintura || !medidaConGrasa?.cuello)
-            ? `Requiere cintura (${medidaConGrasa?.cintura || '?'} cm) y cuello (${medidaConGrasa?.cuello || '?'} cm) con estatura (${estatura} cm).`
-            : `Estimado a partir de cintura (${medidaConGrasa.cintura} cm), cuello (${medidaConGrasa.cuello} cm) y estatura (${estatura} cm).`
-          }
-        </p>
-      </div>
-
-      <!-- Tarjeta 3: Medidas Corporales Actuales y Ratio V -->
-      <div class="cuerpo-tarjeta-v2">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span class="cuerpo-micro-label">MEDIDAS CORPORALES (CM)</span>
-          ${ultimaCamara ? `<span class="cuerpo-chip-diferencia cuerpo-chip-ok" style="font-size:12px;">Ratio V: ${ultimaCamara.ratioV}</span>` : ''}
-        </div>
-
-        <div class="cuerpo-grid-medidas">
-          ${renderItemMedida('Cintura', valCintura, medidaAnterior?.cintura)}
-          ${renderItemMedida('Cuello', valCuello, medidaAnterior?.cuello)}
-          ${renderItemMedida('Pecho', valPecho, medidaAnterior?.pecho)}
-          ${renderItemMedida('Brazo', valBrazo, medidaAnterior?.brazo)}
-          ${renderItemMedida('Hombros', valHombros, medidaAnterior?.hombros)}
-          ${renderItemMedida('Cadera', valCadera, medidaAnterior?.cadera)}
-        </div>
-      </div>
-
-      <!-- Sección: Fotos de Progreso y Comparador con deslizador elegante -->
-      <div class="cuerpo-tarjeta-v2">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div>
-            <h3 style="font-family:'Instrument Serif',Georgia,serif;font-size:26px;font-weight:400;margin:0;line-height:1.1;">
-              Fotos de <em>progreso</em>
-            </h3>
-            <span style="font-size:12px;color:#6B675F;">Privadas y seguras en tu teléfono</span>
-          </div>
-          <button id="btn-subir-foto" class="cuerpo-btn-pildora" style="background-color:#F3F0E8;color:#17171A;height:40px;padding:0 14px;">
-            ${renderIcono('subir')}
-            <span>Subir foto</span>
-          </button>
-        </div>
-
-        <!-- Filtros de vista píldora -->
-        <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;">
-          <button class="cuerpo-btn-pildora btn-filtro-foto" data-vista="todas" style="height:36px;padding:0 14px;background-color:${vistaFotoFiltro === 'todas' ? '#17171A' : '#F3F0E8'};color:${vistaFotoFiltro === 'todas' ? '#F3F0E8' : '#17171A'};">Todas</button>
-          <button class="cuerpo-btn-pildora btn-filtro-foto" data-vista="frente" style="height:36px;padding:0 14px;background-color:${vistaFotoFiltro === 'frente' ? '#17171A' : '#F3F0E8'};color:${vistaFotoFiltro === 'frente' ? '#F3F0E8' : '#17171A'};">Frente</button>
-          <button class="cuerpo-btn-pildora btn-filtro-foto" data-vista="lado" style="height:36px;padding:0 14px;background-color:${vistaFotoFiltro === 'lado' ? '#17171A' : '#F3F0E8'};color:${vistaFotoFiltro === 'lado' ? '#F3F0E8' : '#17171A'};">Lado</button>
-          <button class="cuerpo-btn-pildora btn-filtro-foto" data-vista="espalda" style="height:36px;padding:0 14px;background-color:${vistaFotoFiltro === 'espalda' ? '#17171A' : '#F3F0E8'};color:${vistaFotoFiltro === 'espalda' ? '#F3F0E8' : '#17171A'};">Espalda</button>
-        </div>
-
-        <!-- Visor Comparador con Deslizador -->
-        <div id="contenedor-comparador-fotos"></div>
-
-        <!-- Cuadrícula de fotos guardadas -->
-        <div id="galeria-fotos-progreso" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;"></div>
-      </div>
-
-      <!-- Sección: Historial de registros anteriores -->
-      <div class="cuerpo-tarjeta-v2">
-        <span class="cuerpo-micro-label">HISTORIAL DE MEDICIONES</span>
-        <div id="lista-historial-medidas" style="display:flex;flex-direction:column;gap:6px;"></div>
-      </div>
-    </div>
-  `;
-
-  // Enganchar listeners de eventos principales
-  document.getElementById('btn-abrir-camara')?.addEventListener('click', () => ir('#camara'));
-  document.getElementById('btn-nueva-medida')?.addEventListener('click', abrirModalNuevaMedida);
-  document.getElementById('btn-subir-foto')?.addEventListener('click', abrirModalSubirFoto);
-
-  // Filtros de vista de fotos
-  contenedorRaiz.querySelectorAll('.btn-filtro-foto').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      vistaFotoFiltro = btn.getAttribute('data-vista');
-      renderizarPantalla();
-    });
+  const botonesFiltro = [
+    { id: 'todas', texto: 'Todas' },
+    { id: 'frente', texto: 'Frente' },
+    { id: 'lado', texto: 'Lado' },
+    { id: 'espalda', texto: 'Espalda' }
+  ].map((f) => {
+    const activo = vistaFotoFiltro === f.id;
+    return h('button', {
+      type: 'button',
+      class: 'cuerpo-btn-pildora btn-filtro-foto',
+      dataset: { vista: f.id },
+      style: `min-height:48px;height:48px;padding:0 16px;background-color:${activo ? '#17171A' : '#F3F0E8'};color:${activo ? '#F3F0E8' : '#17171A'};`,
+      on: {
+        click: () => {
+          vistaFotoFiltro = f.id;
+          renderizarPantalla();
+        }
+      }
+    }, f.texto);
   });
+
+  const vistaDOM = h('div', { class: 'cuerpo-v2-contenedor' },
+    // Encabezado editorial con Instrument Serif
+    h('div', { class: 'cuerpo-header' },
+      h('div', {},
+        h('span', { class: 'cuerpo-kicker-unico' }, 'ANTROPOMETRÍA'),
+        h('h2', { class: 'cuerpo-header-titular' }, 'Mi ', h('em', {}, 'cuerpo')),
+        h('div', { class: 'cuerpo-header-sub' }, 'Seguimiento físico y composición')
+      ),
+      h('div', { class: 'cuerpo-acciones-top' },
+        h('button', {
+          id: 'btn-abrir-camara',
+          type: 'button',
+          class: 'cuerpo-btn-pildora cuerpo-btn-papel',
+          title: 'Abrir cámara y visión artificial',
+          on: { click: () => ir('#camara') }
+        }, icono('camara', 20), h('span', {}, 'Cámara')),
+        h('button', {
+          id: 'btn-nueva-medida',
+          type: 'button',
+          class: 'cuerpo-btn-pildora cuerpo-btn-lima',
+          title: 'Registrar nuevas medidas',
+          on: { click: abrirModalNuevaMedida }
+        }, icono('mas', 20), h('span', {}, 'Medida'))
+      )
+    ),
+
+    // Tarjeta 1: Peso en ayunas (Número héroe gigante en Bricolage Grotesque)
+    h('div', { class: 'cuerpo-tarjeta-v2' },
+      h('div', { style: 'display:flex;justify-content:space-between;align-items:baseline;' },
+        h('span', { class: 'cuerpo-subtitulo-card' }, 'Peso en ayunas'),
+        h('span', { style: 'font-size:13px;color:#5D5951;font-weight:500;' },
+          ultimaConPeso ? fechaBonita(ultimaConPeso.fecha) : 'Sin registros'
+        )
+      ),
+      h('div', { style: 'display:flex;align-items:baseline;gap:12px;margin:2px 0;flex-wrap:wrap;' },
+        h('div', { class: 'cuerpo-numero-heroe' },
+          ultimaConPeso ? String(Number(ultimaConPeso.peso)) : '--',
+          h('span', { class: 'cuerpo-numero-unidad' }, 'kg')
+        ),
+        nodoDiffPeso
+      ),
+      h('div', { class: 'cuerpo-fila-resumen' },
+        h('div', {},
+          h('span', { style: 'color:#5D5951;' }, 'Promedio 7 días:'),
+          h('strong', { style: 'color:#17171A;margin-left:4px;' }, promedio7dias ? `${promedio7dias} kg` : 'Sin datos')
+        ),
+        h('div', {},
+          h('span', { style: 'color:#5D5951;' }, 'Tendencia:'),
+          h('strong', { style: 'color:#17171A;margin-left:4px;' }, textoTendencia)
+        )
+      )
+    ),
+
+    // Tarjeta 2: % Grasa Fórmula Marina EE. UU.
+    h('div', { class: 'cuerpo-tarjeta-v2' },
+      h('div', { style: 'display:flex;justify-content:space-between;align-items:center;' },
+        h('span', { class: 'cuerpo-subtitulo-card' }, 'Fórmula Marina EE. UU.'),
+        h('span', { class: 'cuerpo-chip-diferencia cuerpo-chip-ok', style: 'font-size:11px;padding:4px 10px;' },
+          'Margen ±3-4%'
+        )
+      ),
+      h('div', { style: 'display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;' },
+        h('div', { class: 'cuerpo-numero-heroe', style: 'font-size:clamp(52px, 13vw, 68px);' },
+          grasaEstimada !== null ? `${grasaEstimada}%` : '--'
+        ),
+        h('span', { style: 'font-size:14px;color:#5D5951;font-weight:500;' },
+          grasaEstimada !== null ? 'grasa corporal estimada' : 'Registra cintura, cuello y estatura'
+        )
+      ),
+      nodoDetalleGrasa
+    ),
+
+    // Tarjeta 3: Medidas Corporales Actuales y Ratio V
+    h('div', { class: 'cuerpo-tarjeta-v2' },
+      h('div', { style: 'display:flex;justify-content:space-between;align-items:center;' },
+        h('span', { class: 'cuerpo-subtitulo-card' }, 'Medidas corporales (cm)'),
+        ratioCamara !== null
+          ? h('span', { class: 'cuerpo-chip-diferencia cuerpo-chip-ok', style: 'font-size:12px;' }, `Ratio V: ${ratioCamara}`)
+          : null
+      ),
+      h('div', { class: 'cuerpo-grid-medidas' },
+        crearNodoItemMedida('Cintura', cCintura.actual, cCintura.anterior),
+        crearNodoItemMedida('Cuello', cCuello.actual, cCuello.anterior),
+        crearNodoItemMedida('Pecho', cPecho.actual, cPecho.anterior),
+        crearNodoItemMedida('Brazo', cBrazo.actual, cBrazo.anterior),
+        crearNodoItemMedida('Hombros', cHombros.actual, cHombros.anterior),
+        crearNodoItemMedida('Cadera', cCadera.actual, cCadera.anterior)
+      ),
+      nodoResumenCamara
+    ),
+
+    // Sección: Fotos de Progreso y Comparador con deslizador elegante
+    h('div', { class: 'cuerpo-tarjeta-v2' },
+      h('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:8px;' },
+        h('div', {},
+          h('h3', {
+            style: "font-family:'Instrument Serif',Georgia,serif;font-size:26px;font-weight:400;margin:0;line-height:1.1;"
+          }, 'Fotos de ', h('em', {}, 'progreso')),
+          h('span', { style: 'font-size:12px;color:#5D5951;' }, 'Privadas y seguras en tu teléfono')
+        ),
+        h('button', {
+          id: 'btn-subir-foto',
+          type: 'button',
+          class: 'cuerpo-btn-pildora',
+          style: 'background-color:#F3F0E8;color:#17171A;min-height:48px;height:48px;padding:0 16px;',
+          on: { click: abrirModalSubirFoto }
+        }, icono('subir', 18), h('span', {}, 'Subir foto'))
+      ),
+      h('div', { style: 'display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;' }, ...botonesFiltro),
+      h('div', { id: 'contenedor-comparador-fotos' }),
+      h('div', {
+        id: 'galeria-fotos-progreso',
+        style: 'display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;'
+      })
+    ),
+
+    // Sección: Historial de registros anteriores
+    h('div', { class: 'cuerpo-tarjeta-v2' },
+      h('span', { class: 'cuerpo-subtitulo-card' }, 'Historial de mediciones'),
+      h('div', { id: 'lista-historial-medidas', style: 'display:flex;flex-direction:column;gap:6px;' })
+    )
+  );
+
+  contenedorRaiz.replaceChildren(h('style', {}, ESTILOS_CUERPO), vistaDOM);
 
   renderizarComparador();
   renderizarGaleriaFotos();
@@ -592,26 +676,56 @@ function renderizarPantalla() {
 }
 
 /**
- * Renderiza una celda de medida individual con su comparación con la previa.
+ * Crea un nodo DOM seguro para una celda de medida individual con su variación.
+ * Corrección CRÍTICO-01 (diseno.md): Fondo Lima (#C8F03C) con texto Tinta (#17171A) para contraste >13.5:1.
+ * Corrección Hallazgo 8 (seguridad_privacidad.md): Uso de h() en vez de innerHTML.
  */
-function renderItemMedida(nombre, valorActual, valorAnterior) {
-  let diff = null;
-  if (valorActual && valorAnterior) {
-    const d = valorActual - valorAnterior;
-    diff = d !== 0 ? `${d > 0 ? '+' : ''}${d.toFixed(1)}` : '=';
+function crearNodoItemMedida(nombre, valorActual, valorAnterior) {
+  const valAct = numValido(valorActual);
+  const valAnt = numValido(valorAnterior);
+
+  let nodoBadgeDiff = null;
+  if (valAct !== null && valAnt !== null) {
+    const d = valAct - valAnt;
+    const textoDiff = d !== 0 ? `${d > 0 ? '+' : ''}${d.toFixed(1)} cm` : '= 0 cm';
+    nodoBadgeDiff = h('span', {
+      style: 'background:#C8F03C;color:#17171A;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:-0.01em;'
+    }, textoDiff);
   }
 
-  return `
-    <div class="cuerpo-celda-medida">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:13px;color:#6B675F;font-weight:500;">${nombre}</span>
-        ${diff ? `<span style="font-size:12px;font-weight:600;color:${diff.startsWith('+') ? '#C8F03C' : '#17171A'};background:#E9E4D8;padding:2px 8px;border-radius:999px;">${diff} cm</span>` : ''}
-      </div>
-      <div class="cuerpo-celda-valor">
-        ${valorActual ? `${valorActual} <span style="font-size:15px;font-weight:500;color:#6B675F;">cm</span>` : '--'}
-      </div>
-    </div>
-  `;
+  return h('div', { class: 'cuerpo-celda-medida' },
+    h('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:4px;' },
+      h('span', { style: 'font-size:13px;color:#5D5951;font-weight:500;' }, nombre),
+      nodoBadgeDiff
+    ),
+    h('div', { class: 'cuerpo-celda-valor' },
+      valAct !== null ? String(valAct) : '--',
+      valAct !== null ? h('span', { style: 'font-size:15px;font-weight:500;color:#5D5951;margin-left:3px;' }, 'cm') : null
+    )
+  );
+}
+
+/**
+ * Crea el icono SVG de doble flecha para la manija del comparador.
+ */
+function crearIconoManijaComparador() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', '18');
+  svg.setAttribute('height', '18');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2.5');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+
+  const p1 = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  p1.setAttribute('points', '8 7 3 12 8 17');
+  const p2 = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  p2.setAttribute('points', '16 7 21 12 16 17');
+  svg.appendChild(p1);
+  svg.appendChild(p2);
+  return svg;
 }
 
 /**
@@ -621,14 +735,34 @@ function renderizarComparador() {
   const cont = document.getElementById('contenedor-comparador-fotos');
   if (!cont) return;
 
+  if (fnResizeComparador) {
+    window.removeEventListener('resize', fnResizeComparador);
+    fnResizeComparador = null;
+  }
+
+  // Estado vacío editorial con llamado a la acción (MEDIO-06 diseno.md)
   if (datosFotos.length < 2) {
-    cont.innerHTML = `
-      <div style="padding:24px 16px;text-align:center;background:#F3F0E8;border-radius:28px;">
-        <span style="font-size:14px;color:#6B675F;">
-          Guarda al menos 2 fotos de progreso para compararlas lado a lado con el deslizador elegante.
-        </span>
-      </div>
-    `;
+    const estadoVacio = h('div', {
+      style: 'background:#F3F0E8;border-radius:28px;padding:36px 24px;text-align:center;margin-top:4px;'
+    },
+      h('div', {
+        style: 'width:56px;height:56px;border-radius:999px;background:#E9E4D8;display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px;color:#17171A;'
+      }, icono('camara', 26)),
+      h('h4', {
+        style: "font-family:'Instrument Serif',Georgia,serif;font-size:22px;font-weight:400;margin:0 0 8px 0;color:#17171A;"
+      }, 'Compara tu transformación'),
+      h('p', {
+        style: 'font-size:14px;color:#5D5951;margin:0 auto 20px auto;line-height:1.5;max-width:280px;'
+      }, 'Registra al menos 2 fotos de frente, lado o espalda en fechas distintas para comparar tu evolución lado a lado.'),
+      h('button', {
+        type: 'button',
+        id: 'btn-abrir-camara-vacio',
+        class: 'cuerpo-btn-pildora cuerpo-btn-lima',
+        style: 'min-height:48px;border-radius:999px;padding:0 24px;',
+        on: { click: () => ir('#camara') }
+      }, icono('camara', 18), h('span', {}, 'Tomar foto ahora'))
+    );
+    cont.replaceChildren(estadoVacio);
     return;
   }
 
@@ -639,70 +773,94 @@ function renderizarComparador() {
   const urlDespues = URL.createObjectURL(fotoDespues.blob);
   urlsFotosCreadas.push(urlAntes, urlDespues);
 
-  cont.innerHTML = `
-    <div style="background-color:#F3F0E8;border-radius:28px;padding:16px;display:flex;flex-direction:column;gap:12px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;">
-        <div>
-          <span style="color:#6B675F;">Antes:</span>
-          <strong style="color:#17171A;margin-left:3px;">${fechaBonita(fotoAntes.fecha)}</strong> (${fotoAntes.vista})
-        </div>
-        <div>
-          <span style="color:#6B675F;">Después:</span>
-          <strong style="color:#17171A;margin-left:3px;">${fechaBonita(fotoDespues.fecha)}</strong> (${fotoDespues.vista})
-        </div>
-      </div>
+  const imgDespuesEl = h('img', {
+    src: urlDespues,
+    alt: 'Foto después',
+    class: 'cuerpo-comparador-img'
+  });
 
-      <!-- Contenedor del Split Slider con fotos tratadas -->
-      <div id="cuerpo-slider-box" class="cuerpo-comparador-marco">
-        <img src="${urlAntes}" alt="Foto antes" class="cuerpo-comparador-img" />
-        <div id="capa-despues-split" class="cuerpo-comparador-capa-split">
-          <img src="${urlDespues}" alt="Foto después" class="cuerpo-comparador-img" />
-          <div class="cuerpo-comparador-manija">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="8 7 3 12 8 17"></polyline>
-              <polyline points="16 7 21 12 16 17"></polyline>
-            </svg>
-          </div>
-        </div>
-        <span class="cuerpo-comparador-badge" style="left:12px;">Después</span>
-        <span class="cuerpo-comparador-badge" style="right:12px;">Antes</span>
-      </div>
+  const capaSplit = h('div', {
+    id: 'capa-despues-split',
+    class: 'cuerpo-comparador-capa-split'
+  },
+    imgDespuesEl,
+    h('div', { class: 'cuerpo-comparador-manija' }, crearIconoManijaComparador())
+  );
 
-      <!-- Control de rango deslizante minimalista -->
-      <div>
-        <input id="input-slider-comparar" class="cuerpo-slider-rango" type="range" min="0" max="100" value="50" aria-label="Deslizar para comparar antes y después" />
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:#6B675F;font-weight:500;">
-          <span style="display:inline-flex;align-items:center;gap:4px;">${renderIcono('flecha-izq')} Revelar después</span>
-          <span>Desliza para comparar</span>
-          <span style="display:inline-flex;align-items:center;gap:4px;">Revelar antes ${renderIcono('flecha-der')}</span>
-        </div>
-      </div>
-    </div>
-  `;
+  const marcoBox = h('div', {
+    id: 'cuerpo-slider-box',
+    class: 'cuerpo-comparador-marco'
+  },
+    h('img', { src: urlAntes, alt: 'Foto antes', class: 'cuerpo-comparador-img' }),
+    capaSplit,
+    h('span', { class: 'cuerpo-comparador-badge', style: 'left:12px;' }, 'Después'),
+    h('span', { class: 'cuerpo-comparador-badge', style: 'right:12px;' }, 'Antes')
+  );
 
-  // Sincronizar el ancho del split view con el input range
-  const slider = document.getElementById('input-slider-comparar');
-  const capaSplit = document.getElementById('capa-despues-split');
-  const marcoBox = document.getElementById('cuerpo-slider-box');
-
-  if (slider && capaSplit && marcoBox) {
-    const ajustarAnchoImagen = () => {
-      const boxWidth = marcoBox.offsetWidth || 340;
-      const imgDespues = capaSplit.querySelector('img');
-      if (imgDespues) {
-        imgDespues.style.width = `${boxWidth}px`;
-        imgDespues.style.maxWidth = 'none';
+  const slider = h('input', {
+    id: 'input-slider-comparar',
+    class: 'cuerpo-slider-rango',
+    type: 'range',
+    min: '0',
+    max: '100',
+    value: '50',
+    'aria-label': 'Deslizar para comparar antes y después',
+    on: {
+      input: (e) => {
+        capaSplit.style.width = `${e.target.value}%`;
       }
-    };
+    }
+  });
 
-    ajustarAnchoImagen();
-    window.addEventListener('resize', ajustarAnchoImagen, { once: true });
+  const vistaAntes = ['frente', 'lado', 'espalda'].includes(fotoAntes.vista) ? fotoAntes.vista : 'frente';
+  const vistaDespues = ['frente', 'lado', 'espalda'].includes(fotoDespues.vista) ? fotoDespues.vista : 'frente';
 
-    slider.addEventListener('input', (e) => {
-      const val = e.target.value;
-      capaSplit.style.width = `${val}%`;
-    });
-  }
+  // Etiquetas direccionales corregidas (MEDIO-09 camara_cuerpo.md):
+  // Izquierda (0%) = Ver antes · Derecha (100%) = Ver después
+  const bloqueComparador = h('div', {
+    style: 'background-color:#F3F0E8;border-radius:28px;padding:16px;display:flex;flex-direction:column;gap:12px;'
+  },
+    h('div', { style: 'display:flex;justify-content:space-between;align-items:center;font-size:13px;flex-wrap:wrap;gap:6px;' },
+      h('div', {},
+        h('span', { style: 'color:#5D5951;' }, 'Antes: '),
+        h('strong', { style: 'color:#17171A;' }, fechaBonita(fotoAntes.fecha)),
+        h('span', { style: 'color:#5D5951;' }, ` (${vistaAntes})`)
+      ),
+      h('div', {},
+        h('span', { style: 'color:#5D5951;' }, 'Después: '),
+        h('strong', { style: 'color:#17171A;' }, fechaBonita(fotoDespues.fecha)),
+        h('span', { style: 'color:#5D5951;' }, ` (${vistaDespues})`)
+      )
+    ),
+    marcoBox,
+    h('div', {},
+      slider,
+      h('div', { style: 'display:flex;justify-content:space-between;font-size:12px;color:#5D5951;font-weight:500;' },
+        h('span', { style: 'display:inline-flex;align-items:center;gap:4px;' },
+          icono('flecha-izq', 14),
+          'Ver antes (0%)'
+        ),
+        h('span', {}, 'Desliza para comparar'),
+        h('span', { style: 'display:inline-flex;align-items:center;gap:4px;' },
+          'Ver después (100%)',
+          icono('flecha-der', 14)
+        )
+      )
+    )
+  );
+
+  cont.replaceChildren(bloqueComparador);
+
+  // Sincronizar el ancho de la imagen interior en cada cambio de tamaño de ventana (BAJO-13 camara_cuerpo.md)
+  const ajustarAnchoImagen = () => {
+    const boxWidth = marcoBox.offsetWidth || 340;
+    imgDespuesEl.style.width = `${boxWidth}px`;
+    imgDespuesEl.style.maxWidth = 'none';
+  };
+
+  ajustarAnchoImagen();
+  fnResizeComparador = ajustarAnchoImagen;
+  window.addEventListener('resize', fnResizeComparador);
 }
 
 /**
@@ -717,53 +875,57 @@ function renderizarGaleriaFotos() {
   );
 
   if (fotosFiltradas.length === 0) {
-    galeria.innerHTML = `
-      <div style="grid-column:span 2;padding:24px 16px;text-align:center;background:#F3F0E8;border-radius:28px;">
-        <span style="font-size:14px;color:#6B675F;">No hay fotos registradas para esta vista.</span>
-      </div>
-    `;
+    galeria.replaceChildren(
+      h('div', {
+        style: 'grid-column:span 2;padding:24px 16px;text-align:center;background:#F3F0E8;border-radius:28px;'
+      },
+        h('span', { style: 'font-size:14px;color:#5D5951;' }, 'No hay fotos registradas para esta vista.')
+      )
+    );
     return;
   }
 
-  galeria.innerHTML = '';
-
+  const nodosTarjetas = [];
   for (const foto of fotosFiltradas) {
     const url = URL.createObjectURL(foto.blob);
     urlsFotosCreadas.push(url);
+    const vistaSegura = ['frente', 'lado', 'espalda'].includes(foto.vista) ? foto.vista : 'frente';
 
-    const tarjetaFoto = document.createElement('div');
-    tarjetaFoto.className = 'cuerpo-foto-card';
-    tarjetaFoto.innerHTML = `
-      <img src="${url}" alt="Foto de ${foto.vista}" />
-      <div style="padding:8px 12px;font-size:12px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-weight:600;color:#17171A;">${fechaBonita(foto.fecha)}</span>
-        <span style="background:#17171A;color:#F3F0E8;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:600;">
-          ${foto.vista}
-        </span>
-      </div>
-    `;
+    const tarjetaFoto = h('div', {
+      class: 'cuerpo-foto-card',
+      on: { click: () => abrirDetalleFoto(foto, url) }
+    },
+      h('img', { src: url, alt: `Foto de ${vistaSegura}` }),
+      h('div', { style: 'padding:8px 12px;font-size:12px;display:flex;justify-content:space-between;align-items:center;' },
+        h('span', { style: 'font-weight:600;color:#17171A;' }, fechaBonita(foto.fecha)),
+        h('span', {
+          style: 'background:#17171A;color:#F3F0E8;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:600;'
+        }, vistaSegura)
+      )
+    );
 
-    tarjetaFoto.addEventListener('click', () => {
-      abrirDetalleFoto(foto, url);
-    });
-
-    galeria.appendChild(tarjetaFoto);
+    nodosTarjetas.push(tarjetaFoto);
   }
+
+  galeria.replaceChildren(...nodosTarjetas);
 }
 
 /**
  * Diálogo modal para ver, comparar o eliminar una foto de progreso.
  */
 async function abrirDetalleFoto(foto, url) {
+  const vistaSegura = ['frente', 'lado', 'espalda'].includes(foto.vista) ? foto.vista : 'frente';
+  const altoNum = numValido(foto.altoPx);
+
   await dialogo({
-    titulo: `Foto de ${foto.vista} (${fechaBonita(foto.fecha)})`,
+    titulo: `Foto de ${vistaSegura} (${fechaBonita(foto.fecha)})`,
     cuerpo: h('div', { class: 'col', style: 'gap:12px;' },
       h('img', {
         src: url,
         style: 'width:100%;max-height:360px;object-fit:cover;border-radius:28px;filter:contrast(1.05) saturate(0.9);'
       }),
-      h('div', { style: 'font-size:13px;color:#6B675F;' },
-        `Vista: ${foto.vista} · Altura registrada: ${foto.altoPx ? `${foto.altoPx} px` : 'Manual'}`
+      h('div', { style: 'font-size:13px;color:#5D5951;' },
+        `Vista: ${vistaSegura} · Altura registrada: ${altoNum ? `${Math.round(altoNum)} px` : 'Manual'}`
       )
     ),
     botones: [
@@ -792,71 +954,95 @@ async function abrirDetalleFoto(foto, url) {
 }
 
 /**
- * Renderiza el listado histórico de mediciones corporales.
+ * Renderiza el listado histórico de mediciones corporales usando nodos DOM (sin innerHTML).
+ * Corrección Seguridad 8: Validación numérica estricta y creación con h().
  */
 function renderizarHistorialMedidas() {
   const cont = document.getElementById('lista-historial-medidas');
   if (!cont) return;
 
   if (datosMedidas.length === 0) {
-    cont.innerHTML = `
-      <div style="padding:20px;text-align:center;background:#F3F0E8;border-radius:28px;">
-        <span style="font-size:14px;color:#6B675F;">No hay medidas registradas aún. Toca «+ Medida» para iniciar.</span>
-      </div>
-    `;
+    cont.replaceChildren(
+      h('div', {
+        style: 'padding:20px;text-align:center;background:#F3F0E8;border-radius:28px;'
+      },
+        h('span', { style: 'font-size:14px;color:#5D5951;' }, 'No hay medidas registradas aún. Toca «+ Medida» para iniciar.')
+      )
+    );
     return;
   }
 
-  cont.innerHTML = '';
+  const filas = [];
 
   for (const m of datosMedidas) {
-    const item = document.createElement('div');
-    item.className = 'cuerpo-item-historial';
-
     const detalles = [];
-    if (m.cintura) detalles.push(`Cintura: ${m.cintura} cm`);
-    if (m.pecho) detalles.push(`Pecho: ${m.pecho} cm`);
-    if (m.brazo) detalles.push(`Brazo: ${m.brazo} cm`);
+    const vCintura = numValido(m.cintura);
+    const vCuello = numValido(m.cuello);
+    const vPecho = numValido(m.pecho);
+    const vBrazo = numValido(m.brazo);
+    const vHombros = numValido(m.hombros);
+    const vCadera = numValido(m.cadera);
+    const vPeso = numValido(m.peso);
 
-    item.innerHTML = `
-      <div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <strong style="color:#17171A;font-size:14px;">${fechaBonita(m.fecha)}</strong>
-          ${m.peso ? `<span style="background:#C8F03C;color:#17171A;border-radius:999px;padding:2px 8px;font-size:12px;font-weight:600;">${m.peso} kg</span>` : ''}
-          ${m.origen === 'camara' ? `<span style="background:#E9E4D8;color:#17171A;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:600;">Cámara</span>` : ''}
-        </div>
-        <div style="font-size:12px;color:#6B675F;margin-top:2px;">
-          ${detalles.length > 0 ? detalles.join(' · ') : 'Solo peso registrado'}
-        </div>
-      </div>
-      <button class="cuerpo-btn-eliminar-pildora btn-borrar-medida" title="Eliminar registro">
-        ${renderIcono('borrar')}
-      </button>
-    `;
+    if (vCintura !== null) detalles.push(`Cintura: ${vCintura} cm`);
+    if (vCuello !== null) detalles.push(`Cuello: ${vCuello} cm`);
+    if (vPecho !== null) detalles.push(`Pecho: ${vPecho} cm`);
+    if (vBrazo !== null) detalles.push(`Brazo: ${vBrazo} cm`);
+    if (vHombros !== null) detalles.push(`Hombros: ${vHombros} cm`);
+    if (vCadera !== null) detalles.push(`Cadera: ${vCadera} cm`);
 
-    item.querySelector('.btn-borrar-medida')?.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const conf = await confirmar(`¿Eliminar la medición del ${fechaBonita(m.fecha)}?`);
-      if (conf) {
-        await borrar('medidas', m.id);
-        aviso('Medición eliminada', 'info');
-        await cargarDatos();
-        renderizarPantalla();
-      }
-    });
+    const item = h('div', { class: 'cuerpo-item-historial' },
+      h('div', {},
+        h('div', { style: 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;' },
+          h('strong', { style: 'color:#17171A;font-size:14px;' }, fechaBonita(m.fecha)),
+          vPeso !== null
+            ? h('span', {
+                style: 'background:#C8F03C;color:#17171A;border-radius:999px;padding:2px 8px;font-size:12px;font-weight:600;'
+              }, `${vPeso} kg`)
+            : null,
+          m.origen === 'camara'
+            ? h('span', {
+                style: 'background:#E9E4D8;color:#17171A;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:600;'
+              }, 'Cámara')
+            : null
+        ),
+        h('div', { style: 'font-size:12px;color:#5D5951;margin-top:2px;' },
+          detalles.length > 0 ? detalles.join(' · ') : 'Solo peso registrado'
+        )
+      ),
+      h('button', {
+        type: 'button',
+        class: 'cuerpo-btn-eliminar-pildora btn-borrar-medida',
+        title: 'Eliminar registro',
+        on: {
+          click: async (e) => {
+            e.stopPropagation();
+            const conf = await confirmar(`¿Eliminar la medición del ${fechaBonita(m.fecha)}?`);
+            if (conf) {
+              await borrar('medidas', m.id);
+              aviso('Medición eliminada', 'info');
+              await cargarDatos();
+              renderizarPantalla();
+            }
+          }
+        }
+      }, icono('borrar', 18))
+    );
 
-    cont.appendChild(item);
+    filas.push(item);
   }
+
+  cont.replaceChildren(...filas);
 }
 
 /**
  * Diálogo modal para ingresar una nueva medición corporal completa.
  * Captura y almacena los valores de los inputs en variables de estado reactivas
- * ANTES de que se cierre el diálogo (Corrección 1.1).
+ * ANTES de que se cierre el diálogo.
  */
 async function abrirModalNuevaMedida() {
   const hoy = hoyISO();
-  const estatura = perfilUsuario?.estaturaCm || 175;
+  const estatura = numValido(perfilUsuario?.estaturaCm) || 175;
 
   const valores = {
     fecha: hoy,
@@ -879,7 +1065,9 @@ async function abrirModalNuevaMedida() {
     const q = parseFloat(valores.cuello);
     if (!isNaN(c) && !isNaN(q) && c > q && estatura) {
       const pct = grasaNavy(c, q, estatura);
-      lblPreview.textContent = `Grasa estimada (Marina): ${pct}% (±3%)`;
+      if (pct !== null) {
+        lblPreview.textContent = `Grasa estimada (Marina): ${pct}% (±3%)`;
+      }
     }
   }
 
@@ -1052,7 +1240,7 @@ async function abrirModalNuevaMedida() {
 
 /**
  * Diálogo modal para subir una foto manualmente (frente, lado, espalda).
- * Captura el archivo en evento change antes del cierre del modal (Corrección 1.1).
+ * Captura el archivo en evento change antes del cierre del modal.
  */
 async function abrirModalSubirFoto() {
   const hoy = hoyISO();

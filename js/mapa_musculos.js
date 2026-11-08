@@ -2,7 +2,7 @@
  * js/mapa_musculos.js
  * Mapa del cuerpo humano (frente y espalda) en SVG propio.
  * Dirección de arte Forja v2 («Revista de sala»):
- * - Colores: Tinta suave (#6B675F) para la silueta inactiva y Lima (#C8F03C) para músculos activos.
+ * - Colores: Tinta suave (#5D5951 / #6B675F) para la silueta inactiva y Lima (#C8F03C) para músculos activos.
  * - Soporta interactividad táctil para filtrar ejercicios.
  */
 
@@ -39,6 +39,8 @@ const SINONIMOS = {
   'pectorales': 'pectoral',
   'pectoral mayor': 'pectoral',
   'pectoral menor': 'pectoral',
+  'haz clavicular': 'pectoral',
+  'haz esternocostal': 'pectoral',
   'chest': 'pectoral',
 
   // Deltoides
@@ -57,6 +59,7 @@ const SINONIMOS = {
   'deltoides_lateral': 'deltoides lateral',
   'hombro lateral': 'deltoides lateral',
   'hombro medio': 'deltoides lateral',
+  'supraespinoso': 'deltoides lateral',
   'side delt': 'deltoides lateral',
 
   'deltoides posterior': 'deltoides posterior',
@@ -64,6 +67,9 @@ const SINONIMOS = {
   'deltoides post': 'deltoides posterior',
   'deltoides_posterior': 'deltoides posterior',
   'hombro posterior': 'deltoides posterior',
+  'manguito rotador': 'deltoides posterior',
+  'infraespinoso': 'deltoides posterior',
+  'redondo menor': 'deltoides posterior',
   'rear delt': 'deltoides posterior',
 
   'hombro': 'deltoides lateral',
@@ -74,6 +80,8 @@ const SINONIMOS = {
   'biceps': 'bíceps',
   'bíceps': 'bíceps',
   'biceps braquial': 'bíceps',
+  'braquial': 'bíceps',
+  'braquial anterior': 'bíceps',
   'brazo': 'bíceps',
   'brazos': 'bíceps',
 
@@ -86,6 +94,10 @@ const SINONIMOS = {
   'antebrazo': 'antebrazo',
   'antebrazos': 'antebrazo',
   'braquiorradial': 'antebrazo',
+  'flexores de los dedos': 'antebrazo',
+  'flexores de la muneca': 'antebrazo',
+  'extensores de la muneca': 'antebrazo',
+  'agarre': 'antebrazo',
   'forearm': 'antebrazo',
   'forearms': 'antebrazo',
 
@@ -101,6 +113,7 @@ const SINONIMOS = {
   'dorsal ancho': 'dorsal ancho',
   'dorsal': 'dorsal ancho',
   'dorsales': 'dorsal ancho',
+  'redondo mayor': 'dorsal ancho',
   'lat': 'dorsal ancho',
   'lats': 'dorsal ancho',
   'latissimus': 'dorsal ancho',
@@ -127,6 +140,7 @@ const SINONIMOS = {
   'abdomen': 'abdomen',
   'abdominales': 'abdomen',
   'recto abdominal': 'abdomen',
+  'transverso abdominal': 'abdomen',
   'abs': 'abdomen',
   'core': 'abdomen',
   'panza': 'abdomen',
@@ -136,6 +150,8 @@ const SINONIMOS = {
   'oblicuo': 'oblicuos',
   'oblicuo externo': 'oblicuos',
   'oblicuos externos': 'oblicuos',
+  'oblicuo interno': 'oblicuos',
+  'cuadrado lumbar': 'oblicuos',
   'cintura': 'oblicuos',
 
   // Glúteo
@@ -163,11 +179,14 @@ const SINONIMOS = {
   'femoral': 'isquiotibiales',
   'femorales': 'isquiotibiales',
   'biceps femoral': 'isquiotibiales',
+  'semitendinoso': 'isquiotibiales',
+  'semimembranoso': 'isquiotibiales',
   'hamstrings': 'isquiotibiales',
 
   // Aductores
   'aductores': 'aductores',
   'aductor': 'aductores',
+  'aductor mayor': 'aductores',
   'adductor': 'aductores',
   'adductors': 'aductores',
 
@@ -178,6 +197,7 @@ const SINONIMOS = {
   'gluteo medio': 'abductores',
   'glúteo medio': 'abductores',
   'gluteo menor': 'abductores',
+  'tensor de la fascia lata': 'abductores',
 
   // Gemelos
   'gemelos': 'gemelos',
@@ -193,6 +213,9 @@ const SINONIMOS = {
   'cuello': 'cuello',
   'cervical': 'cuello',
   'cervicales': 'cuello',
+  'esternocleidomastoideo': 'cuello',
+  'flexores profundos del cuello': 'cuello',
+  'extensores del cuello': 'cuello',
   'neck': 'cuello'
 };
 
@@ -254,7 +277,7 @@ function normalizarConjunto(lista) {
 
 /**
  * Genera el elemento contenedor interactivo con el mapa anatómico en SVG (frente y espalda).
- * Paleta Forja v2 («Revista de sala»): Tinta suave (#6B675F) y Lima (#C8F03C).
+ * Paleta Forja v2 («Revista de sala»): Tinta suave (#5D5951) y Lima (#C8F03C).
  * 
  * @param {Array<string>|string} musculosPrincipales - Lista de músculos principales
  * @param {Array<string>|string} musculosSecundarios - Lista de músculos secundarios
@@ -265,9 +288,9 @@ export function mapaSVG(musculosPrincipales = [], musculosSecundarios = [], alTo
   const princSet = normalizarConjunto(musculosPrincipales);
   const secSet = normalizarConjunto(musculosSecundarios);
 
-  // Paleta Forja v2 «Revista de sala»
-  const COLOR_INACTIVO = 'rgba(107, 103, 95, 0.22)';  // Tinta suave translúcido
-  const COLOR_BORDE = '#6B675F';                      // Tinta suave
+  // Paleta Forja v2 «Revista de sala» (contraste WCAG AA mejorado)
+  const COLOR_INACTIVO = 'rgba(93, 89, 81, 0.22)';    // Tinta suave translúcido
+  const COLOR_BORDE = '#5D5951';                      // Tinta suave accesible
   const COLOR_BASE = '#E9E4D8';                       // Papel 2 (cabeza, manos, pies)
   const COLOR_PRINCIPAL = '#C8F03C';                  // Lima de tiza
   const COLOR_SECUNDARIO = 'rgba(200, 240, 60, 0.52)'; // Lima suave
@@ -314,19 +337,18 @@ export function mapaSVG(musculosPrincipales = [], musculosSecundarios = [], alTo
             filter: drop-shadow(0 0 3px #C8F03C);
           }
           .etiqueta-vista {
-            fill: #6B675F;
+            fill: #5D5951;
             font-size: 11px;
             font-weight: 600;
             text-anchor: middle;
             font-family: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
-            letter-spacing: 0.08em;
           }
         </style>
       </defs>
 
       <!-- Títulos de vistas -->
-      <text x="85" y="16" class="etiqueta-vista">FRENTE</text>
-      <text x="255" y="16" class="etiqueta-vista">ESPALDA</text>
+      <text x="85" y="16" class="etiqueta-vista">Frente</text>
+      <text x="255" y="16" class="etiqueta-vista">Espalda</text>
 
       <!-- ============================================== -->
       <!-- ============ SILUETA BASE: FRENTE ============ -->
@@ -598,9 +620,9 @@ export function mapaSVG(musculosPrincipales = [], musculosSecundarios = [], alTo
     </svg>
   `;
 
-  // Leyenda de colores explicativa (sin emojis, colores lima y tinta suave)
+  // Leyenda de colores explicativa (sin emojis, colores lima y tinta suave accesible)
   const leyendaHtml = `
-    <div style="display: flex; gap: 14px; justify-content: center; font-size: 11px; margin-top: 6px; color: #6B675F; font-family: 'Bricolage Grotesque', system-ui, sans-serif;">
+    <div style="display: flex; gap: 14px; justify-content: center; font-size: 11px; margin-top: 6px; color: var(--tinta-suave, #5D5951); font-family: 'Bricolage Grotesque', system-ui, sans-serif;">
       <span style="display: inline-flex; align-items: center; gap: 5px;">
         <span style="width: 8px; height: 8px; border-radius: 999px; background: ${COLOR_PRINCIPAL}; display: inline-block;"></span>
         Principal

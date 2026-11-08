@@ -1,7 +1,8 @@
 // =============================================================================
 // js/qr.js - Generador de código QR en SVG y lector de QR con BarcodeDetector
 // Implementación propia en JavaScript puro sin dependencias externas.
-// Soporta modo Byte, corrección de errores M, y versiones 1 a 10.
+// Soporta modo Byte, corrección de errores M, y versiones 1 a 10 (extendido a 12
+// para admitir payloads JSON completos de CONTRATOS.md).
 // Estilo Forja v2: Radios canónicos 28px y tinta #17171A.
 // =============================================================================
 
@@ -52,7 +53,7 @@ function rsEncode(dataBytes, ecCount) {
   return remainder;
 }
 
-// --- Parámetros de versiones 1 a 10 (Nivel de error M) ---
+// --- Parámetros de versiones 1 a 12 (Nivel de error M) ---
 // Formato: { total, ecPorBloque, bloques: [[numBloques, datosPorBloque], ...] }
 const TABLA_VERSIONES_M = [
   null,
@@ -65,10 +66,12 @@ const TABLA_VERSIONES_M = [
   { total: 196, ec: 18, bloques: [[4, 31]] },                           // V7: 124 datos
   { total: 242, ec: 22, bloques: [[2, 38], [2, 39]] },                  // V8: 154 datos
   { total: 292, ec: 22, bloques: [[3, 36], [2, 37]] },                  // V9: 182 datos
-  { total: 346, ec: 26, bloques: [[4, 43], [1, 44]] }                   // V10: 216 datos
+  { total: 346, ec: 26, bloques: [[4, 43], [1, 44]] },                  // V10: 216 datos
+  { total: 404, ec: 30, bloques: [[1, 50], [4, 51]] },                  // V11: 254 datos
+  { total: 466, ec: 22, bloques: [[6, 36], [2, 37]] }                   // V12: 290 datos
 ];
 
-// Coordenadas de patrones de alineación para versiones 1-10
+// Coordenadas de patrones de alineación para versiones 1-12
 const ALINEACIONES = [
   [],
   [],
@@ -80,15 +83,19 @@ const ALINEACIONES = [
   [6, 22, 38],
   [6, 24, 42],
   [6, 26, 46],
-  [6, 28, 50]
+  [6, 28, 50],
+  [6, 30, 54],
+  [6, 32, 58]
 ];
 
-// Bits de versión para V7-V10 (código Golay BCH de 18 bits)
+// Bits de versión para V7-V12 (código Golay BCH de 18 bits)
 const BITS_VERSION = {
   7:  0x07c94,
   8:  0x085bc,
   9:  0x09a99,
-  10: 0x0a4d3
+  10: 0x0a4d3,
+  11: 0x0bbf6,
+  12: 0x0c762
 };
 
 // Bits de formato para Nivel M (00) y cada máscara (0-7)
@@ -114,7 +121,7 @@ function capacidadBytes(v) {
 
 // Determina la versión mínima capaz de alojar los bytes
 function seleccionarVersion(numBytes) {
-  for (let v = 1; v <= 10; v++) {
+  for (let v = 1; v < TABLA_VERSIONES_M.length; v++) {
     if (numBytes <= capacidadBytes(v)) return v;
   }
   return null;
@@ -204,7 +211,7 @@ function construirMatrizQR(version, datosCodificados) {
   }
 
   // 3. Patrones de alineación
-  const coordsAlineacion = ALINEACIONES[version];
+  const coordsAlineacion = ALINEACIONES[version] || [];
   if (coordsAlineacion.length > 0) {
     for (const r of coordsAlineacion) {
       for (const c of coordsAlineacion) {
@@ -277,7 +284,6 @@ function construirMatrizQR(version, datosCodificados) {
   }
 
   // 8. Evaluar penalización de las 8 máscaras y seleccionar la óptima
-  let mejorMascara = 0;
   let menorPenalizacion = Infinity;
   let mejorMatriz = null;
 
@@ -374,7 +380,6 @@ function construirMatrizQR(version, datosCodificados) {
 
     if (pen < menorPenalizacion) {
       menorPenalizacion = pen;
-      mejorMascara = m;
       mejorMatriz = copia;
     }
   }
@@ -395,10 +400,9 @@ export function qrSvg(texto) {
   const version = seleccionarVersion(rawBytes.length);
 
   if (!version) {
-    // Si excede la capacidad de versión 10 en modo byte (~213 bytes)
-    const errText = 'Texto demasiado largo para QR v1-10';
+    const errText = 'Texto demasiado largo para QR';
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 64" width="100%" height="auto">
-      <rect width="240" height="64" fill="#222226" rx="28"/>
+      <rect width="240" height="64" fill="#232328" rx="28"/>
       <text x="120" y="37" fill="#E2553A" font-size="12" text-anchor="middle" font-family="'Bricolage Grotesque', sans-serif" font-weight="600">${errText}</text>
     </svg>`;
   }
@@ -496,7 +500,7 @@ let soporteQrVerificado = null; // null: no verificado, true: soportado, false: 
 /**
  * Lee un código QR de un elemento <video> en reproducción utilizando BarcodeDetector nativo.
  * Devuelve el texto leído o null si no se detectó código o si el navegador no soporta la API.
- * Corrección 2.6: Reutiliza una única instancia singleton de BarcodeDetector para evitar fugas y GC thrashing.
+ * Reutiliza una única instancia singleton de BarcodeDetector para evitar fugas y GC thrashing.
  * @param {HTMLVideoElement} video - Elemento de video HTML con el flujo de la cámara.
  * @returns {Promise<string|null>}
  */

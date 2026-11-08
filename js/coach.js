@@ -9,13 +9,15 @@ import * as calculos from './calculos.js';
 import * as config from './config.js';
 import { buscarEjercicio } from './parser.js';
 import { icono } from './iconos.js';
+import { mdAHtml } from './markdown.js';
 
 let mlcEngine = null;
 let descargando = false;
+let enGeneracion = false;
 let estadoPantalla = null;
 
 // ============================================================================
-// 1. UTILIDADES, FECHAS LOCALES Y BÚSQUEDA DE EJERCICIOS
+// 1. UTILIDADES, FECHAS LOCALES, SANITIZACIÓN XSS Y BÚSQUEDA DE EJERCICIOS
 // ============================================================================
 
 export function normalizar(str) {
@@ -33,6 +35,68 @@ export function lunesSemanaISO() {
   const d = new Date(), day = d.getDay();
   d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
   return fechaLocalISO(d);
+}
+
+/** Escapa todos los caracteres HTML especiales (incluyendo comillas) para evitar XSS */
+export function escaparHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Renderiza Markdown del chat de forma segura contra XSS (Seguridad Hallazgo 2).
+ * Escapa HTML/comillas, valida enlaces internos (#ruta) y se apoya en mdAHtml de markdown.js.
+ */
+function renderMarkdown(md) {
+  if (!md) return '';
+  const enlacesSeguros = [];
+  const codigosInline = [];
+
+  // 1. Extraer únicamente código inline y enlaces internos seguros (#[a-zA-Z0-9_/-]+)
+  // usando marcadores sin guiones bajos para no colisionar con cursivas en markdown.js
+  let textoPrep = String(md).replace(/`([^`\n]+)`/g, (_m, code) => {
+    const idx = codigosInline.length;
+    codigosInline.push(`<code>${escaparHtml(code)}</code>`);
+    return `%%COACHCODE${idx}%%`;
+  });
+
+  textoPrep = textoPrep.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, destino) => {
+    const limpio = String(destino || '').trim();
+    if (/^#[a-zA-Z0-9_\/-]+$/.test(limpio)) {
+      const idx = enlacesSeguros.length;
+      enlacesSeguros.push(`<a href="${escaparHtml(limpio)}" class="coach-link">${escaparHtml(label)}</a>`);
+      return `%%COACHLINK${idx}%%`;
+    }
+    // Si el destino contiene comillas, atributos o esquemas externos, se neutraliza como texto plano
+    return `${label} (${limpio})`;
+  });
+
+  let html = '';
+  try {
+    if (typeof mdAHtml === 'function') {
+      html = mdAHtml(textoPrep);
+    }
+  } catch (_) {
+    html = '';
+  }
+
+  if (!html) {
+    const esc = escaparHtml(textoPrep);
+    html = esc
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|[^\*])\*([^\*\n]+?)\*/g, '$1<em>$2</em>')
+      .replace(/\n/g, '<br>');
+  }
+
+  // 2. Restaurar enlaces internos validados y código inline ya escapados
+  html = html.replace(/%%COACHLINK(\d+)%%/g, (_m, idx) => enlacesSeguros[Number(idx)] || '');
+  html = html.replace(/%%COACHCODE(\d+)%%/g, (_m, idx) => codigosInline[Number(idx)] || '');
+  return html;
 }
 
 function similitud(a, b) {
@@ -85,19 +149,35 @@ function encontrarEjercicio(termino, lista) {
   return mejor;
 }
 
-function renderMarkdown(md) {
-  if (!md) return '';
-  const esc = String(md).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return esc.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-            .replace(/(^|[^\*])\*([^\*]+?)\*/g, '$1<em>$2</em>')
-            .replace(/\[([^\]]+)\]\((#[^)]+)\)/g, '<a href="$2" class="coach-link">$1</a>')
-            .replace(/\n/g, '<br>');
-}
-
 function esErrorMemoria(err) {
   if (!err) return false;
   const msg = (err.message || String(err)).toLowerCase();
   return ['memory', 'oom', 'allocation', 'buffer', 'device lost', 'out of', 'exceeded', 'quota', 'insufficient'].some(k => msg.includes(k));
+}
+
+/**
+ * CFG-01: Normaliza y sincroniza el modelo del ajuste 'ia' con config.WEBLLM_MODELO
+ * y config.WEBLLM_MODELO_RESPALDO evitando que valores obsoletos desincronicen el Coach.
+ */
+function normalizarModeloConfig(modeloCandidato) {
+  const modeloPrincipal = config.WEBLLM_MODELO || 'Qwen3.5-2B-q4f16_1-MLC';
+  const modeloRespaldo = config.WEBLLM_MODELO_RESPALDO || 'Qwen3.5-0.8B-q4f16_1-MLC';
+  if (!modeloCandidato || typeof modeloCandidato !== 'string') return modeloPrincipal;
+  if (modeloCandidato === modeloPrincipal || modeloCandidato === modeloRespaldo) return modeloCandidato;
+  if (modeloCandidato.includes('0.5B') || modeloCandidato.includes('0.8B')) return modeloRespaldo;
+  if (modeloCandidato.includes('1.5B') || modeloCandidato.includes('2B')) return modeloPrincipal;
+  return modeloCandidato;
+}
+
+async function obtenerAjusteIASincronizado() {
+  const modeloPrincipal = config.WEBLLM_MODELO || 'Qwen3.5-2B-q4f16_1-MLC';
+  const aj = await db.ajuste('ia', { activa: false, modelo: modeloPrincipal });
+  const modeloSinc = normalizarModeloConfig(aj?.modelo);
+  const estado = { activa: Boolean(aj?.activa), modelo: modeloSinc };
+  if (aj && aj.modelo !== modeloSinc) {
+    try { await db.ponerAjuste('ia', estado); } catch (_) {}
+  }
+  return estado;
 }
 
 function renderIcono(nombre, attrs = {}) {
@@ -213,7 +293,9 @@ async function responderComoVoy() {
   let txtMeta = '**Días para la meta**: No has configurado fecha en Ajustes.';
   if (perfil?.metaFecha) {
     const diff = Math.ceil((new Date(perfil.metaFecha + 'T00:00:00') - new Date(hoyISO + 'T00:00:00')) / 86400000);
-    txtMeta = `**Días para la meta**: Faltan **${diff} días** para ${perfil.metaNombre || 'tu meta'} (${ui.fechaBonita(perfil.metaFecha)}).`;
+    txtMeta = diff >= 0
+      ? `**Días para la meta**: Faltan **${diff} días** para ${perfil.metaNombre || 'tu meta'} (${ui.fechaBonita(perfil.metaFecha)}).`
+      : `**Días para la meta**: ¡Meta alcanzada! (${perfil.metaNombre || 'tu meta'}, ${ui.fechaBonita(perfil.metaFecha)}).`;
   }
   if (perfil?.metaMes) txtMeta += `\n**Meta del mes**: "${perfil.metaMes}"`;
 
@@ -237,13 +319,15 @@ async function responderComoVoy() {
   const prs = calculos.prs(series);
   const prsRec = Object.entries(prs).filter(([_, p]) => p?.fecha && p.fecha >= hace7DiasISO).map(([id, p]) => {
     const ej = ejs.find(e => e.id === id);
-    return `• **${ej?.nombre || id}**: ${ui.formatoKg(p.kg, p.porLado, p.unidad)} x ${p.reps} reps (1RM est. ${Math.round(p.unoRM)} kg) el ${ui.fechaBonita(p.fecha)}`;
+    const info1RM = p.unoRM > 0 ? ` (1RM est. ${Math.round(p.unoRM)} kg)` : '';
+    return `• **${ej?.nombre || id}**: ${ui.formatoKg(p.kg, p.porLado, p.unidad)} x ${p.reps} reps${info1RM} el ${ui.fechaBonita(p.fecha)}`;
   });
   const txtPR = prsRec.length ? `**Récords nuevos (últimos 7 días)**:\n${prsRec.join('\n')}` : '**Récords personales**: Sin récords nuevos en los últimos 7 días. Consistencia.';
 
-  // 5. Tendencias peso y cintura
-  const vPeso = medidas.filter(m => m.peso != null).map(m => ({ fecha: m.fecha, valor: Number(m.peso) }));
-  const vCint = medidas.filter(m => m.cintura != null).map(m => ({ fecha: m.fecha, valor: Number(m.cintura) }));
+  // 5. Tendencias peso y cintura (COA-01: ordenar medidas por fecha ascendente antes de calcular)
+  const medidasOrdenadas = [...medidas].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+  const vPeso = medidasOrdenadas.filter(m => m.peso != null).map(m => ({ fecha: m.fecha, valor: Number(m.peso) }));
+  const vCint = medidasOrdenadas.filter(m => m.cintura != null).map(m => ({ fecha: m.fecha, valor: Number(m.cintura) }));
   const tPeso = calculos.tendenciaSemanal(vPeso), tCint = calculos.tendenciaSemanal(vCint);
   const ultP = vPeso[vPeso.length - 1], ultC = vCint[vCint.length - 1];
   let txtTend = '**Tendencias corporales**:\n';
@@ -273,7 +357,10 @@ async function responderPesoUso(termino) {
   }
   series.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || ((b.hora || 0) - (a.hora || 0)));
   const ultFecha = series[0].fecha;
-  const ultSeries = series.filter(s => s.fecha === ultFecha);
+  // COA-02: ordenar las series de la última sesión cronológicamente (ascendente por hora)
+  const ultSeries = series
+    .filter(s => s.fecha === ultFecha)
+    .sort((a, b) => (a.hora || 0) - (b.hora || 0));
   const sug = calculos.pesoSugerido(ultSeries, ej);
   const det = ultSeries.map((s, i) => `• Serie ${i + 1}: ${ui.formatoKg(s.kg, s.porLado, s.unidad)} x ${s.reps} reps${s.fallo ? ' [fallo]' : s.rir != null ? ` [RIR ${s.rir}]` : ''}`).join('\n');
   const pTxt = sug?.kg !== undefined ? ui.formatoKg(sug.kg, sug.porLado, sug.unidad) : 'Mismo peso previo';
@@ -319,7 +406,11 @@ async function responderQueTocaHoy() {
     let sugTxt = '';
     if (seriesEj.length && ej) {
       seriesEj.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || ((b.hora || 0) - (a.hora || 0)));
-      const ultS = seriesEj.filter(s => s.fecha === seriesEj[0].fecha);
+      const ultFecha = seriesEj[0].fecha;
+      // COA-02: ordenar las series de la última sesión en orden ascendente por hora
+      const ultS = seriesEj
+        .filter(s => s.fecha === ultFecha)
+        .sort((a, b) => (a.hora || 0) - (b.hora || 0));
       const sug = calculos.pesoSugerido(ultS, ej);
       if (sug?.kg !== undefined) sugTxt = ` → Sugerido: **${ui.formatoKg(sug.kg, sug.porLado, sug.unidad)}**`;
     }
@@ -343,7 +434,10 @@ async function responderUltimaVez(termino) {
     series.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || ((b.hora || 0) - (a.hora || 0)));
     const ultFecha = series[0].fecha;
     const dias = Math.floor((new Date(ui.hoyISO() + 'T00:00:00') - new Date(ultFecha + 'T00:00:00')) / 86400000);
-    const nomEj = [...new Set(series.filter(s => s.fecha === ultFecha).map(s => ejs.find(e => e.id === s.ejercicioId)?.nombre || s.ejercicioId))];
+    const seriesUltFecha = series
+      .filter(s => s.fecha === ultFecha)
+      .sort((a, b) => (a.hora || 0) - (b.hora || 0));
+    const nomEj = [...new Set(seriesUltFecha.map(s => ejs.find(e => e.id === s.ejercicioId)?.nombre || s.ejercicioId))];
     return `La última vez que entrenaste **${esMusc}** fue el **${ui.fechaBonita(ultFecha)}** (${dias === 0 ? 'hoy' : dias === 1 ? 'ayer' : `hace ${dias} días`}).\n\nEjercicios realizados:\n• ` + nomEj.join('\n• ');
   }
 
@@ -354,10 +448,14 @@ async function responderUltimaVez(termino) {
 
   series.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || ((b.hora || 0) - (a.hora || 0)));
   const ultFecha = series[0].fecha;
-  const ultSeries = series.filter(s => s.fecha === ultFecha);
+  // COA-02: ordenar las series de la última sesión en orden ascendente por hora
+  const ultSeries = series
+    .filter(s => s.fecha === ultFecha)
+    .sort((a, b) => (a.hora || 0) - (b.hora || 0));
   const dias = Math.floor((new Date(ui.hoyISO() + 'T00:00:00') - new Date(ultFecha + 'T00:00:00')) / 86400000);
   const det = ultSeries.map((s, i) => `• Serie ${i + 1}: ${ui.formatoKg(s.kg, s.porLado, s.unidad)} x ${s.reps} reps${s.fallo ? ' [fallo]' : s.rir != null ? ` [RIR ${s.rir}]` : ''}`).join('\n');
-  return `La última vez que hiciste **${ej.nombre}** fue el **${ui.fechaBonita(ultFecha)}** (${dias === 0 ? 'hoy' : dias === 1 ? 'ayer' : `hace ${dias} días`}).\n\nDetalle de esa sesión:\n${det}${ultSeries[0]?.nota ? `\n\nNota: "${ultSeries[0].nota}"` : ''}`;
+  const notaSesion = ultSeries.find(s => s.nota)?.nota;
+  return `La última vez que hiciste **${ej.nombre}** fue el **${ui.fechaBonita(ultFecha)}** (${dias === 0 ? 'hoy' : dias === 1 ? 'ayer' : `hace ${dias} días`}).\n\nDetalle de esa sesión:\n${det}${notaSesion ? `\n\nNota: "${notaSesion}"` : ''}`;
 }
 
 async function responderComoSeHace(termino) {
@@ -398,29 +496,37 @@ async function armarResumenParaIA() {
   const diffMeta = perfil?.metaFecha ? Math.ceil((new Date(perfil.metaFecha + 'T00:00:00') - new Date(hoyISO + 'T00:00:00')) / 86400000) : 'N/D';
 
   const prs = Object.entries(calculos.prs(series)).slice(0, 12).map(([id, p]) => `${ejs.find(e => e.id === id)?.nombre || id}: ${ui.formatoKg(p.kg, p.porLado, p.unidad)} x ${p.reps}`).join('; ');
-  const s14 = series.filter(s => s.fecha >= iso14 && s.fecha <= hoyISO);
+  const s14 = series
+    .filter(s => s.fecha >= iso14 && s.fecha <= hoyISO)
+    .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '') || ((a.hora || 0) - (b.hora || 0)));
   const pf = {};
   for (const s of s14) {
     if (!pf[s.fecha]) pf[s.fecha] = [];
     pf[s.fecha].push(`${ejs.find(e => e.id === s.ejercicioId)?.nombre || s.ejercicioId} ${ui.formatoKg(s.kg, s.porLado, s.unidad)} x ${s.reps}`);
   }
   const entreno = Object.entries(pf).map(([f, it]) => `${f}: ${it.join(', ')}`).join('\n');
-  const tPeso = calculos.tendenciaSemanal(medidas.filter(m => m.peso != null).map(m => ({ fecha: m.fecha, valor: Number(m.peso) })));
-  const tCint = calculos.tendenciaSemanal(medidas.filter(m => m.cintura != null).map(m => ({ fecha: m.fecha, valor: Number(m.cintura) })));
-  const ultM = medidas[medidas.length - 1];
+
+  // COA-01: ordenar medidas cronológicamente por fecha antes de extraer el último valor y calcular tendencia
+  const medidasOrdenadas = [...medidas].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+  const vPeso = medidasOrdenadas.filter(m => m.peso != null).map(m => ({ fecha: m.fecha, valor: Number(m.peso) }));
+  const vCint = medidasOrdenadas.filter(m => m.cintura != null).map(m => ({ fecha: m.fecha, valor: Number(m.cintura) }));
+  const tPeso = calculos.tendenciaSemanal(vPeso);
+  const tCint = calculos.tendenciaSemanal(vCint);
+  const ultP = vPeso[vPeso.length - 1];
+  const ultC = vCint[vCint.length - 1];
 
   const pDia = {};
   for (const c of comidas.filter(c => c.fecha >= iso14)) pDia[c.fecha] = (pDia[c.fecha] || 0) + (Number(c.proteina) || 0);
   const promProt = Object.keys(pDia).length ? Math.round(Object.values(pDia).reduce((a, b) => a + b, 0) / Object.keys(pDia).length) : 0;
   const reglas = (config.REGLAS_COACH || ['Fallo solo en última serie en máquina.', 'Peso libre 1-2 RIR.', 'Descanso 2 min compuestos.']).join('\n- ');
 
-  return `DATOS DEL USUARIO (FORJA):\n- Perfil: ${perfil?.nombre || 'el usuario'}, meta: ${perfil?.metaNombre || 'Grado'} (${perfil?.metaFecha || 'N/D'}, faltan ${diffMeta} días). Meta mes: "${perfil?.metaMes || 'N/D'}".\n- Objetivos diarios: ${perfil?.kcal || 2200} kcal, ${perfil?.proteina || 128}g prot, ${perfil?.aguaVasos || 10} vasos agua.\n- Tendencias: Peso ${ultM?.peso || 'N/D'}kg (${tPeso !== null ? tPeso.toFixed(2) + 'kg/sem' : 'N/D'}), cintura ${ultM?.cintura || 'N/D'}cm (${tCint !== null ? tCint.toFixed(2) + 'cm/sem' : 'N/D'}).\n- Proteína promedio: ${promProt}g/día.\n- PRs: ${prs || 'Sin registros'}.\n- Entrenamientos recientes:\n${entreno || 'Sin entrenamientos recientes'}\n- Reglas del coach:\n- ${reglas}`;
+  return `DATOS DEL USUARIO (FORJA):\n- Perfil: ${perfil?.nombre || 'el usuario'}, meta: ${perfil?.metaNombre || 'Grado'} (${perfil?.metaFecha || 'N/D'}, faltan ${diffMeta} días). Meta mes: "${perfil?.metaMes || 'N/D'}".\n- Objetivos diarios: ${perfil?.kcal || 2200} kcal, ${perfil?.proteina || 128}g prot, ${perfil?.aguaVasos || 10} vasos agua.\n- Tendencias: Peso ${ultP?.valor ?? 'N/D'}kg (${tPeso !== null ? tPeso.toFixed(2) + 'kg/sem' : 'N/D'}), cintura ${ultC?.valor ?? 'N/D'}cm (${tCint !== null ? tCint.toFixed(2) + 'cm/sem' : 'N/D'}).\n- Proteína promedio: ${promProt}g/día.\n- PRs: ${prs || 'Sin registros'}.\n- Entrenamientos recientes:\n${entreno || 'Sin entrenamientos recientes'}\n- Reglas del coach:\n- ${reglas}`;
 }
 
 /**
  * Descarga o inicializa el motor de WebLLM para su uso sin conexión.
- * Si el modelo grande falla por memoria, ofrece cambiar al de respaldo.
- * Exportada para ser utilizada tanto por el Coach como por Ajustes (3.4).
+ * Si el modelo grande falla por memoria, ofrece cambiar al de respaldo de config.js.
+ * Exportada para ser utilizada tanto por el Coach como por Ajustes.
  */
 export async function descargarModelo(alAvance, modelo = null) {
   if (!tieneWebGPU()) throw new Error('WebGPU no está disponible en este dispositivo o navegador.');
@@ -428,8 +534,8 @@ export async function descargarModelo(alAvance, modelo = null) {
   descargando = true;
   try {
     const webllm = await import(config.WEBLLM_URL);
-    const aj = await db.ajuste('ia', { activa: false, modelo: config.WEBLLM_MODELO });
-    let modeloACargar = modelo || aj?.modelo || config.WEBLLM_MODELO;
+    const aj = await obtenerAjusteIASincronizado();
+    let modeloACargar = modelo ? normalizarModeloConfig(modelo) : aj.modelo;
     const modeloRespaldo = config.WEBLLM_MODELO_RESPALDO || 'Qwen3.5-0.8B-q4f16_1-MLC';
 
     if (mlcEngine && mlcEngine._modeloCargado === modeloACargar) {
@@ -445,6 +551,8 @@ export async function descargarModelo(alAvance, modelo = null) {
         initProgressCallback: rep => { if (typeof alAvance === 'function') alAvance(rep); }
       });
       mlcEngine._modeloCargado = modeloACargar;
+      await db.ponerAjuste('ia', { ...aj, activa: true, modelo: modeloACargar });
+      if (estadoPantalla?.actualizarModo) estadoPantalla.actualizarModo(true, modeloACargar);
       return mlcEngine;
     } catch (err) {
       if (esErrorMemoria(err) && modeloACargar !== modeloRespaldo) {
@@ -458,6 +566,7 @@ export async function descargarModelo(alAvance, modelo = null) {
         if (cambiar) {
           modeloACargar = modeloRespaldo;
           await db.ponerAjuste('ia', { ...aj, activa: true, modelo: modeloRespaldo });
+          if (estadoPantalla?.actualizarModo) estadoPantalla.actualizarModo(true, modeloRespaldo);
           ui.aviso(`Cambiando al modelo de respaldo: ${modeloRespaldo}...`, 'info');
           if (typeof alAvance === 'function') {
             alAvance({ progress: 0.05, text: `Cargando modelo de respaldo (${modeloRespaldo})...` });
@@ -481,6 +590,10 @@ export async function descargarModelo(alAvance, modelo = null) {
  * Borra los pesos y cachés del modelo local para liberar almacenamiento
  */
 export async function borrarModelo() {
+  if (enGeneracion && mlcEngine && typeof mlcEngine.interruptGenerate === 'function') {
+    try { mlcEngine.interruptGenerate(); } catch (_) {}
+  }
+  enGeneracion = false;
   if (mlcEngine) {
     try { await mlcEngine.unload(); } catch (_) {}
     mlcEngine = null;
@@ -505,14 +618,18 @@ export async function borrarModelo() {
       }
     } catch (_) {}
   }
+  if (estadoPantalla?.actualizarModo) {
+    const aj = await obtenerAjusteIASincronizado();
+    estadoPantalla.actualizarModo(false, aj.modelo);
+  }
   return true;
 }
 
 async function responderConIA(pregunta, onChunk, onProgreso) {
   if (!tieneWebGPU()) return 'Tu dispositivo no soporta WebGPU para IA local. Sigo respondiendo con reglas locales.';
   try {
-    const ajIA = await db.ajuste('ia', { activa: true, modelo: config.WEBLLM_MODELO });
-    const modeloActual = ajIA?.modelo || config.WEBLLM_MODELO;
+    const ajIA = await obtenerAjusteIASincronizado();
+    const modeloActual = ajIA.modelo;
     const modeloRespaldo = config.WEBLLM_MODELO_RESPALDO || 'Qwen3.5-0.8B-q4f16_1-MLC';
 
     if (!mlcEngine || mlcEngine._modeloCargado !== modeloActual) {
@@ -529,21 +646,37 @@ async function responderConIA(pregunta, onChunk, onProgreso) {
         throw errCarga;
       }
     }
+
     const contexto = await armarResumenParaIA();
-    const chatP = (await db.todos('chat')).sort((a, b) => (a.hora || 0) - (b.hora || 0)).slice(-4);
+    // COA-03: excluir la pregunta recién guardada del historial previo para no duplicarla
+    const todosMsgs = (await db.todos('chat')).sort((a, b) => (a.hora || 0) - (b.hora || 0));
+    const ultimo = todosMsgs[todosMsgs.length - 1];
+    const sinActual = (ultimo && ultimo.rol === 'yo' && ultimo.texto === pregunta)
+      ? todosMsgs.slice(0, -1)
+      : todosMsgs;
+    const chatPrevio = sinActual.slice(-4);
+
     const msgs = [
       { role: 'system', content: `Eres el entrenador personal del usuario en "Forja". Responde en español latino simple, cercano y motivador. Usa SOLO los siguientes datos. Si no sabes algo, dilo. NUNCA des consejos médicos.\n\n${contexto}` },
-      ...chatP.map(m => ({ role: m.rol === 'yo' ? 'user' : 'assistant', content: m.texto })),
+      ...chatPrevio.map(m => ({ role: m.rol === 'yo' ? 'user' : 'assistant', content: m.texto })),
       { role: 'user', content: pregunta }
     ];
-    const stream = await mlcEngine.chat.completions.create({ messages: msgs, stream: true });
+
+    enGeneracion = true;
     let acc = '';
-    for await (const chunk of stream) {
-      acc += chunk.choices[0]?.delta?.content || '';
-      if (onChunk) onChunk(acc);
+    try {
+      const stream = await mlcEngine.chat.completions.create({ messages: msgs, stream: true });
+      for await (const chunk of stream) {
+        if (!enGeneracion) break;
+        acc += chunk.choices[0]?.delta?.content || '';
+        if (onChunk && enGeneracion) onChunk(acc);
+      }
+    } finally {
+      enGeneracion = false;
     }
     return acc;
   } catch (err) {
+    enGeneracion = false;
     const modeloRespaldo = config.WEBLLM_MODELO_RESPALDO || 'Qwen3.5-0.8B-q4f16_1-MLC';
     if (esErrorMemoria(err)) {
       return `La IA local se quedó sin memoria en tu dispositivo. Puedes cambiar al modelo ligero de respaldo (${modeloRespaldo}) en Ajustes o seguir usando el coach por reglas directas.`;
@@ -566,8 +699,8 @@ export async function responder(texto, { onChunk, onProgreso } = {}) {
     if (c.tipo === 'ULTIMA_VEZ') return await responderUltimaVez(c.termino);
     if (c.tipo === 'COMO_SE_HACE') return await responderComoSeHace(c.termino);
   }
-  const ajIA = await db.ajuste('ia', { activa: false, modelo: config.WEBLLM_MODELO });
-  if (ajIA?.activa) return await responderConIA(texto, onChunk, onProgreso);
+  const ajIA = await obtenerAjusteIASincronizado();
+  if (ajIA.activa) return await responderConIA(texto, onChunk, onProgreso);
   return mensajeSugerencias();
 }
 
@@ -581,28 +714,33 @@ const CSS_COACH = `
 .coach-cabecera-texto { display: flex; flex-direction: column; gap: 2px; }
 .coach-titulo { font-family: 'Instrument Serif', Georgia, serif; font-size: 32px; font-weight: 400; line-height: 1.05; color: var(--tinta, #17171A); letter-spacing: -0.01em; margin: 0; }
 .coach-titulo em { font-style: italic; }
-.coach-estado { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--tinta-suave, #6B675F); }
+.coach-estado { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--tinta-suave, #5D5951); }
 .coach-punto { width: 6px; height: 6px; border-radius: 999px; background-color: var(--lima, #C8F03C); }
-.coach-btn-limpiar { width: 40px; height: 40px; border-radius: 999px; background: var(--papel2, #E9E4D8); border: none; color: var(--tinta, #17171A); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 140ms, background 140ms; }
+.coach-btn-limpiar { width: 48px; height: 48px; min-width: 48px; min-height: 48px; border-radius: 999px; background: var(--papel2, #E9E4D8); border: none; color: var(--tinta, #17171A); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 140ms, background 140ms; }
 .coach-btn-limpiar:active { transform: scale(0.94); background: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }
 .coach-chips { display: flex; gap: 8px; overflow-x: auto; padding: 8px 0 12px; scrollbar-width: none; -ms-overflow-style: none; }
 .coach-chips::-webkit-scrollbar { display: none; }
-.coach-chip-btn { flex-shrink: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 999px; border: none; background: var(--papel2, #E9E4D8); color: var(--tinta, #17171A); cursor: pointer; transition: transform 140ms, background 140ms, color 140ms; white-space: nowrap; }
+.coach-chip-btn { flex-shrink: 0; min-height: 48px; font-family: 'Bricolage Grotesque', sans-serif; font-size: 13px; font-weight: 600; padding: 0 16px; border-radius: 999px; border: none; background: var(--papel2, #E9E4D8); color: var(--tinta, #17171A); cursor: pointer; transition: transform 140ms, background 140ms, color 140ms; white-space: nowrap; display: inline-flex; align-items: center; }
 .coach-chip-btn:active { transform: scale(0.96); background: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }
 .coach-mensajes { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 0; display: flex; flex-direction: column; gap: 14px; scrollbar-width: none; -ms-overflow-style: none; }
 .coach-mensajes::-webkit-scrollbar { display: none; }
 .coach-msg { max-width: 86%; padding: 14px 18px; border-radius: 28px; font-family: 'Bricolage Grotesque', sans-serif; font-size: 15px; line-height: 1.45; word-break: break-word; }
-.coach-msg-coach { align-self: flex-start; background: var(--papel2, #E9E4D8); color: var(--tinta, #17171A); border-bottom-left-radius: 6px; }
-.coach-msg-yo { align-self: flex-end; background: var(--tinta, #17171A); color: var(--papel, #F3F0E8); border-bottom-right-radius: 6px; }
+.coach-msg-coach { align-self: flex-start; background: var(--papel2, #E9E4D8); color: var(--tinta, #17171A); }
+.coach-msg-yo { align-self: flex-end; background: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }
+.coach-msg-cuerpo p { margin: 0 0 8px 0; }
+.coach-msg-cuerpo p:last-child { margin-bottom: 0; }
+.coach-msg-cuerpo ul, .coach-msg-cuerpo ol { margin: 4px 0 8px 18px; padding: 0; }
+.coach-msg-cuerpo li { margin-bottom: 4px; }
+.coach-msg-cuerpo code { background: rgba(23, 23, 26, 0.08); padding: 2px 6px; border-radius: 999px; font-size: 13px; }
 .coach-msg-cuerpo strong { font-weight: 700; }
 .coach-msg-yo .coach-msg-cuerpo strong { color: #FFFFFF; }
 .coach-msg-meta { font-size: 11px; margin-top: 6px; display: flex; justify-content: flex-end; font-variant-numeric: tabular-nums; }
-.coach-msg-coach .coach-msg-meta { color: var(--tinta-suave, #6B675F); }
+.coach-msg-coach .coach-msg-meta { color: var(--tinta-suave, #5D5951); }
 .coach-msg-yo .coach-msg-meta { color: rgba(243, 240, 232, 0.65); }
 .coach-barra { display: flex; gap: 10px; padding: 12px 0 4px; align-items: center; }
 .coach-in { flex: 1; height: 52px; min-height: 52px; padding: 0 20px; border-radius: 999px; background: var(--papel2, #E9E4D8); border: none; color: var(--tinta, #17171A); font-family: 'Bricolage Grotesque', sans-serif; font-size: 15px; outline: none; box-sizing: border-box; transition: box-shadow 150ms; }
 .coach-in:focus { box-shadow: 0 0 0 2px var(--tinta, #17171A); }
-.coach-in::placeholder { color: var(--tinta-suave, #6B675F); }
+.coach-in::placeholder { color: var(--tinta-suave, #5D5951); }
 .coach-btn-env { width: 52px; height: 52px; min-width: 52px; min-height: 52px; border-radius: 999px; border: none; background: var(--lima, #C8F03C); color: var(--tinta, #17171A); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 140ms; flex-shrink: 0; }
 .coach-btn-env:active { transform: scale(0.94); }
 .coach-btn-env:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
@@ -613,9 +751,9 @@ const CSS_COACH = `
 export async function montar(contenedor, params = []) {
   desmontar();
   let procesando = false;
-  const ajIA = await db.ajuste('ia', { activa: false, modelo: config.WEBLLM_MODELO });
-  const modNombre = ajIA?.modelo || config.WEBLLM_MODELO || 'Qwen';
-  const modo = ajIA?.activa ? `IA: ${modNombre}` : 'Reglas';
+  const ajIA = await obtenerAjusteIASincronizado();
+  const modNombre = ajIA.modelo || config.WEBLLM_MODELO || 'Qwen';
+  const modo = ajIA.activa ? `IA: ${modNombre}` : 'Reglas';
 
   const raiz = ui.h('div', { class: 'coach-pantalla' },
     ui.h('style', {}, CSS_COACH),
@@ -685,6 +823,13 @@ export async function montar(contenedor, params = []) {
   const mensajesEl = raiz.querySelector('.coach-mensajes');
   const inputEl = raiz.querySelector('.coach-in');
   const btnEnvEl = raiz.querySelector('.coach-btn-env');
+  const modoTxtEl = raiz.querySelector('.coach-modo-txt');
+
+  function actualizarModo(activa, modelo) {
+    if (modoTxtEl) {
+      modoTxtEl.textContent = `Coach (${activa ? `IA: ${modelo || config.WEBLLM_MODELO}` : 'Reglas'})`;
+    }
+  }
 
   function chip(lbl, acc) {
     return ui.h('button', {
@@ -740,21 +885,38 @@ export async function montar(contenedor, params = []) {
 
     try {
       const resp = await responder(texto, {
-        onProgreso: p => { cEl.innerHTML = renderMarkdown(`*${p}*`); scroll(); },
-        onChunk: ch => { cEl.innerHTML = renderMarkdown(ch); scroll(); }
+        onProgreso: p => {
+          if (!estadoPantalla || estadoPantalla.raiz !== raiz) return;
+          cEl.innerHTML = renderMarkdown(`*${p}*`);
+          scroll();
+        },
+        onChunk: ch => {
+          if (!estadoPantalla || estadoPantalla.raiz !== raiz) return;
+          cEl.innerHTML = renderMarkdown(ch);
+          scroll();
+        }
       });
-      cEl.innerHTML = renderMarkdown(resp);
-      await db.guardar('chat', { hora: Date.now(), rol: 'coach', texto: resp });
+      if (resp) {
+        if (estadoPantalla && estadoPantalla.raiz === raiz) {
+          cEl.innerHTML = renderMarkdown(resp);
+        }
+        await db.guardar('chat', { hora: Date.now(), rol: 'coach', texto: resp });
+      }
     } catch (err) {
       const errTxt = `No pude responder: ${err.message || err}`;
-      cEl.innerHTML = renderMarkdown(errTxt);
+      if (estadoPantalla && estadoPantalla.raiz === raiz) {
+        cEl.innerHTML = renderMarkdown(errTxt);
+      }
       await db.guardar('chat', { hora: Date.now(), rol: 'coach', texto: errTxt });
     } finally {
       procesando = false;
       inputEl.disabled = false;
       if (btnEnvEl) btnEnvEl.disabled = false;
-      inputEl.focus();
-      scroll();
+      // COA-04: enfocar inputEl únicamente si sigue montado en el documento activo
+      if (inputEl && typeof document !== 'undefined' && document.body.contains(inputEl)) {
+        inputEl.focus();
+        scroll();
+      }
     }
   }
 
@@ -763,10 +925,15 @@ export async function montar(contenedor, params = []) {
 
   contenedor.innerHTML = '';
   contenedor.appendChild(raiz);
-  estadoPantalla = { raiz };
+  estadoPantalla = { raiz, actualizarModo };
   scroll();
 }
 
 export function desmontar() {
+  // COA-04: interrumpir la generación en streaming si el usuario sale de la pantalla
+  if (enGeneracion && mlcEngine && typeof mlcEngine.interruptGenerate === 'function') {
+    try { mlcEngine.interruptGenerate(); } catch (_) {}
+  }
+  enGeneracion = false;
   if (estadoPantalla) estadoPantalla = null;
 }

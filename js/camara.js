@@ -32,6 +32,9 @@ let camaraPausada = false;
 let ultimoTimestampVideo = -1;
 let ultimoEscaneoQR = 0; // Control de cadencia a ~5 fps para BarcodeDetector
 
+// Lista blanca de almacenes permitidos para importación por QR / JSON (Seguridad Hallazgo 10)
+const ALMACENES_QR_PERMITIDOS = ['medidas', 'series'];
+
 // Estado de Modo 1: Foto guiada
 let estadoFoto = {
   cuentaRegresiva: null,
@@ -103,9 +106,9 @@ const EJERCICIOS_CONFIG = {
     nombre: 'Press militar con mancuernas sentado',
     articulacion: 'Codo y hombro',
     puntos: [11, 13, 15],
-    anguloExtendido: 155, // brazos arriba
-    anguloContraido: 75,  // codos flexionados
-    invertido: true
+    anguloExtendido: 155, // brazos extendidos arriba
+    anguloContraido: 75,  // codos flexionados abajo
+    invertido: false
   },
   sentadilla_hack: {
     id: 'sentadilla_hack',
@@ -121,9 +124,9 @@ const EJERCICIOS_CONFIG = {
     nombre: 'Elevaciones laterales con mancuernas de pie',
     articulacion: 'Hombro',
     puntos: [23, 11, 13], // cadera, hombro, codo
-    anguloExtendido: 30,  // brazos abajo
-    anguloContraido: 85,  // brazos horizontales
-    invertido: true
+    anguloExtendido: 30,  // brazos abajo junto al torso
+    anguloContraido: 85,  // brazos elevados horizontalmente
+    invertido: true       // ángulo creciente al subir
   },
   flexiones_declinadas: {
     id: 'flexiones_declinadas',
@@ -146,20 +149,6 @@ const EJERCICIOS_CONFIG = {
 };
 
 /**
- * Renderiza de manera segura un icono SVG proveniente de ./iconos.js.
- */
-function renderIcono(nombre, clase = '') {
-  try {
-    const res = icono(nombre, { class: clase });
-    if (typeof res === 'string') return res;
-    if (res instanceof Node) return res.outerHTML || '';
-    return String(res || '');
-  } catch (e) {
-    return '';
-  }
-}
-
-/**
  * Calcula el ángulo en grados en el vértice B formado por los puntos A, B y C.
  */
 function calcularAngulo(a, b, c) {
@@ -177,6 +166,19 @@ function distancia2D(p1, p2, ancho, alto) {
   const dx = (p1.x - p2.x) * ancho;
   const dy = (p1.y - p2.y) * alto;
   return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * Apaga el hardware de la cámara cuando la pestaña o app pasa a segundo plano
+ * y lo reanuda al volver (ALTO-5 camara_cuerpo.md).
+ */
+function manejarVisibilidad() {
+  if (document.hidden) {
+    cancelarCuentaRegresiva();
+    detenerCamara();
+  } else if (!desmontado && (modoActual !== 'qr' || estadoQR.submodo === 'recibir')) {
+    iniciarCamara();
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -241,6 +243,9 @@ async function iniciarCamara() {
 
   if (desmontado) return;
 
+  const visor = document.querySelector('.camara-visor-marco');
+  visor?.querySelector('.btn-reintentar-camara')?.remove();
+
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     aviso('Tu dispositivo o navegador no admite acceso a la cámara', 'error');
     actualizarUIEstado('Cámara no compatible', true);
@@ -274,7 +279,25 @@ async function iniciarCamara() {
   } catch (err) {
     console.error('Error al acceder a la cámara:', err);
     let msg = 'Permiso de cámara denegado o no disponible';
-    if (err.name === 'NotAllowedError') msg = 'Debes permitir el acceso a la cámara';
+    if (err.name === 'NotAllowedError') {
+      msg = 'Habilita el permiso de cámara en tu navegador y toca Reintentar';
+    }
+    // Botón de reintento visible cuando se deniega el permiso (MEDIO-11 camara_cuerpo.md)
+    if (visor) {
+      visor.querySelector('.btn-reintentar-camara')?.remove();
+      const btnReintentar = h('button', {
+        type: 'button',
+        class: 'camara-btn-primario-lima btn-reintentar-camara',
+        style: 'position:absolute;z-index:30;width:auto;padding:0 24px;min-height:48px;',
+        on: {
+          click: () => {
+            btnReintentar.remove();
+            iniciarCamara();
+          }
+        }
+      }, 'Reintentar acceso a cámara');
+      visor.appendChild(btnReintentar);
+    }
     actualizarUIEstado(msg, true);
     aviso(msg, 'error');
   }
@@ -335,20 +358,35 @@ function iniciarBucleDeteccion() {
 
       // Si poseLandmarker está cargado y no estamos en QR
       if (poseLandmarker && modoActual !== 'qr') {
+        // Garantizar timestamp estrictamente monótono (MEDIO-10 camara_cuerpo.md)
         const ahora = performance.now();
-        if (ahora !== ultimoTimestampVideo) {
-          ultimoTimestampVideo = ahora;
-          try {
-            const resultados = poseLandmarker.detectForVideo(elementoVideo, ahora);
-            if (resultados && resultados.landmarks && resultados.landmarks.length > 0) {
-              const landmarks = resultados.landmarks[0];
-              dibujarEsqueleto(landmarks, videoW, videoH);
-              procesarModoActivo(landmarks, videoW, videoH, resultados.segmentationMasks);
-            } else {
-              dibujarGuiaVacia(videoW, videoH);
+        const timestamp = Math.max(ahora, ultimoTimestampVideo + 1);
+        ultimoTimestampVideo = timestamp;
+
+        let resultados = null;
+        try {
+          resultados = poseLandmarker.detectForVideo(elementoVideo, timestamp);
+          if (resultados && resultados.landmarks && resultados.landmarks.length > 0) {
+            const landmarks = resultados.landmarks[0];
+            dibujarEsqueleto(landmarks, videoW, videoH);
+            procesarModoActivo(landmarks, videoW, videoH, resultados.segmentationMasks);
+          } else {
+            dibujarGuiaVacia(videoW, videoH);
+          }
+        } catch (e) {
+          // Evitar rotura del bucle de requestAnimationFrame
+        } finally {
+          // Liberación estricta de texturas WebGL y memoria WASM (CRÍTICO-3 camara_cuerpo.md)
+          if (resultados && resultados.segmentationMasks) {
+            for (const mask of resultados.segmentationMasks) {
+              if (mask && typeof mask.close === 'function') {
+                try {
+                  mask.close();
+                } catch (_) {
+                  // Ignorar si ya fue liberada
+                }
+              }
             }
-          } catch (e) {
-            // Ignorar errores de fotogramas pendientes
           }
         }
       }
@@ -467,8 +505,9 @@ function dibujarSiluetaGuia(w, h, mensajeEstado, enPosicion = false) {
   contexto2D.setLineDash([]);
 
   // Píldora de mensaje flotante superior
-  contexto2D.fillStyle = 'rgba(23, 23, 26, 0.85)';
+  contexto2D.fillStyle = 'rgba(23, 23, 26, 0.88)';
   const boxW = 320;
+  contexto2D.beginPath();
   contexto2D.roundRect(cx - boxW / 2, 22, boxW, 44, 999);
   contexto2D.fill();
 
@@ -608,6 +647,14 @@ async function tomarFotoProgreso(altoPx, landmarks) {
   }
   ctxFoto.drawImage(elementoVideo, 0, 0);
 
+  // Reflejar coordenadas X de landmarks si la cámara es frontal (ALTO-6 camara_cuerpo.md)
+  const puntosNormalizados = (!camaraTrasera && Array.isArray(landmarks))
+    ? landmarks.map((pt) => ({
+        ...pt,
+        x: typeof pt.x === 'number' ? 1 - pt.x : pt.x
+      }))
+    : landmarks;
+
   canvasFoto.toBlob(async (blob) => {
     if (!blob) {
       aviso('Error al capturar la imagen', 'error');
@@ -619,7 +666,7 @@ async function tomarFotoProgreso(altoPx, landmarks) {
       fecha: hoyISO(),
       vista: 'frente',
       blob: blob,
-      puntos: landmarks,
+      puntos: puntosNormalizados,
       altoPx: Math.round(altoPx)
     };
 
@@ -656,25 +703,36 @@ async function tomarFotoProgreso(altoPx, landmarks) {
 }
 
 /**
- * Modo 2: Medir proporciones (hombros, cintura, V-taper)
+ * Modo 2: Medir proporciones (hombros, cintura con máscara de segmentación, V-taper)
+ * Correcciones CRÍTICO-4 y ALTO-8 de camara_cuerpo.md.
  */
 function procesarMedicion(landmarks, w, h, masks) {
   if (estadoMedicion.completado) return;
 
+  const nariz = landmarks[0];
+  const orejaIzq = landmarks[7];
+  const orejaDer = landmarks[8];
   const hombroIzq = landmarks[11];
   const hombroDer = landmarks[12];
   const caderaIzq = landmarks[23];
   const caderaDer = landmarks[24];
   const tobilloIzq = landmarks[27];
   const tobilloDer = landmarks[28];
-  const nariz = landmarks[0];
+  const pieIzq = landmarks[31];
+  const pieDer = landmarks[32];
 
-  const visibles = [hombroIzq, hombroDer, caderaIzq, caderaDer, tobilloIzq, tobilloDer].every(
-    (p) => p && (p.visibility || 1) > 0.6
-  );
+  const puntosClave = [nariz, hombroIzq, hombroDer, caderaIzq, caderaDer, tobilloIzq, tobilloDer];
+  const visibles = puntosClave.every((p) => p && (p.visibility || 1) > 0.7);
 
   if (!visibles) {
-    actualizarProgresoMedicion('Ponte recto en cuadro completo para medir', 0);
+    actualizarProgresoMedicion('Ponte recto en cuadro completo para medir', estadoMedicion.cuadrosRecolectados.length);
+    return;
+  }
+
+  // Validar que cabeza y tobillos no estén cortados por los bordes del visor (ALTO-8)
+  const maxTobilloY = Math.max(tobilloIzq.y, tobilloDer.y);
+  if (nariz.y < 0.05 || maxTobilloY > 0.95) {
+    actualizarProgresoMedicion('Aléjate un poco: deja margen arriba de la cabeza y bajo los pies', estadoMedicion.cuadrosRecolectados.length);
     return;
   }
 
@@ -693,15 +751,76 @@ function procesarMedicion(landmarks, w, h, masks) {
   }
   estadoMedicion.ultimoLandmarkCentral = centroActual;
 
-  const altoCuerpoPx = (Math.max(tobilloIzq.y, tobilloDer.y) - nariz.y) * h * 1.15;
+  // Estimar coronilla y base de los pies de forma geométrica robusta (ALTO-8)
+  const orejaPromedioY = (orejaIzq && orejaDer)
+    ? (orejaIzq.y + orejaDer.y) / 2
+    : nariz.y + 0.025;
+  const distOrejaNariz = Math.max(0.022, Math.abs(orejaPromedioY - nariz.y));
+  const coronillaY = Math.max(0, nariz.y - distOrejaNariz * 2.2);
+
+  const piePromedioY = (pieIzq && pieDer && (pieIzq.visibility || 0) > 0.5 && (pieDer.visibility || 0) > 0.5)
+    ? Math.min(1.0, (pieIzq.y + pieDer.y) / 2)
+    : Math.min(1.0, maxTobilloY + distOrejaNariz * 1.2);
+
+  const altoCuerpoPx = (piePromedioY - coronillaY) * h;
+  if (altoCuerpoPx < h * 0.5) {
+    actualizarProgresoMedicion('Acércate un paso para medir con precisión', estadoMedicion.cuadrosRecolectados.length);
+    return;
+  }
+
   const cmPorPx = estadoMedicion.estaturaCm / altoCuerpoPx;
 
+  // Ancho de hombros entre acromiones + margen deltoideo
   const anchoHombrosPx = distancia2D(hombroIzq, hombroDer, w, h) * 1.14;
   const hombrosCm = anchoHombrosPx * cmPorPx;
 
-  const anchoCinturaPx = distancia2D(caderaIzq, caderaDer, w, h) * 1.08;
-  const cinturaCm = anchoCinturaPx * cmPorPx;
+  // Ancho de cintura usando el contorno de la máscara de segmentación (CRÍTICO-4)
+  let anchoCinturaPx = 0;
+  if (masks && masks[0]) {
+    const mask = masks[0];
+    const maskW = mask.width;
+    const maskH = mask.height;
+    // Altura Y aproximada del ombligo / cintura (60% del torso hacia abajo)
+    const yTorsoNorm = ((hombroIzq.y + hombroDer.y) / 2) * 0.4 + ((caderaIzq.y + caderaDer.y) / 2) * 0.6;
+    const yPixel = Math.min(maskH - 1, Math.max(0, Math.round(yTorsoNorm * maskH)));
+    const filaOffset = yPixel * maskW;
 
+    let xMin = -1;
+    let xMax = -1;
+
+    if (typeof mask.getAsFloat32Array === 'function') {
+      const maskData = mask.getAsFloat32Array();
+      for (let x = 0; x < maskW; x++) {
+        if (maskData[filaOffset + x] > 0.5) {
+          if (xMin === -1) xMin = x;
+          xMax = x;
+        }
+      }
+    } else if (typeof mask.getAsUint8Array === 'function') {
+      const maskData = mask.getAsUint8Array();
+      for (let x = 0; x < maskW; x++) {
+        if (maskData[filaOffset + x] > 127) {
+          if (xMin === -1) xMin = x;
+          xMax = x;
+        }
+      }
+    }
+
+    if (xMin !== -1 && xMax > xMin) {
+      const candidatoPx = ((xMax - xMin) / maskW) * w;
+      // Validar que el contorno segmentado esté en un rango anatómico coherente (no brazos extendidos)
+      if (candidatoPx > anchoHombrosPx * 0.45 && candidatoPx < anchoHombrosPx * 1.15) {
+        anchoCinturaPx = candidatoPx;
+      }
+    }
+  }
+
+  // Fallback si la máscara no estuvo disponible en este cuadro
+  if (!anchoCinturaPx) {
+    anchoCinturaPx = distancia2D(caderaIzq, caderaDer, w, h) * 1.15;
+  }
+
+  const cinturaCm = anchoCinturaPx * cmPorPx;
   const ratioV = hombrosCm / cinturaCm;
 
   estadoMedicion.cuadrosRecolectados.push({ hombrosCm, cinturaCm, ratioV });
@@ -748,88 +867,118 @@ async function finalizarMedicion() {
   };
 
   const panel = document.getElementById('panel-resultado-medicion');
-  if (panel) {
-    panel.style.display = 'block';
-    panel.innerHTML = `
-      <div style="background-color:#26262B;border-radius:28px;padding:20px;display:flex;flex-direction:column;gap:12px;margin-top:14px;">
-        <span class="micro-label" style="color:#C8F03C;">PROPORCIONES ESTIMADAS</span>
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span style="color:#8E8A82;font-size:14px;">Ancho de hombros:</span>
-          <strong style="color:#F3F0E8;font-size:16px;">${avgHombros} cm <span style="font-size:12px;color:#8E8A82;">± 3 cm</span></strong>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span style="color:#8E8A82;font-size:14px;">Ancho de cintura:</span>
-          <strong style="color:#F3F0E8;font-size:16px;">${avgCintura} cm <span style="font-size:12px;color:#8E8A82;">± 3 cm</span></strong>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(243,240,232,0.08);padding-top:10px;">
-          <span style="color:#8E8A82;font-size:14px;">Proporción en V (Hombro/Cintura):</span>
-          <strong style="color:#C8F03C;font-size:24px;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;">${avgRatio}</strong>
-        </div>
-        <p style="font-size:12px;color:#8E8A82;margin:0;line-height:1.4;">
-          Estimado a partir de tu estatura (${estadoMedicion.estaturaCm} cm) promediando 30 cuadros estables.
-        </p>
-        <div style="display:flex;gap:10px;margin-top:6px;">
-          <button id="btn-guardar-medicion" class="camara-btn-primario-lima" style="flex:1;">Guardar en Cuerpo</button>
-          <button id="btn-repetir-medicion" class="camara-btn-secundario">Repetir</button>
-        </div>
-      </div>
-    `;
+  if (!panel) return;
 
-    document.getElementById('btn-guardar-medicion')?.addEventListener('click', async () => {
-      try {
-        const idMed = nuevoId();
-        const hoy = hoyISO();
+  panel.style.display = 'block';
 
-        await guardar('camara', {
-          id: idMed,
-          fecha: hoy,
-          hombrosCm: avgHombros,
-          cinturaCm: avgCintura,
-          ratioV: avgRatio,
-          margenCm: 3
-        });
+  const btnGuardar = h('button', {
+    id: 'btn-guardar-medicion',
+    type: 'button',
+    class: 'camara-btn-primario-lima',
+    style: 'flex:1;',
+    on: {
+      click: async () => {
+        try {
+          const idMed = nuevoId();
+          const hoy = hoyISO();
 
-        const todasMedidas = await todos('medidas');
-        const medidaExistenteHoy = todasMedidas.find((m) => m.fecha === hoy);
-
-        if (medidaExistenteHoy) {
-          medidaExistenteHoy.cintura = avgCintura;
-          medidaExistenteHoy.hombros = avgHombros;
-          medidaExistenteHoy.actualizado = Date.now();
-          await guardar('medidas', medidaExistenteHoy);
-        } else {
-          await guardar('medidas', {
-            id: nuevoId(),
+          // 1. Guardar resultado óptico en el store dedicado 'camara'
+          await guardar('camara', {
+            id: idMed,
             fecha: hoy,
-            peso: null,
-            cintura: avgCintura,
-            cuello: null,
-            pecho: null,
-            brazo: null,
-            hombros: avgHombros,
-            cadera: null,
-            grasaNavy: null,
-            origen: 'camara'
+            hombrosCm: avgHombros,
+            cinturaCm: avgCintura,
+            ratioV: avgRatio,
+            margenCm: 3
           });
+
+          // 2. Guardar la medición de cámara aparte en 'medidas' con origen: 'camara',
+          // NUNCA sobreescribiendo un registro manual (ALTO-7 camara_cuerpo.md)
+          const todasMedidas = await todos('medidas');
+          const medidaCamaraHoy = todasMedidas.find((m) => m.fecha === hoy && m.origen === 'camara');
+
+          if (medidaCamaraHoy) {
+            medidaCamaraHoy.cintura = avgCintura;
+            medidaCamaraHoy.hombros = avgHombros;
+            medidaCamaraHoy.origen = 'camara';
+            medidaCamaraHoy.actualizado = Date.now();
+            await guardar('medidas', medidaCamaraHoy);
+          } else {
+            await guardar('medidas', {
+              id: nuevoId(),
+              fecha: hoy,
+              peso: null,
+              cintura: avgCintura,
+              cuello: null,
+              pecho: null,
+              brazo: null,
+              hombros: avgHombros,
+              cadera: null,
+              grasaNavy: null,
+              origen: 'camara'
+            });
+          }
+
+          aviso('Medición de cámara guardada aparte en tu Cuerpo', 'ok');
+          ir('#cuerpo');
+        } catch (err) {
+          aviso('Error al guardar las medidas', 'error');
         }
-
-        aviso('Medidas guardadas correctamente en tu Cuerpo', 'ok');
-        ir('#cuerpo');
-      } catch (err) {
-        aviso('Error al guardar las medidas', 'error');
       }
-    });
+    }
+  }, 'Guardar en Cuerpo');
 
-    document.getElementById('btn-repetir-medicion')?.addEventListener('click', () => {
-      estadoMedicion.cuadrosRecolectados = [];
-      estadoMedicion.completado = false;
-      panel.style.display = 'none';
-    });
-  }
+  const btnRepetir = h('button', {
+    id: 'btn-repetir-medicion',
+    type: 'button',
+    class: 'camara-btn-secundario',
+    on: {
+      click: () => {
+        estadoMedicion.cuadrosRecolectados = [];
+        estadoMedicion.completado = false;
+        panel.style.display = 'none';
+      }
+    }
+  }, 'Repetir');
+
+  const tarjetaResultado = h('div', {
+    style: 'background-color:#232328;border-radius:28px;padding:20px;display:flex;flex-direction:column;gap:12px;margin-top:14px;'
+  },
+    h('span', { style: 'font-size:14px;font-weight:600;color:#C8F03C;' }, 'Proporciones estimadas'),
+    h('div', { style: 'display:flex;justify-content:space-between;align-items:center;' },
+      h('span', { style: 'color:#8E8A82;font-size:14px;' }, 'Ancho de hombros:'),
+      h('strong', { style: 'color:#F3F0E8;font-size:16px;' },
+        `${avgHombros} cm `,
+        h('span', { style: 'font-size:12px;color:#8E8A82;font-weight:500;' }, '± 3 cm aprox.')
+      )
+    ),
+    h('div', { style: 'display:flex;justify-content:space-between;align-items:center;' },
+      h('span', { style: 'color:#8E8A82;font-size:14px;' }, 'Ancho de cintura:'),
+      h('strong', { style: 'color:#F3F0E8;font-size:16px;' },
+        `${avgCintura} cm `,
+        h('span', { style: 'font-size:12px;color:#8E8A82;font-weight:500;' }, '± 3 cm aprox.')
+      )
+    ),
+    h('div', {
+      style: 'display:flex;justify-content:space-between;align-items:center;background:#17171A;border-radius:999px;padding:10px 18px;margin-top:2px;'
+    },
+      h('span', { style: 'color:#F3F0E8;font-size:14px;' }, 'Proporción en V (Hombro/Cintura):'),
+      h('strong', {
+        style: "color:#C8F03C;font-size:24px;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;"
+      }, String(avgRatio))
+    ),
+    h('p', { style: 'font-size:12px;color:#8E8A82;margin:0;line-height:1.4;' },
+      `Estimado a partir de tu estatura (${estadoMedicion.estaturaCm} cm) promediando 30 cuadros estables con máscara de segmentación.`
+    ),
+    h('div', { style: 'display:flex;gap:10px;margin-top:6px;' }, btnGuardar, btnRepetir)
+  );
+
+  panel.replaceChildren(tarjetaResultado);
 }
 
 /**
  * Modo 3: Contar repeticiones y evaluar técnica biomecánica
+ * Correcciones CRÍTICO-1 (invertido) y CRÍTICO-2 (articulación de hombro en elevaciones laterales).
  */
 function procesarContadorReps(landmarks, w, h) {
   const conf = EJERCICIOS_CONFIG[estadoReps.ejercicio] || EJERCICIOS_CONFIG.curl_martillo_mancuernas;
@@ -838,11 +987,19 @@ function procesarContadorReps(landmarks, w, h) {
   let pB = landmarks[conf.puntos[1]];
   let pC = landmarks[conf.puntos[2]];
 
-  if (conf.puntos[0] === 11 && (pA.visibility || 0) < (landmarks[12]?.visibility || 0)) {
+  // Conmutar al perfil más visible respetando la anatomía de cada ejercicio (CRÍTICO-2)
+  if (estadoReps.ejercicio === 'elevaciones_laterales_mancuerna_pie') {
+    // [23, 11, 13] (cadera, hombro, codo izq) -> [24, 12, 14] (cadera, hombro, codo der)
+    if ((landmarks[11]?.visibility || 0) < (landmarks[12]?.visibility || 0)) {
+      pA = landmarks[24];
+      pB = landmarks[12];
+      pC = landmarks[14];
+    }
+  } else if (conf.puntos[0] === 11 && (pA?.visibility || 0) < (landmarks[12]?.visibility || 0)) {
     pA = landmarks[12];
     pB = landmarks[14];
     pC = landmarks[16];
-  } else if (conf.puntos[0] === 23 && (pA.visibility || 0) < (landmarks[24]?.visibility || 0)) {
+  } else if (conf.puntos[0] === 23 && (pA?.visibility || 0) < (landmarks[24]?.visibility || 0)) {
     pA = landmarks[24];
     pB = landmarks[26];
     pC = landmarks[28];
@@ -857,26 +1014,47 @@ function procesarContadorReps(landmarks, w, h) {
 
   const umbralExtendido = conf.anguloExtendido;
   const umbralContraido = conf.anguloContraido;
+  const inv = conf.invertido === true;
 
+  // Máquina de estados con soporte para ángulos decrecientes y crecientes (CRÍTICO-1)
   if (estadoReps.fase === 'extendido') {
-    if (angulo < umbralExtendido - 15) {
+    const iniciaMovimiento = inv
+      ? angulo > umbralExtendido + 15
+      : angulo < umbralExtendido - 15;
+    if (iniciaMovimiento) {
       estadoReps.fase = 'subiendo';
       estadoReps.tiempoInicioFase = performance.now();
       estadoReps.rangoIncompleto = false;
     }
   } else if (estadoReps.fase === 'subiendo') {
-    if (angulo <= umbralContraido) {
+    const alcanzaContraccion = inv
+      ? angulo >= umbralContraido
+      : angulo <= umbralContraido;
+    const abortaMovimiento = inv
+      ? angulo < umbralExtendido + 5
+      : angulo > umbralExtendido - 5;
+    if (alcanzaContraccion) {
       estadoReps.fase = 'contraido';
-    } else if (angulo > umbralExtendido - 5) {
+    } else if (abortaMovimiento) {
       estadoReps.fase = 'extendido';
       estadoReps.rangoIncompleto = true;
     }
   } else if (estadoReps.fase === 'contraido') {
-    if (angulo > umbralContraido + 15) {
+    const iniciaRetorno = inv
+      ? angulo < umbralContraido - 15
+      : angulo > umbralContraido + 15;
+    if (iniciaRetorno) {
       estadoReps.fase = 'bajando';
     }
   } else if (estadoReps.fase === 'bajando') {
-    if (angulo >= umbralExtendido) {
+    const completaRep = inv
+      ? angulo <= umbralExtendido
+      : angulo >= umbralExtendido;
+    const regresaAContraido = inv
+      ? angulo > umbralContraido - 5
+      : angulo < umbralContraido + 5;
+
+    if (completaRep) {
       estadoReps.reps++;
       estadoReps.fase = 'extendido';
       const durSeg = ((performance.now() - estadoReps.tiempoInicioFase) / 1000).toFixed(1);
@@ -885,14 +1063,14 @@ function procesarContadorReps(landmarks, w, h) {
       vibrar(70);
       sonido();
 
-      if (durSeg < 1.0) {
+      if (Number(durSeg) < 1.0) {
         estadoReps.cadenciaAviso = 'Muy rápido (controla la bajada)';
       } else {
-        estadoReps.cadenciaAviso = 'Buen ritmo (' + durSeg + 's)';
+        estadoReps.cadenciaAviso = `Buen ritmo (${durSeg}s)`;
       }
 
       actualizarUIReps();
-    } else if (angulo < umbralContraido + 5) {
+    } else if (regresaAContraido) {
       estadoReps.fase = 'contraido';
       estadoReps.rangoIncompleto = true;
     }
@@ -906,7 +1084,7 @@ function dibujarAnguloEnCanvas(pB, angulo, w, h) {
   const x = camaraTrasera ? pB.x * w : (1 - pB.x) * w;
   const y = pB.y * h;
 
-  contexto2D.fillStyle = 'rgba(23, 23, 26, 0.85)';
+  contexto2D.fillStyle = 'rgba(23, 23, 26, 0.88)';
   contexto2D.beginPath();
   contexto2D.arc(x, y - 25, 24, 0, Math.PI * 2);
   contexto2D.fill();
@@ -949,6 +1127,51 @@ function actualizarUIRepsDinamica() {
 // Modo 4: Sincronización QR PC <-> Celular
 // -----------------------------------------------------------------------------
 
+/**
+ * Normaliza y guarda de forma segura un objeto importado por QR o JSON,
+ * aplicando lista blanca de almacenes (Seguridad Hallazgo 10).
+ */
+async function guardarObjetoImportadoQR(obj) {
+  if (!obj || typeof obj !== 'object' || !obj.item || typeof obj.item !== 'object') {
+    aviso('Formato JSON no reconocido', 'error');
+    return false;
+  }
+
+  const tipoNormalizado = obj.tipo === 'serie' ? 'series' : obj.tipo;
+  const storeDestino = ALMACENES_QR_PERMITIDOS.includes(tipoNormalizado) ? tipoNormalizado : 'medidas';
+
+  if (storeDestino === 'medidas') {
+    const it = obj.item;
+    const numONull = (v) => (v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null);
+    const medidaCanonica = {
+      id: typeof it.id === 'string' && it.id ? it.id : nuevoId(),
+      fecha: typeof it.fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(it.fecha) ? it.fecha : hoyISO(),
+      peso: numONull(it.peso),
+      cintura: numONull(it.cintura),
+      cuello: numONull(it.cuello),
+      pecho: numONull(it.pecho),
+      brazo: numONull(it.brazo),
+      hombros: numONull(it.hombros),
+      cadera: numONull(it.cadera),
+      grasaNavy: numONull(it.grasaNavy),
+      origen: it.origen === 'camara' ? 'camara' : 'manual'
+    };
+    await guardar('medidas', medidaCanonica);
+    aviso('Medidas importadas con éxito', 'ok');
+    ir('#cuerpo');
+    return true;
+  }
+
+  if (storeDestino === 'series') {
+    await guardar('series', obj.item);
+    aviso('Serie importada con éxito', 'ok');
+    ir('#hoy');
+    return true;
+  }
+
+  return false;
+}
+
 async function procesarCuadroQR() {
   if (!elementoVideo || elementoVideo.readyState < 2) return;
 
@@ -965,19 +1188,10 @@ async function procesarCuadroQR() {
 
       try {
         const datos = JSON.parse(textoDetectado);
-        const confirmacion = await confirmar(`Se detectaron datos QR de Forja (${datos.tipo || 'datos'}). ¿Deseas importarlos?`);
+        const tipoEtiqueta = datos.tipo === 'serie' || datos.tipo === 'series' ? 'series' : 'medidas';
+        const confirmacion = await confirmar(`Se detectaron datos QR de Forja (${tipoEtiqueta}). ¿Deseas importarlos?`);
         if (confirmacion) {
-          if (datos.tipo === 'medidas' && datos.item) {
-            await guardar('medidas', datos.item);
-            aviso('Medidas importadas desde QR con éxito', 'ok');
-            ir('#cuerpo');
-          } else if (datos.tipo === 'serie' && datos.item) {
-            await guardar('series', datos.item);
-            aviso('Serie importada desde QR con éxito', 'ok');
-            ir('#hoy');
-          } else {
-            aviso('Formato de datos recibido correctamente', 'info');
-          }
+          await guardarObjetoImportadoQR(datos);
         }
       } catch (e) {
         aviso(`QR leído: ${textoDetectado.slice(0, 40)}...`, 'info');
@@ -988,6 +1202,176 @@ async function procesarCuadroQR() {
   }
 }
 
+const ESTILOS_CAMARA = `
+  .camara-pantalla-oscura {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 10px 16px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background-color: #17171A;
+    color: #F3F0E8;
+    font-family: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
+    min-height: 100%;
+  }
+  .camara-selector-modos {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .camara-selector-modos::-webkit-scrollbar {
+    display: none;
+  }
+  .camara-btn-modo {
+    min-height: 48px;
+    height: 48px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: none;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 160ms, color 160ms, transform 120ms;
+  }
+  .camara-btn-modo:active {
+    transform: scale(0.96);
+  }
+  .camara-btn-modo.activo {
+    background-color: #C8F03C;
+    color: #17171A;
+  }
+  .camara-btn-modo.inactivo {
+    background-color: #232328;
+    color: #F3F0E8;
+  }
+  .camara-visor-marco {
+    position: relative;
+    width: 100%;
+    background-color: #17171A;
+    border-radius: 28px;
+    overflow: hidden;
+    min-height: 380px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .camara-cuenta-regresiva {
+    display: none;
+    position: absolute;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 96px;
+    font-weight: 800;
+    color: #C8F03C;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 4px 24px rgba(0,0,0,0.85);
+    z-index: 20;
+  }
+  .camara-estado-pildora {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    background-color: rgba(23, 23, 26, 0.88);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #F3F0E8;
+    z-index: 15;
+  }
+  .camara-btn-rotar {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    min-width: 48px;
+    min-height: 48px;
+    width: 48px;
+    height: 48px;
+    background-color: rgba(23, 23, 26, 0.88);
+    color: #F3F0E8;
+    border-radius: 999px;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 25;
+    transition: transform 140ms ease;
+  }
+  .camara-btn-rotar:active {
+    transform: scale(0.93) rotate(45deg);
+  }
+  .camara-btn-rotar:disabled {
+    opacity: 0.5;
+    cursor: wait;
+  }
+  .camara-tarjeta-control {
+    background-color: #232328;
+    border-radius: 28px;
+    border: none;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    color: #F3F0E8;
+  }
+  .camara-btn-primario-lima {
+    width: 100%;
+    min-height: 56px;
+    height: 56px;
+    background-color: #C8F03C;
+    border: none;
+    border-radius: 999px;
+    color: #17171A;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: transform 140ms cubic-bezier(.2,.8,.2,1);
+  }
+  .camara-btn-primario-lima:active {
+    transform: scale(0.97);
+  }
+  .camara-btn-secundario {
+    min-height: 52px;
+    height: 52px;
+    background-color: #17171A;
+    border: none;
+    border-radius: 999px;
+    color: #F3F0E8;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 0 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: transform 140ms ease;
+  }
+  .camara-btn-secundario:active {
+    transform: scale(0.97);
+  }
+  .camara-subtitulo {
+    font-size: 14px;
+    font-weight: 600;
+    color: #C8F03C;
+    line-height: 1.2;
+  }
+`;
+
 // -----------------------------------------------------------------------------
 // Montaje y Desmontaje de la pantalla (Contrato Forja)
 // -----------------------------------------------------------------------------
@@ -996,16 +1380,19 @@ export async function montar(contenedor, params = []) {
   contenedorRaiz = contenedor;
   modoActual = (params && params[0]) ? params[0] : 'foto';
 
+  document.removeEventListener('visibilitychange', manejarVisibilidad);
+  document.addEventListener('visibilitychange', manejarVisibilidad);
+
   try {
     const p = await perfil();
     if (p && p.estaturaCm) {
-      estadoMedicion.estaturaCm = p.estaturaCm;
+      estadoMedicion.estaturaCm = Number(p.estaturaCm) || 175;
     }
     const fotos = await todos('fotos');
     const fotosFrente = fotos.filter((f) => f.vista === 'frente' && f.altoPx);
     if (fotosFrente.length > 0) {
       fotosFrente.sort((a, b) => (b.fecha > a.fecha ? 1 : -1));
-      estadoFoto.altoAnteriorPx = fotosFrente[0].altoPx;
+      estadoFoto.altoAnteriorPx = Number(fotosFrente[0].altoPx) || null;
     }
   } catch (e) {
     console.warn('No se pudo precargar perfil para cámara:', e);
@@ -1022,238 +1409,72 @@ export async function montar(contenedor, params = []) {
     }
   }
 
-  // Estructura HTML de la pantalla de Cámara en Modo Oscuro Forja v2
-  contenedor.innerHTML = `
-    <style>
-      .camara-pantalla-oscura {
-        max-width: 720px;
-        margin: 0 auto;
-        padding: 10px 16px 40px;
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-        background-color: #17171A;
-        color: #F3F0E8;
-        font-family: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
-        min-height: 100%;
-      }
-      .camara-selector-modos {
-        display: flex;
-        gap: 8px;
-        overflow-x: auto;
-        scrollbar-width: none;
-        padding-bottom: 2px;
-      }
-      .camara-selector-modos::-webkit-scrollbar {
-        display: none;
-      }
-      .camara-btn-modo {
-        height: 44px;
-        padding: 0 18px;
-        border-radius: 999px;
-        border: none;
-        font-family: 'Bricolage Grotesque', sans-serif;
-        font-size: 13px;
-        font-weight: 600;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-        white-space: nowrap;
-        transition: background-color 160ms, color 160ms, transform 120ms;
-      }
-      .camara-btn-modo:active {
-        transform: scale(0.96);
-      }
-      .camara-btn-modo.activo {
-        background-color: #C8F03C;
-        color: #17171A;
-      }
-      .camara-btn-modo.inactivo {
-        background-color: #26262B;
-        color: #F3F0E8;
-      }
-      .camara-visor-marco {
-        position: relative;
-        width: 100%;
-        background-color: #111113;
-        border-radius: 28px;
-        overflow: hidden;
-        min-height: 380px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .camara-cuenta-regresiva {
-        display: none;
-        position: absolute;
-        font-family: 'Bricolage Grotesque', sans-serif;
-        font-size: 96px;
-        font-weight: 800;
-        color: #C8F03C;
-        font-variant-numeric: tabular-nums;
-        text-shadow: 0 4px 24px rgba(0,0,0,0.85);
-        z-index: 20;
-      }
-      .camara-estado-pildora {
-        position: absolute;
-        bottom: 14px;
-        left: 14px;
-        background-color: rgba(23, 23, 26, 0.85);
-        backdrop-filter: blur(8px);
-        padding: 6px 14px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 500;
-        color: #8E8A82;
-        z-index: 15;
-      }
-      .camara-btn-rotar {
-        position: absolute;
-        top: 14px;
-        right: 14px;
-        width: 44px;
-        height: 44px;
-        background-color: rgba(23, 23, 26, 0.85);
-        backdrop-filter: blur(8px);
-        color: #F3F0E8;
-        border-radius: 999px;
-        border: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        z-index: 25;
-        transition: transform 140ms ease;
-      }
-      .camara-btn-rotar:active {
-        transform: scale(0.93) rotate(45deg);
-      }
-      .camara-tarjeta-control {
-        background-color: #222226;
-        border-radius: 28px;
-        border: none;
-        padding: 22px;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        color: #F3F0E8;
-      }
-      .camara-btn-primario-lima {
-        width: 100%;
-        height: 56px;
-        background-color: #C8F03C;
-        border: none;
-        border-radius: 999px;
-        color: #17171A;
-        font-family: 'Bricolage Grotesque', sans-serif;
-        font-size: 16px;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        cursor: pointer;
-        transition: transform 140ms cubic-bezier(.2,.8,.2,1);
-      }
-      .camara-btn-primario-lima:active {
-        transform: scale(0.97);
-      }
-      .camara-btn-secundario {
-        height: 52px;
-        background-color: #26262B;
-        border: none;
-        border-radius: 999px;
-        color: #F3F0E8;
-        font-family: 'Bricolage Grotesque', sans-serif;
-        font-size: 15px;
-        font-weight: 600;
-        padding: 0 20px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        cursor: pointer;
-        transition: transform 140ms ease;
-      }
-      .camara-btn-secundario:active {
-        transform: scale(0.97);
-      }
-      .micro-label {
-        font-size: 10px;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        font-weight: 700;
-        line-height: 1;
-      }
-    </style>
+  const modos = [
+    { id: 'foto', icono: 'camara', texto: 'Foto guiada' },
+    { id: 'medir', icono: 'regla', texto: 'Proporciones' },
+    { id: 'reps', icono: 'reps', texto: 'Contar reps' },
+    { id: 'qr', icono: 'qr', texto: 'QR PC ⇄ Cel' }
+  ];
 
-    <div class="camara-pantalla-oscura">
-      <!-- Selector de modos píldora superior -->
-      <div class="camara-selector-modos">
-        <button class="camara-btn-modo ${modoActual === 'foto' ? 'activo' : 'inactivo'}" data-modo="foto">
-          ${renderIcono('camara')}
-          <span>Foto guiada</span>
-        </button>
-        <button class="camara-btn-modo ${modoActual === 'medir' ? 'activo' : 'inactivo'}" data-modo="medir">
-          ${renderIcono('regla')}
-          <span>Proporciones</span>
-        </button>
-        <button class="camara-btn-modo ${modoActual === 'reps' ? 'activo' : 'inactivo'}" data-modo="reps">
-          ${renderIcono('reps')}
-          <span>Contar reps</span>
-        </button>
-        <button class="camara-btn-modo ${modoActual === 'qr' ? 'activo' : 'inactivo'}" data-modo="qr">
-          ${renderIcono('qr')}
-          <span>QR PC ⇄ Cel</span>
-        </button>
-      </div>
+  const botonesModo = modos.map((m) =>
+    h('button', {
+      type: 'button',
+      class: `camara-btn-modo ${modoActual === m.id ? 'activo' : 'inactivo'}`,
+      dataset: { modo: m.id },
+      on: { click: () => cambiarModo(m.id) }
+    }, icono(m.icono, 18), h('span', {}, m.texto))
+  );
 
-      <!-- Visor de cámara con Canvas superpuesto -->
-      <div class="camara-visor-marco">
-        <video id="camara-video" playsinline muted autoplay style="width:100%;height:auto;display:block;transform:${camaraTrasera ? 'none' : 'scaleX(-1)'};"></video>
-        <canvas id="camara-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></canvas>
+  elementoVideo = h('video', {
+    id: 'camara-video',
+    playsinline: true,
+    muted: true,
+    autoplay: true,
+    style: `width:100%;height:auto;display:block;transform:${camaraTrasera ? 'none' : 'scaleX(-1)'};`
+  });
 
-        <!-- Indicador de cuenta regresiva en lima (#C8F03C) -->
-        <div id="camara-cuenta-atras" class="camara-cuenta-regresiva">5</div>
-
-        <!-- Estado de cámara píldora -->
-        <div id="camara-estado" class="camara-estado-pildora">
-          Iniciando visor...
-        </div>
-
-        <!-- Botón para girar cámara (frontal / trasera) -->
-        <button id="btn-cambiar-camara" class="camara-btn-rotar" title="Cambiar cámara">
-          ${renderIcono('rotar')}
-        </button>
-      </div>
-
-      <!-- Panel dinámico de controles según el modo -->
-      <div id="panel-controles-modo"></div>
-    </div>
-  `;
-
-  elementoVideo = document.getElementById('camara-video');
-  canvasSuperpuesto = document.getElementById('camara-canvas');
+  canvasSuperpuesto = h('canvas', {
+    id: 'camara-canvas',
+    style: 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;'
+  });
   contexto2D = canvasSuperpuesto.getContext('2d');
 
-  // Eventos de selección de modo
-  const botonesModo = contenedor.querySelectorAll('[data-modo]');
-  botonesModo.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const nuevoModo = btn.getAttribute('data-modo');
-      cambiarModo(nuevoModo);
-    });
-  });
-
-  // Botón para alternar cámara
-  document.getElementById('btn-cambiar-camara')?.addEventListener('click', async () => {
-    camaraTrasera = !camaraTrasera;
-    if (elementoVideo) {
-      elementoVideo.style.transform = camaraTrasera ? 'none' : 'scaleX(-1)';
+  // Botón para alternar cámara con protección contra condición de carrera (BAJO-14 camara_cuerpo.md)
+  const btnRotar = h('button', {
+    id: 'btn-cambiar-camara',
+    type: 'button',
+    class: 'camara-btn-rotar',
+    title: 'Cambiar cámara',
+    on: {
+      click: async () => {
+        if (btnRotar.disabled) return;
+        btnRotar.disabled = true;
+        try {
+          camaraTrasera = !camaraTrasera;
+          if (elementoVideo) {
+            elementoVideo.style.transform = camaraTrasera ? 'none' : 'scaleX(-1)';
+          }
+          await iniciarCamara();
+        } finally {
+          btnRotar.disabled = false;
+        }
+      }
     }
-    await iniciarCamara();
-  });
+  }, icono('rotar', 20));
+
+  const pantallaDOM = h('div', { class: 'camara-pantalla-oscura' },
+    h('div', { class: 'camara-selector-modos' }, ...botonesModo),
+    h('div', { class: 'camara-visor-marco' },
+      elementoVideo,
+      canvasSuperpuesto,
+      h('div', { id: 'camara-cuenta-atras', class: 'camara-cuenta-regresiva' }, '5'),
+      h('div', { id: 'camara-estado', class: 'camara-estado-pildora' }, 'Iniciando visor...'),
+      btnRotar
+    ),
+    h('div', { id: 'panel-controles-modo' })
+  );
+
+  contenedor.replaceChildren(h('style', {}, ESTILOS_CAMARA), pantallaDOM);
 
   renderizarPanelModo();
   await iniciarCamara();
@@ -1285,196 +1506,242 @@ function renderizarPanelModo() {
   if (!panel) return;
 
   if (modoActual === 'foto') {
-    panel.innerHTML = `
-      <div class="camara-tarjeta-control">
-        <span class="micro-label" style="color:#C8F03C;">FOTO GUIADA DE PROGRESO</span>
-        <p style="margin:0;font-size:14px;color:#8E8A82;line-height:1.45;">
-          Párate completo de frente. Al reconocer tu silueta y distancia, la cámara iniciará una cuenta de 5 segundos y guardará tu foto en el teléfono.
-        </p>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
-          <span style="font-size:13px;color:#8E8A82;">
-            ${estadoFoto.altoAnteriorPx ? `Distancia calibrada: ${Math.round(estadoFoto.altoAnteriorPx)} px` : 'Sin foto previa para comparar distancia'}
-          </span>
-          <button id="btn-foto-manual" class="camara-btn-primario-lima" style="width:auto;padding:0 24px;height:48px;">
-            Tomar ahora
-          </button>
-        </div>
-      </div>
-    `;
+    const textoDistancia = estadoFoto.altoAnteriorPx
+      ? `Distancia calibrada: ${Math.round(estadoFoto.altoAnteriorPx)} px`
+      : 'Sin foto previa para comparar distancia';
 
-    document.getElementById('btn-foto-manual')?.addEventListener('click', () => {
-      iniciarCuentaRegresiva(canvasSuperpuesto.height * 0.75, []);
-    });
+    const tarjetaFoto = h('div', { class: 'camara-tarjeta-control' },
+      h('span', { class: 'camara-subtitulo' }, 'Foto guiada de progreso'),
+      h('p', { style: 'margin:0;font-size:14px;color:#F3F0E8;opacity:0.8;line-height:1.45;' },
+        'Párate completo de frente. Al reconocer tu silueta y distancia, la cámara iniciará una cuenta de 5 segundos y guardará tu foto en el teléfono.'
+      ),
+      h('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-top:4px;gap:10px;flex-wrap:wrap;' },
+        h('span', { style: 'font-size:13px;color:#F3F0E8;opacity:0.75;' }, textoDistancia),
+        h('button', {
+          id: 'btn-foto-manual',
+          type: 'button',
+          class: 'camara-btn-primario-lima',
+          style: 'width:auto;padding:0 24px;min-height:48px;height:48px;',
+          on: {
+            click: () => {
+              iniciarCuentaRegresiva((canvasSuperpuesto?.height || 720) * 0.75, []);
+            }
+          }
+        }, 'Tomar ahora')
+      )
+    );
+    panel.replaceChildren(tarjetaFoto);
 
   } else if (modoActual === 'medir') {
     estadoMedicion.cuadrosRecolectados = [];
     estadoMedicion.completado = false;
 
-    panel.innerHTML = `
-      <div class="camara-tarjeta-control">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span class="micro-label" style="color:#C8F03C;">MEDICIÓN DE PROPORCIONES</span>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <label style="font-size:13px;color:#8E8A82;">Estatura:</label>
-            <input id="input-estatura-camara" type="number" value="${estadoMedicion.estaturaCm}" style="width:68px;padding:6px 8px;text-align:center;border-radius:999px;border:none;background:#26262B;color:#F3F0E8;font-weight:600;" />
-            <span style="font-size:13px;color:#8E8A82;">cm</span>
-          </div>
-        </div>
-
-        <div style="height:8px;background:#26262B;border-radius:999px;overflow:hidden;margin:4px 0;">
-          <div id="medicion-barra-relleno" style="width:0%;height:100%;background:#C8F03C;transition:width 0.2s;"></div>
-        </div>
-
-        <div id="medicion-estado-texto" style="font-size:13px;color:#8E8A82;">
-          Párate erguido de frente a la cámara...
-        </div>
-
-        <div id="panel-resultado-medicion" style="display:none;"></div>
-      </div>
-    `;
-
-    document.getElementById('input-estatura-camara')?.addEventListener('change', (e) => {
-      const val = parseInt(e.target.value, 10);
-      if (val > 100 && val < 250) estadoMedicion.estaturaCm = val;
+    const inputEstatura = h('input', {
+      id: 'input-estatura-camara',
+      type: 'number',
+      value: String(estadoMedicion.estaturaCm),
+      style: 'width:72px;min-height:48px;padding:6px 10px;text-align:center;border-radius:999px;border:none;background:#17171A;color:#F3F0E8;font-weight:600;font-variant-numeric:tabular-nums;',
+      on: {
+        change: (e) => {
+          const val = parseInt(e.target.value, 10);
+          if (val > 100 && val < 250) estadoMedicion.estaturaCm = val;
+        }
+      }
     });
+
+    const tarjetaMedir = h('div', { class: 'camara-tarjeta-control' },
+      h('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;' },
+        h('span', { class: 'camara-subtitulo' }, 'Medición de proporciones'),
+        h('div', { style: 'display:flex;align-items:center;gap:6px;' },
+          h('label', { for: 'input-estatura-camara', style: 'font-size:13px;color:#F3F0E8;opacity:0.8;' }, 'Estatura:'),
+          inputEstatura,
+          h('span', { style: 'font-size:13px;color:#F3F0E8;opacity:0.8;' }, 'cm')
+        )
+      ),
+      h('div', { style: 'height:8px;background:#17171A;border-radius:999px;overflow:hidden;margin:4px 0;' },
+        h('div', { id: 'medicion-barra-relleno', style: 'width:0%;height:100%;background:#C8F03C;transition:width 0.2s;' })
+      ),
+      h('div', { id: 'medicion-estado-texto', style: 'font-size:13px;color:#F3F0E8;opacity:0.8;' },
+        'Párate erguido de frente a la cámara...'
+      ),
+      h('div', { id: 'panel-resultado-medicion', style: 'display:none;' })
+    );
+
+    panel.replaceChildren(tarjetaMedir);
 
   } else if (modoActual === 'reps') {
     estadoReps.reps = 0;
     estadoReps.fase = 'extendido';
+    estadoReps.rangoIncompleto = false;
 
-    panel.innerHTML = `
-      <div class="camara-tarjeta-control">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <select id="select-ejercicio-camara" style="padding:10px 18px;border-radius:999px;font-weight:600;background:#26262B;color:#F3F0E8;border:none;outline:none;">
-            <option value="curl_martillo_mancuernas">Curl martillo con mancuernas</option>
-            <option value="press_militar_mancuernas_sentado">Press militar sentado</option>
-            <option value="sentadilla_hack">Sentadilla hack en máquina</option>
-            <option value="elevaciones_laterales_mancuerna_pie">Elevaciones laterales de pie</option>
-            <option value="flexiones_declinadas">Flexiones declinadas</option>
-            <option value="dominadas_pronadas">Dominadas pronadas</option>
-          </select>
-          <div id="reps-fase-badge" style="background:#26262B;color:#C8F03C;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;">Listo</div>
-        </div>
+    const opcionesEjercicios = Object.values(EJERCICIOS_CONFIG).map((cfg) =>
+      h('option', {
+        value: cfg.id,
+        selected: estadoReps.ejercicio === cfg.id
+      }, cfg.nombre)
+    );
 
-        <!-- Área de número héroe de repeticiones -->
-        <div style="display:flex;align-items:center;justify-content:space-around;margin:8px 0;">
-          <div style="text-align:center;">
-            <div id="reps-contador-grande" style="font-family:'Bricolage Grotesque',sans-serif;font-size:80px;font-weight:800;color:#C8F03C;line-height:0.95;font-variant-numeric:tabular-nums;">0</div>
-            <div style="font-size:13px;color:#8E8A82;margin-top:4px;">Repeticiones</div>
-          </div>
-          <div style="text-align:center;">
-            <div id="reps-cadencia-texto" style="font-family:'Bricolage Grotesque',sans-serif;font-size:24px;font-weight:700;color:#F3F0E8;">0.0 s</div>
-            <div style="font-size:13px;color:#8E8A82;margin-top:4px;">Cadencia / Técnica</div>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:10px;">
-          <button id="btn-finalizar-serie-camara" class="camara-btn-primario-lima" style="flex:1;">Guardar serie</button>
-          <button id="btn-reiniciar-reps" class="camara-btn-secundario">Reiniciar</button>
-        </div>
-      </div>
-    `;
-
-    document.getElementById('select-ejercicio-camara')?.addEventListener('change', (e) => {
-      estadoReps.ejercicio = e.target.value;
-      estadoReps.reps = 0;
-      estadoReps.fase = 'extendido';
-      actualizarUIReps();
-    });
-
-    document.getElementById('btn-reiniciar-reps')?.addEventListener('click', () => {
-      estadoReps.reps = 0;
-      estadoReps.fase = 'extendido';
-      actualizarUIReps();
-    });
-
-    document.getElementById('btn-finalizar-serie-camara')?.addEventListener('click', async () => {
-      if (estadoReps.reps === 0) {
-        aviso('Aún no has registrado repeticiones en esta serie', 'info');
-        return;
-      }
-
-      let inputKgValor = '';
-      const inputKgElemento = h('input', {
-        id: 'dialogo-kg-serie',
-        type: 'number',
-        step: '0.5',
-        placeholder: 'kg',
-        style: 'border-radius:999px;padding:10px 14px;',
-        on: {
-          input: (e) => { inputKgValor = e.target.value; },
-          change: (e) => { inputKgValor = e.target.value; }
-        }
-      });
-
-      await dialogo({
-        titulo: 'Guardar serie realizada',
-        cuerpo: h('div', { class: 'col', style: 'gap:10px;' },
-          h('p', {}, `Completaste ${estadoReps.reps} repeticiones de ${EJERCICIOS_CONFIG[estadoReps.ejercicio].nombre}.`),
-          h('div', { class: 'campo' },
-            h('label', {}, 'Peso utilizado (kg, o vacío si es peso corporal):'),
-            inputKgElemento
-          )
-        ),
-        botones: [
-          { texto: 'Guardar', valor: 'guardar', tipo: 'primario' },
-          { texto: 'Cancelar', valor: 'cancelar' }
-        ]
-      }).then(async (resp) => {
-        if (resp === 'guardar') {
-          const textoKg = inputKgValor.trim() || inputKgElemento.value;
-          const valKg = parseFloat(textoKg);
-          const serie = {
-            id: nuevoId(),
-            fecha: hoyISO(),
-            hora: Date.now(),
-            ejercicioId: estadoReps.ejercicio,
-            kg: isNaN(valKg) ? null : valKg,
-            porLado: false,
-            reps: estadoReps.reps,
-            rir: null,
-            fallo: false,
-            maquina: '',
-            nota: 'Detectado con cámara PoseLandmarker',
-            sesionId: null
-          };
-          await guardar('series', serie);
-          aviso(`Serie de ${estadoReps.reps} reps guardada`, 'ok');
+    const selectEjercicio = h('select', {
+      id: 'select-ejercicio-camara',
+      style: 'min-height:48px;padding:10px 18px;border-radius:999px;font-weight:600;background:#17171A;color:#F3F0E8;border:none;outline:none;max-width:100%;',
+      on: {
+        change: (e) => {
+          estadoReps.ejercicio = e.target.value;
           estadoReps.reps = 0;
+          estadoReps.fase = 'extendido';
+          estadoReps.rangoIncompleto = false;
           actualizarUIReps();
+          actualizarUIRepsDinamica();
         }
-      });
-    });
+      }
+    }, ...opcionesEjercicios);
+
+    const tarjetaReps = h('div', { class: 'camara-tarjeta-control' },
+      h('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;' },
+        selectEjercicio,
+        h('div', {
+          id: 'reps-fase-badge',
+          style: 'background:#17171A;color:#C8F03C;padding:8px 14px;border-radius:999px;font-size:12px;font-weight:600;'
+        }, 'Listo para iniciar')
+      ),
+      h('div', { style: 'display:flex;align-items:center;justify-content:space-around;margin:8px 0;' },
+        h('div', { style: 'text-align:center;' },
+          h('div', {
+            id: 'reps-contador-grande',
+            style: "font-family:'Bricolage Grotesque',sans-serif;font-size:80px;font-weight:800;color:#C8F03C;line-height:0.95;font-variant-numeric:tabular-nums;"
+          }, '0'),
+          h('div', { style: 'font-size:13px;color:#F3F0E8;opacity:0.75;margin-top:4px;' }, 'Repeticiones')
+        ),
+        h('div', { style: 'text-align:center;' },
+          h('div', {
+            id: 'reps-cadencia-texto',
+            style: "font-family:'Bricolage Grotesque',sans-serif;font-size:24px;font-weight:700;color:#F3F0E8;font-variant-numeric:tabular-nums;"
+          }, '0.0 s'),
+          h('div', { style: 'font-size:13px;color:#F3F0E8;opacity:0.75;margin-top:4px;' }, 'Cadencia / Técnica')
+        )
+      ),
+      h('div', { style: 'display:flex;gap:10px;' },
+        h('button', {
+          id: 'btn-finalizar-serie-camara',
+          type: 'button',
+          class: 'camara-btn-primario-lima',
+          style: 'flex:1;',
+          on: { click: guardarSerieContada }
+        }, 'Guardar serie'),
+        h('button', {
+          id: 'btn-reiniciar-reps',
+          type: 'button',
+          class: 'camara-btn-secundario',
+          on: {
+            click: () => {
+              estadoReps.reps = 0;
+              estadoReps.fase = 'extendido';
+              estadoReps.rangoIncompleto = false;
+              actualizarUIReps();
+              actualizarUIRepsDinamica();
+            }
+          }
+        }, 'Reiniciar')
+      )
+    );
+
+    panel.replaceChildren(tarjetaReps);
 
   } else if (modoActual === 'qr') {
-    panel.innerHTML = `
-      <div class="camara-tarjeta-control">
-        <div style="display:flex;gap:8px;">
-          <button id="btn-qr-recibir" class="camara-btn-modo ${estadoQR.submodo === 'recibir' ? 'activo' : 'inactivo'}" style="flex:1;justify-content:center;">
-            Escanear con cámara
-          </button>
-          <button id="btn-qr-enviar" class="camara-btn-modo ${estadoQR.submodo === 'enviar' ? 'activo' : 'inactivo'}" style="flex:1;justify-content:center;">
-            Generar QR (desde PC)
-          </button>
-        </div>
+    const tarjetaQR = h('div', { class: 'camara-tarjeta-control' },
+      h('div', { style: 'display:flex;gap:8px;' },
+        h('button', {
+          id: 'btn-qr-recibir',
+          type: 'button',
+          class: `camara-btn-modo ${estadoQR.submodo === 'recibir' ? 'activo' : 'inactivo'}`,
+          style: 'flex:1;justify-content:center;',
+          on: {
+            click: async () => {
+              estadoQR.submodo = 'recibir';
+              renderizarPanelModo();
+              await iniciarCamara();
+            }
+          }
+        }, 'Escanear con cámara'),
+        h('button', {
+          id: 'btn-qr-enviar',
+          type: 'button',
+          class: `camara-btn-modo ${estadoQR.submodo === 'enviar' ? 'activo' : 'inactivo'}`,
+          style: 'flex:1;justify-content:center;',
+          on: {
+            click: () => {
+              estadoQR.submodo = 'enviar';
+              detenerCamara();
+              renderizarPanelModo();
+            }
+          }
+        }, 'Generar QR (desde PC)')
+      ),
+      h('div', { id: 'contenedor-qr-contenido', style: 'margin-top:6px;' })
+    );
 
-        <div id="contenedor-qr-contenido" style="margin-top:6px;"></div>
-      </div>
-    `;
-
-    document.getElementById('btn-qr-recibir')?.addEventListener('click', async () => {
-      estadoQR.submodo = 'recibir';
-      renderizarPanelModo();
-      await iniciarCamara();
-    });
-
-    document.getElementById('btn-qr-enviar')?.addEventListener('click', () => {
-      estadoQR.submodo = 'enviar';
-      detenerCamara();
-      renderizarPanelModo();
-    });
-
+    panel.replaceChildren(tarjetaQR);
     renderizarContenidoQR();
+  }
+}
+
+async function guardarSerieContada() {
+  if (estadoReps.reps === 0) {
+    aviso('Aún no has registrado repeticiones en esta serie', 'info');
+    return;
+  }
+
+  let inputKgValor = '';
+  const inputKgElemento = h('input', {
+    id: 'dialogo-kg-serie',
+    type: 'number',
+    step: '0.5',
+    placeholder: 'kg',
+    style: 'border-radius:999px;padding:10px 14px;',
+    on: {
+      input: (e) => { inputKgValor = e.target.value; },
+      change: (e) => { inputKgValor = e.target.value; }
+    }
+  });
+
+  const cfgEj = EJERCICIOS_CONFIG[estadoReps.ejercicio] || EJERCICIOS_CONFIG.curl_martillo_mancuernas;
+
+  const resp = await dialogo({
+    titulo: 'Guardar serie realizada',
+    cuerpo: h('div', { class: 'col', style: 'gap:10px;' },
+      h('p', {}, `Completaste ${estadoReps.reps} repeticiones de ${cfgEj.nombre}.`),
+      h('div', { class: 'campo' },
+        h('label', {}, 'Peso utilizado (kg, o vacío si es peso corporal):'),
+        inputKgElemento
+      )
+    ),
+    botones: [
+      { texto: 'Guardar', valor: 'guardar', tipo: 'primario' },
+      { texto: 'Cancelar', valor: 'cancelar' }
+    ]
+  });
+
+  if (resp === 'guardar') {
+    const textoKg = inputKgValor.trim() || inputKgElemento.value;
+    const valKg = parseFloat(textoKg);
+    const serie = {
+      id: nuevoId(),
+      fecha: hoyISO(),
+      hora: Date.now(),
+      ejercicioId: estadoReps.ejercicio,
+      kg: isNaN(valKg) ? null : valKg,
+      porLado: false,
+      reps: estadoReps.reps,
+      rir: null,
+      fallo: false,
+      maquina: '',
+      nota: 'Detectado con cámara PoseLandmarker',
+      sesionId: null
+    };
+    await guardar('series', serie);
+    aviso(`Serie de ${estadoReps.reps} reps guardada`, 'ok');
+    estadoReps.reps = 0;
+    actualizarUIReps();
   }
 }
 
@@ -1483,130 +1750,178 @@ function renderizarContenidoQR() {
   if (!cont) return;
 
   if (estadoQR.submodo === 'recibir') {
-    const advertenciaDetector = !estadoQR.detectorDisponible
-      ? `<div style="background:rgba(226,85,58,0.15);color:#E2553A;padding:10px 14px;border-radius:999px;font-size:12px;margin-bottom:10px;">Tu navegador no soporta BarcodeDetector nativo. Usa la caja de texto o archivo abajo.</div>`
-      : `<p style="font-size:13px;color:#8E8A82;margin:0 0 10px 0;">Apunta la cámara hacia el código QR mostrado en la pantalla de tu PC.</p>`;
+    const nodoAvisoDetector = !estadoQR.detectorDisponible
+      ? h('div', {
+          style: 'background:rgba(226,85,58,0.16);color:#F3F0E8;padding:10px 16px;border-radius:999px;font-size:12px;margin-bottom:10px;'
+        }, 'Tu navegador no soporta BarcodeDetector nativo. Usa la caja de texto o archivo abajo.')
+      : h('p', {
+          style: 'font-size:13px;color:#F3F0E8;opacity:0.8;margin:0 0 10px 0;'
+        }, 'Apunta la cámara hacia el código QR mostrado en la pantalla de tu PC.');
 
-    cont.innerHTML = `
-      ${advertenciaDetector}
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <label style="font-size:13px;color:#8E8A82;">Pegar los datos JSON manualmente:</label>
-        <textarea id="textarea-qr-manual" rows="3" style="width:100%;border-radius:20px;padding:12px;background:#26262B;color:#F3F0E8;border:none;font-family:monospace;font-size:12px;resize:none;" placeholder='{"tipo":"medidas", ...}'></textarea>
-        <button id="btn-cargar-json-manual" class="camara-btn-primario-lima" style="height:48px;">Importar texto JSON</button>
-      </div>
+    // Sin fuente monoespaciada y con radio canónico de 28px (ALTO-05 y MEDIO-02 diseno.md)
+    const textareaManual = h('textarea', {
+      id: 'textarea-qr-manual',
+      rows: '3',
+      placeholder: '{"tipo":"medidas", "item": {...}}',
+      style: "width:100%;height:120px;border-radius:28px;padding:16px 20px;background:#17171A;color:#F3F0E8;border:none;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-size:13px;resize:none;"
+    });
 
-      <div style="margin-top:14px;border-top:1px solid rgba(243,240,232,0.08);padding-top:12px;">
-        <label style="font-size:13px;color:#8E8A82;display:block;margin-bottom:8px;">O carga directamente un archivo .json:</label>
-        <label class="camara-btn-secundario" style="display:flex;width:100%;">
-          ${renderIcono('carpeta')}
-          <span>Subir archivo .json</span>
-          <input id="input-archivo-json" type="file" accept=".json,application/json" style="display:none;" />
-        </label>
-      </div>
-    `;
-
-    document.getElementById('btn-cargar-json-manual')?.addEventListener('click', async () => {
-      const txt = document.getElementById('textarea-qr-manual')?.value.trim();
-      if (!txt) return;
-      try {
-        const obj = JSON.parse(txt);
-        if (obj.tipo === 'medidas' && obj.item) {
-          await guardar('medidas', obj.item);
-          aviso('Medidas importadas con éxito', 'ok');
-          ir('#cuerpo');
-        } else if (obj.tipo === 'serie' && obj.item) {
-          await guardar('series', obj.item);
-          aviso('Serie importada con éxito', 'ok');
-          ir('#hoy');
-        } else if (obj.item) {
-          await guardar(obj.tipo || 'medidas', obj.item);
-          aviso('Datos importados con éxito', 'ok');
-        } else {
-          aviso('Formato JSON no reconocido', 'error');
+    const inputArchivo = h('input', {
+      id: 'input-archivo-json',
+      type: 'file',
+      accept: '.json,application/json',
+      style: 'display:none;',
+      on: {
+        change: (e) => {
+          const archivo = e.target.files?.[0];
+          if (!archivo) return;
+          const lector = new FileReader();
+          lector.onload = async (ev) => {
+            try {
+              const obj = JSON.parse(String(ev.target?.result || ''));
+              await guardarObjetoImportadoQR(obj);
+            } catch (err) {
+              aviso('Archivo JSON inválido o dañado', 'error');
+            }
+          };
+          lector.readAsText(archivo);
         }
-      } catch (err) {
-        aviso('JSON inválido o mal formado', 'error');
       }
     });
 
-    document.getElementById('input-archivo-json')?.addEventListener('change', (e) => {
-      const archivo = e.target.files?.[0];
-      if (!archivo) return;
-      const lector = new FileReader();
-      lector.onload = async (ev) => {
-        try {
-          const obj = JSON.parse(ev.target.result);
-          if (obj.tipo === 'medidas' && obj.item) {
-            await guardar('medidas', obj.item);
-            aviso('Medidas importadas desde archivo JSON con éxito', 'ok');
-            ir('#cuerpo');
-          } else if (obj.tipo === 'serie' && obj.item) {
-            await guardar('series', obj.item);
-            aviso('Serie importada desde archivo JSON con éxito', 'ok');
-            ir('#hoy');
-          } else if (obj.item) {
-            await guardar(obj.tipo || 'medidas', obj.item);
-            aviso('Datos importados con éxito', 'ok');
-          } else {
-            aviso('Formato de archivo JSON no reconocido', 'error');
+    const bloqueRecibir = h('div', { style: 'display:flex;flex-direction:column;gap:12px;' },
+      nodoAvisoDetector,
+      h('div', { style: 'display:flex;flex-direction:column;gap:8px;' },
+        h('label', { for: 'textarea-qr-manual', style: 'font-size:13px;color:#F3F0E8;opacity:0.8;' }, 'Pegar los datos JSON manualmente:'),
+        textareaManual,
+        h('button', {
+          id: 'btn-cargar-json-manual',
+          type: 'button',
+          class: 'camara-btn-primario-lima',
+          style: 'min-height:48px;height:48px;',
+          on: {
+            click: async () => {
+              const txt = textareaManual.value.trim();
+              if (!txt) return;
+              try {
+                const obj = JSON.parse(txt);
+                await guardarObjetoImportadoQR(obj);
+              } catch (err) {
+                aviso('JSON inválido o mal formado', 'error');
+              }
+            }
           }
-        } catch (err) {
-          aviso('Archivo JSON inválido o dañado', 'error');
-        }
-      };
-      lector.readAsText(archivo);
-    });
+        }, 'Importar texto JSON')
+      ),
+      h('div', { style: 'margin-top:6px;' },
+        h('label', { style: 'font-size:13px;color:#F3F0E8;opacity:0.8;display:block;margin-bottom:8px;' }, 'O carga directamente un archivo .json:'),
+        h('label', { class: 'camara-btn-secundario', style: 'display:flex;width:100%;' },
+          icono('carpeta', 18),
+          h('span', {}, 'Subir archivo .json'),
+          inputArchivo
+        )
+      )
+    );
 
+    cont.replaceChildren(bloqueRecibir);
   } else {
     generarPayloadQRParaMostrar(cont);
   }
 }
 
+/**
+ * Genera el payload QR respetando íntegramente el contrato de 'medidas'
+ * (MEDIO-12 camara_cuerpo.md).
+ */
 async function generarPayloadQRParaMostrar(cont) {
-  cont.innerHTML = `<div style="font-size:13px;color:#8E8A82;text-align:center;padding:16px;">Generando código QR con tus datos...</div>`;
+  cont.replaceChildren(
+    h('div', { style: 'font-size:13px;color:#F3F0E8;opacity:0.8;text-align:center;padding:16px;' },
+      'Generando código QR con tus datos...'
+    )
+  );
+
   try {
     const medidas = await todos('medidas');
-    medidas.sort((a, b) => (b.fecha > a.fecha ? 1 : -1));
+    medidas.sort((a, b) => {
+      if (b.fecha !== a.fecha) return b.fecha > a.fecha ? 1 : -1;
+      if (a.origen === 'manual' && b.origen !== 'manual') return -1;
+      if (b.origen === 'manual' && a.origen !== 'manual') return 1;
+      return 0;
+    });
     const ultimaMedida = medidas[0] || null;
+
+    const itemExportar = ultimaMedida ? {
+      id: ultimaMedida.id || nuevoId(),
+      fecha: ultimaMedida.fecha || hoyISO(),
+      peso: ultimaMedida.peso ?? null,
+      cintura: ultimaMedida.cintura ?? null,
+      cuello: ultimaMedida.cuello ?? null,
+      pecho: ultimaMedida.pecho ?? null,
+      brazo: ultimaMedida.brazo ?? null,
+      hombros: ultimaMedida.hombros ?? null,
+      cadera: ultimaMedida.cadera ?? null,
+      grasaNavy: ultimaMedida.grasaNavy ?? null,
+      origen: ultimaMedida.origen || 'manual'
+    } : {
+      id: nuevoId(),
+      fecha: hoyISO(),
+      peso: 75,
+      cintura: 82,
+      cuello: 38,
+      pecho: null,
+      brazo: null,
+      hombros: null,
+      cadera: null,
+      grasaNavy: null,
+      origen: 'manual'
+    };
 
     const payload = JSON.stringify({
       app: 'forja',
       tipo: 'medidas',
-      item: ultimaMedida ? {
-        fecha: ultimaMedida.fecha,
-        peso: ultimaMedida.peso,
-        cintura: ultimaMedida.cintura,
-        cuello: ultimaMedida.cuello
-      } : { fecha: hoyISO(), peso: 75, cintura: 82 }
+      item: itemExportar
     });
 
-    const svgQr = qrSvg(payload);
+    const svgQrTexto = qrSvg(payload);
+    const contenedorSvg = h('div', { style: 'margin:12px auto;' });
+    // Parsear el SVG generado por qrSvg (código propio, sin datos sin escapar) mediante DOMParser
+    const docSvg = new DOMParser().parseFromString(svgQrTexto, 'image/svg+xml');
+    if (docSvg && docSvg.documentElement) {
+      contenedorSvg.appendChild(document.importNode(docSvg.documentElement, true));
+    }
 
-    cont.innerHTML = `
-      <div style="text-align:center;">
-        <div style="margin:12px auto;">${svgQr}</div>
-        <p style="font-size:13px;color:#8E8A82;margin:8px 0 14px 0;">
-          Escanea este código con la cámara de tu celular en Forja para transferir tus últimas medidas.
-        </p>
-        <button id="btn-descargar-json" class="camara-btn-secundario" style="width:100%;">
-          ${renderIcono('descargar')}
-          <span>Descargar archivo .json</span>
-        </button>
-      </div>
-    `;
+    const bloqueEnviar = h('div', { style: 'text-align:center;' },
+      contenedorSvg,
+      h('p', { style: 'font-size:13px;color:#F3F0E8;opacity:0.8;margin:8px 0 14px 0;' },
+        'Escanea este código con la cámara de tu celular en Forja para transferir tus últimas medidas.'
+      ),
+      h('button', {
+        id: 'btn-descargar-json',
+        type: 'button',
+        class: 'camara-btn-secundario',
+        style: 'width:100%;',
+        on: {
+          click: () => {
+            const blob = new Blob([payload], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `forja_medicion_${hoyISO()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            aviso('Archivo JSON descargado', 'ok');
+          }
+        }
+      }, icono('descargar', 18), h('span', {}, 'Descargar archivo .json'))
+    );
 
-    document.getElementById('btn-descargar-json')?.addEventListener('click', () => {
-      const blob = new Blob([payload], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `forja_medicion_${hoyISO()}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      aviso('Archivo JSON descargado', 'ok');
-    });
+    cont.replaceChildren(bloqueEnviar);
   } catch (err) {
-    cont.innerHTML = `<div style="font-size:13px;color:#E2553A;text-align:center;">Error al generar QR de transferencia.</div>`;
+    cont.replaceChildren(
+      h('div', { style: 'font-size:13px;color:#E2553A;text-align:center;' },
+        'Error al generar QR de transferencia.'
+      )
+    );
   }
 }
 
@@ -1615,7 +1930,7 @@ function actualizarUIEstado(mensaje, esError = false) {
   if (lbl) {
     lbl.textContent = mensaje;
     lbl.style.display = mensaje ? 'block' : 'none';
-    lbl.style.color = esError ? '#E2553A' : '#8E8A82';
+    lbl.style.color = esError ? '#E2553A' : '#F3F0E8';
   }
 }
 
@@ -1624,6 +1939,7 @@ function actualizarUIEstado(mensaje, esError = false) {
 // -----------------------------------------------------------------------------
 export function desmontar() {
   desmontado = true;
+  document.removeEventListener('visibilitychange', manejarVisibilidad);
   cancelarCuentaRegresiva();
   detenerCamara();
 

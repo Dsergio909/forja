@@ -76,7 +76,6 @@
 ## Fuentes
 
 1. **The effect of abdominal exercise on abdominal fat** — Vispute, S. S., Smith, J. D., LeCheminant, J. D., & Hurley, K. S. (2011). *Journal of Strength and Conditioning Research*, 25(9), 2559-2564. (Estudio experimental controlado aleatorizado). https://pubmed.ncbi.nlm.nih.gov/21804427/
-2. **A proposed model to test the hypothesis of exercise-induced localized fat reduction (spot reduction), including a systematic review with meta-analysis** — Ramirez-Campillo, R., Andrade, D. C., et al. (2022). *Human Movement*, 23(1), 1-14. (Revisión sistemática y metaanálisis). https://www.termedia.pl/A-proposed-model-to-test-the-hypothesis-of-exercise-induced-localized-fat-reduction-spot-reduction-including-a-systematic-review-with-meta-analysis,145,46214,0,1.html
 3. **Specificity of resistance training responses in neck muscle size and strength** — Conley, M. S., Stone, M. H., Nimmons, M., & Dudley, G. A. (1997). *European Journal of Applied Physiology and Occupational Physiology*, 75(5), 443-448. (Estudio experimental con resonancia magnética). https://pubmed.ncbi.nlm.nih.gov/9189737/
 4. **Electromyographic analysis of traditional and nontraditional abdominal exercises: implications for rehabilitation and training** — Escamilla, R. F., Babb, E., DeWitt, R., et al. (2006). *Physical Therapy*, 86(5), 656-671. (Estudio biomecánico y electromiográfico). https://pubmed.ncbi.nlm.nih.gov/16649890/
 5. **An electromyographic comparison of a modified version of the plank with a long lever and posterior tilt versus the traditional plank** — Schoenfeld, B. J., Contreras, B., Tiryaki-Sonmez, G., et al. (2014). *Sports Biomechanics*, 13(3), 296-306. (Estudio biomecánico y EMG comparativo). https://pubmed.ncbi.nlm.nih.gov/25391338/
@@ -85,3 +84,6 @@
 8. **Neck strength: a protective factor reducing risk for concussion in high school sports** — Collins, C. L., Fletcher, E. N., Fields, S. K., et al. (2014). *The Journal of Primary Prevention*, 35(5), 309-319. (Estudio observacional y preventivo). https://pubmed.ncbi.nlm.nih.gov/24930727/
 
 ---
+
+
+> Fuentes revisadas automáticamente el 7-nov-2026 contra Crossref: se quitaron 1 enlaces que no existían o no correspondían al tema.

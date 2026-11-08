@@ -1,15 +1,16 @@
 /**
  * js/registro.js — Pantalla «Registrar» de Forja.
  *
- * Ronda de Diseño v2 — Dirección de arte «Revista de sala»:
+ * Ronda de Diseño v2 y Auditoría — Dirección de arte «Revista de sala»:
  * - Sin emojis: usa icono(nombre) de ./iconos.js (mas, menos, check, microfono, reloj, borrar, editar, etc.).
  * - Modo serie por serie con video/foto del ejercicio arriba (<video autoplay muted loop playsinline class='foto-ejercicio'>).
  * - Números héroe de kg y reps con clase .grande (76-96px) en Bricolage Grotesque tabular-nums.
- * - Botones − / + redondos grandes táctiles.
- * - Esfuerzo en 5 píldoras canónicas (Fácil 3 · 2 · 1 · 0 · Fallo).
+ * - Botones − / + redondos grandes táctiles (>= 48px).
+ * - Esfuerzo en 5 píldoras canónicas (Fácil 3 · 2 · 1 · 0 · Fallo) en grilla adaptable a 360px y >= 48px de alto.
  * - Botón principal lima píldora «Guardar serie N de M» con burbuja de icono check.
- * - Temporizador de descanso idéntico a Pantalla 3 (fondo tinta con clase .oscuro, anillo lima SVG, +30 s y Saltar).
- * - Quita estilos inline que choquen con styles.css (sin fuentes mono, sin bordes toscos, radios de 28px y 999px).
+ * - Temporizador de descanso resiliente (C-01): guarda hora de fin en localStorage, sobrevive al bloqueo del celular
+ *   (visibilitychange + WakeLock + Notification) y a cambiar de pantalla (barra flotante global + temporizadorActivo()).
+ * - Al cambiar de ejercicio limpia el estado sucio y carga pesoSugerido() de la última sesión (C-02).
  * - Cumple con todos los contratos de CONTRATOS.md y requerimientos de ENCARGO_APP.md.
  */
 
@@ -17,6 +18,7 @@ import { nuevoId, guardar, borrar, filtrar } from './db.js';
 import { h, aviso, dialogo, confirmar, hoyISO, fechaBonita, formatoKg, vibrar, sonido } from './ui.js';
 import { ejercicios } from './datos.js';
 import { DESCANSO } from './config.js';
+import { pesoSugerido } from './calculos.js';
 import { entenderTexto } from './parser.js';
 import { icono } from './iconos.js';
 
@@ -28,9 +30,12 @@ let modoActivo = 'serie'; // 'serie' | 'texto' (por defecto serie por serie seg�
 let reconocimientoVoz = null;
 let escuchandoVoz = false;
 let intervaloTimer = null;
+let wakeLockSentinel = null;
+let listenersGlobalesRegistrados = false;
 
 const STORAGE_TIMER_INICIO = 'forja_descanso_inicio';
 const STORAGE_TIMER_DURACION = 'forja_descanso_duracion';
+const STORAGE_TIMER_FIN = 'forja_descanso_fin';
 const STORAGE_TIMER_EJERCICIO = 'forja_descanso_ejercicio';
 
 const estadoSerie = {
@@ -97,6 +102,94 @@ function ico(nombre) {
 }
 
 /**
+ * Determina si un ejercicio es naturalmente de peso corporal.
+ * @param {Object|null} ej
+ * @returns {boolean}
+ */
+function esCorporalPorDefecto(ej) {
+  if (!ej) return false;
+  const txt = `${ej.equipo || ''} ${ej.tipo || ''} ${ej.nombre || ''} ${ej.id || ''}`.toLowerCase();
+  return txt.includes('corporal') || txt.includes('dominada') ||
+         txt.includes('flexion') || txt.includes('flexión') ||
+         txt.includes('fondo') || txt.includes('plancha') ||
+         txt.includes('colgado') || txt.includes('barra de dominadas');
+}
+
+/**
+ * Carga y limpia el estado para un ejercicio seleccionado, evitando arrastrar
+ * kilos, placas, modo corporal o notas del ejercicio anterior (C-02).
+ * @param {string} ejercicioId
+ * @param {string} fecha
+ */
+async function cargarEstadoParaEjercicio(ejercicioId, fecha) {
+  estadoSerie.ejercicioId = ejercicioId || '';
+  estadoSerie.maquina = '';
+  estadoSerie.nota = '';
+  estadoSerie.fallo = false;
+
+  const ej = listaEjercicios.find(e => e.id === ejercicioId) || null;
+  const rirRec = ej && typeof ej.rir_recomendado === 'number' ? ej.rir_recomendado : 1;
+  estadoSerie.rir = Math.max(0, Math.min(3, rirRec));
+
+  if (!ejercicioId) {
+    estadoSerie.kg = 20;
+    estadoSerie.reps = 8;
+    estadoSerie.unidad = 'kg';
+    estadoSerie.porLado = false;
+    estadoSerie.esPesoCorporal = false;
+    return;
+  }
+
+  try {
+    const todasPrevias = await filtrar('series', s => s.ejercicioId === ejercicioId && s.fecha <= fecha);
+    if (todasPrevias && todasPrevias.length > 0) {
+      todasPrevias.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || ((b.hora || 0) - (a.hora || 0)));
+      const ultimaFecha = todasPrevias[0].fecha;
+      const seriesUltima = todasPrevias
+        .filter(s => s.fecha === ultimaFecha)
+        .sort((a, b) => (a.hora || 0) - (b.hora || 0));
+
+      // Si las series son de una sesión previa, calculamos doble progresión con pesoSugerido;
+      // si ya hizo una serie hoy en esta misma fecha, mantenemos la carga recién usada hoy.
+      if (ultimaFecha === fecha) {
+        const refHoy = seriesUltima[seriesUltima.length - 1];
+        estadoSerie.esPesoCorporal = (refHoy.kg === null || refHoy.kg === undefined);
+        estadoSerie.kg = !estadoSerie.esPesoCorporal ? Number(refHoy.kg) : 20;
+        estadoSerie.reps = Number(refHoy.reps) || 8;
+        estadoSerie.unidad = refHoy.unidad === 'placa' ? 'placa' : 'kg';
+        estadoSerie.porLado = Boolean(refHoy.porLado);
+        estadoSerie.maquina = refHoy.maquina || '';
+        return;
+      }
+
+      const sug = pesoSugerido(seriesUltima, ej || {});
+      if (sug) {
+        estadoSerie.esPesoCorporal = (sug.kg === null);
+        estadoSerie.kg = sug.kg !== null && !isNaN(Number(sug.kg)) ? Number(sug.kg) : 20;
+        estadoSerie.reps = Number(sug.reps) || 8;
+        estadoSerie.unidad = sug.unidad === 'placa' ? 'placa' : 'kg';
+        estadoSerie.porLado = Boolean(sug.porLado);
+        return;
+      }
+    }
+  } catch (e) {
+    // Fallback limpio si falla la lectura de historial
+  }
+
+  // Sin historial previo para este ejercicio: inicializar valores limpios según el ejercicio
+  let sugVacia = null;
+  try {
+    sugVacia = pesoSugerido([], ej || {});
+  } catch (e) {}
+
+  estadoSerie.esPesoCorporal = esCorporalPorDefecto(ej);
+  estadoSerie.kg = 20;
+  estadoSerie.reps = Number(sugVacia?.reps) || 8;
+  estadoSerie.unidad = 'kg';
+  estadoSerie.porLado = Boolean(ej?.equipo && /mancuerna/i.test(ej.equipo));
+}
+
+/**
  * Obtiene o crea la sesión correspondiente a una fecha.
  * @param {string} fecha ISO 'AAAA-MM-DD'
  * @returns {Promise<Object>}
@@ -125,48 +218,288 @@ function obtenerDescansoSeg(ejercicioId) {
 }
 
 /**
- * Inicia el temporizador de descanso basado en timestamp real.
+ * Solicita mantener la pantalla encendida (Wake Lock API) durante el descanso.
+ */
+async function adquirirWakeLock() {
+  try {
+    if ('wakeLock' in navigator && navigator.wakeLock && typeof navigator.wakeLock.request === 'function') {
+      if (!wakeLockSentinel) {
+        wakeLockSentinel = await navigator.wakeLock.request('screen');
+        wakeLockSentinel.addEventListener('release', () => {
+          wakeLockSentinel = null;
+        });
+      }
+    }
+  } catch (e) {
+    wakeLockSentinel = null;
+  }
+}
+
+/**
+ * Libera el bloqueo de pantalla activa cuando el temporizador finaliza o se cancela.
+ */
+async function liberarWakeLock() {
+  try {
+    if (wakeLockSentinel && typeof wakeLockSentinel.release === 'function') {
+      await wakeLockSentinel.release();
+    }
+  } catch (e) {}
+  wakeLockSentinel = null;
+}
+
+/**
+ * Lee el estado actual del temporizador desde localStorage usando la hora de fin (C-01).
+ * @returns {{inicio: number, duracion: number, fin: number, restante: number, ejercicio: string}|null}
+ */
+function leerDatosTemporizador() {
+  try {
+    const finStr = localStorage.getItem(STORAGE_TIMER_FIN);
+    const iniStr = localStorage.getItem(STORAGE_TIMER_INICIO);
+    const durStr = localStorage.getItem(STORAGE_TIMER_DURACION);
+    const ejNom = localStorage.getItem(STORAGE_TIMER_EJERCICIO) || 'Descanso';
+
+    if (!finStr && (!iniStr || !durStr)) return null;
+
+    const inicio = iniStr ? parseInt(iniStr, 10) : Date.now();
+    const duracion = durStr ? parseInt(durStr, 10) : 60000;
+    const fin = finStr ? parseInt(finStr, 10) : (inicio + duracion);
+
+    if (isNaN(fin) || isNaN(duracion) || duracion <= 0) return null;
+
+    const restante = fin - Date.now();
+    return { inicio, duracion, fin, restante, ejercicio: ejNom };
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Remueve la barra flotante global de descanso si existe.
+ */
+function removerBarraFlotante() {
+  const barra = document.getElementById('forja-timer-flotante');
+  if (barra) barra.remove();
+}
+
+/**
+ * Crea o actualiza la barra flotante pequeña de descanso en cualquier pantalla cuando el usuario
+ * no está viendo el temporizador completo de la pantalla Registrar (C-01).
+ * @param {{inicio: number, duracion: number, fin: number, restante: number, ejercicio: string}|null} estado
+ */
+function sincronizarBarraFlotante(estado) {
+  if (typeof document === 'undefined' || !document.body) return;
+  if (!estado || estado.restante <= 0) {
+    removerBarraFlotante();
+    return;
+  }
+
+  // Si el widget grande de Registrar está visible en el DOM actual, ocultamos la barra flotante para no duplicar
+  const domGrande = document.getElementById('reg-timer-display');
+  if (domGrande && document.body.contains(domGrande)) {
+    removerBarraFlotante();
+    return;
+  }
+
+  inyectarEstilos();
+
+  const total = Math.max(0, Math.ceil(estado.restante / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  const textoTiempo = `${m}:${s < 10 ? '0' : ''}${s}`;
+
+  let barra = document.getElementById('forja-timer-flotante');
+  if (!barra) {
+    barra = h('div', {
+      id: 'forja-timer-flotante',
+      class: 'reg-timer-flotante oscuro',
+      role: 'status',
+      'aria-live': 'polite'
+    },
+      h('button', {
+        type: 'button',
+        class: 'reg-timer-flotante-info',
+        on: {
+          click: () => {
+            window.location.hash = '#registrar';
+          }
+        }
+      },
+        h('span', { class: 'reg-timer-flotante-icono' }, ico('reloj')),
+        h('span', { class: 'reg-timer-flotante-tiempo', id: 'forja-timer-flotante-tiempo' }, textoTiempo),
+        h('span', { class: 'reg-timer-flotante-ej', id: 'forja-timer-flotante-ej' }, estado.ejercicio)
+      ),
+      h('div', { class: 'reg-timer-flotante-acciones' },
+        h('button', {
+          type: 'button',
+          class: 'reg-timer-flotante-btn',
+          'aria-label': 'Sumar 30 segundos al descanso',
+          on: { click: async () => { await ajustarTiempoTemporizador(30); } }
+        }, '+30 s'),
+        h('button', {
+          type: 'button',
+          class: 'reg-timer-flotante-btn lima',
+          'aria-label': 'Saltar descanso',
+          on: { click: async () => { await detenerTemporizador(); } }
+        }, 'Saltar')
+      )
+    );
+    document.body.appendChild(barra);
+  } else {
+    const elTiempo = document.getElementById('forja-timer-flotante-tiempo');
+    const elEj = document.getElementById('forja-timer-flotante-ej');
+    if (elTiempo) elTiempo.textContent = textoTiempo;
+    if (elEj) elEj.textContent = estado.ejercicio;
+  }
+}
+
+/**
+ * Envía una notificación del sistema si la página está oculta o el celular bloqueado.
+ * @param {string} ejercicio
+ */
+function notificarFinDescanso(ejercicio) {
+  try {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden' && 'Notification' in window && Notification.permission === 'granted') {
+      const titulo = '¡Descanso terminado!';
+      const opciones = {
+        body: `Siguiente serie de ${ejercicio || 'tu ejercicio'}`,
+        vibrate: [300, 150, 300, 150, 600],
+        tag: 'forja-descanso'
+      };
+      if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
+        navigator.serviceWorker.ready.then(reg => {
+          if (reg && typeof reg.showNotification === 'function') {
+            reg.showNotification(titulo, opciones).catch(() => {});
+          }
+        }).catch(() => {});
+      } else {
+        new Notification(titulo, opciones);
+      }
+    }
+  } catch (e) {}
+}
+
+/**
+ * Inicia el temporizador de descanso basado en la hora de inicio y la hora de fin (C-01).
  * @param {string} nombreEjercicio
  * @param {number} segundos
  */
 async function iniciarTemporizador(nombreEjercicio, segundos) {
+  const ahora = Date.now();
+  const duracionMs = Math.max(1000, segundos * 1000);
+  const finMs = ahora + duracionMs;
+
   try {
-    localStorage.setItem(STORAGE_TIMER_INICIO, Date.now().toString());
-    localStorage.setItem(STORAGE_TIMER_DURACION, (segundos * 1000).toString());
+    localStorage.setItem(STORAGE_TIMER_INICIO, ahora.toString());
+    localStorage.setItem(STORAGE_TIMER_DURACION, duracionMs.toString());
+    localStorage.setItem(STORAGE_TIMER_FIN, finMs.toString());
     localStorage.setItem(STORAGE_TIMER_EJERCICIO, nombreEjercicio || 'Descanso');
   } catch (e) {}
+
+  try {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+  } catch (e) {}
+
+  adquirirWakeLock();
+  registrarListenersGlobalesTimer();
   iniciarLoopTemporizador();
-  await actualizarUI();
+
+  if (contenedorRaiz) {
+    await actualizarUI();
+  } else {
+    sincronizarBarraFlotante(leerDatosTemporizador());
+  }
 }
 
 /**
- * Detiene y limpia el temporizador de descanso.
+ * Detiene y limpia el temporizador de descanso sin destruir el formulario activo (A-04).
  */
 async function detenerTemporizador() {
   if (intervaloTimer) {
     clearInterval(intervaloTimer);
     intervaloTimer = null;
   }
+  await liberarWakeLock();
   try {
     localStorage.removeItem(STORAGE_TIMER_INICIO);
     localStorage.removeItem(STORAGE_TIMER_DURACION);
+    localStorage.removeItem(STORAGE_TIMER_FIN);
     localStorage.removeItem(STORAGE_TIMER_EJERCICIO);
   } catch (e) {}
-  await actualizarUI();
+
+  // A-04: Remover únicamente el nodo del temporizador sin borrar lo que el usuario está escribiendo
+  const widgetTimer = document.querySelector('.reg-descanso-container');
+  if (widgetTimer) {
+    widgetTimer.remove();
+  }
+  removerBarraFlotante();
 }
 
 /**
- * Ajusta la duración del descanso sumando o restando segundos.
+ * Ajusta la duración y hora de fin del descanso sumando o restando segundos.
+ * Actualiza el DOM puntualmente sin borrar inputs activos.
  * @param {number} deltaSeg
  */
 async function ajustarTiempoTemporizador(deltaSeg) {
-  const durStr = localStorage.getItem(STORAGE_TIMER_DURACION);
-  if (!durStr) return;
-  const nueva = Math.max(5000, parseInt(durStr, 10) + deltaSeg * 1000);
+  const estado = leerDatosTemporizador();
+  if (!estado) return;
+
+  const deltaMs = deltaSeg * 1000;
+  const nuevoFin = Math.max(Date.now() + 5000, estado.fin + deltaMs);
+  const nuevaDuracion = Math.max(5000, estado.duracion + deltaMs);
+
   try {
-    localStorage.setItem(STORAGE_TIMER_DURACION, nueva.toString());
+    localStorage.setItem(STORAGE_TIMER_FIN, nuevoFin.toString());
+    localStorage.setItem(STORAGE_TIMER_DURACION, nuevaDuracion.toString());
   } catch (e) {}
-  await actualizarUI();
+
+  actualizarNodosTemporizador();
+}
+
+/**
+ * Verifica y actualiza los nodos del temporizador (tanto el bloque grande en Registrar
+ * como la barra flotante en otras pantallas). Si llegó a 0, dispara la alerta.
+ */
+function actualizarNodosTemporizador() {
+  const estado = leerDatosTemporizador();
+  if (!estado) {
+    if (intervaloTimer) {
+      clearInterval(intervaloTimer);
+      intervaloTimer = null;
+    }
+    removerBarraFlotante();
+    return;
+  }
+
+  const { duracion, restante, ejercicio } = estado;
+
+  if (restante <= 0) {
+    detenerTemporizador();
+    sonido();
+    vibrar([300, 150, 300, 150, 600]);
+    notificarFinDescanso(ejercicio);
+    aviso('¡Descanso terminado! Siguiente serie.', 'ok');
+    return;
+  }
+
+  const total = Math.ceil(restante / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  const textoTiempo = `${m}:${s < 10 ? '0' : ''}${s}`;
+
+  const domDisplay = document.getElementById('reg-timer-display');
+  const domCircle = document.getElementById('reg-timer-circle');
+  if (domDisplay) {
+    domDisplay.textContent = textoTiempo;
+  }
+  if (domCircle) {
+    const ratio = Math.max(0, Math.min(1, restante / duracion));
+    const offset = 722.5 * (1 - ratio);
+    domCircle.style.strokeDashoffset = offset.toString();
+  }
+
+  sincronizarBarraFlotante(estado);
 }
 
 /**
@@ -174,37 +507,72 @@ async function ajustarTiempoTemporizador(deltaSeg) {
  */
 function iniciarLoopTemporizador() {
   if (intervaloTimer) clearInterval(intervaloTimer);
-  intervaloTimer = setInterval(() => {
-    const iniStr = localStorage.getItem(STORAGE_TIMER_INICIO);
-    const durStr = localStorage.getItem(STORAGE_TIMER_DURACION);
-    if (!iniStr || !durStr) {
-      clearInterval(intervaloTimer);
-      intervaloTimer = null;
-      return;
-    }
-    const inicio = parseInt(iniStr, 10), duracion = parseInt(durStr, 10);
-    const transcurrido = Date.now() - inicio, restante = duracion - transcurrido;
+  actualizarNodosTemporizador();
+  intervaloTimer = setInterval(actualizarNodosTemporizador, 500);
+}
 
-    if (restante <= 0) {
-      detenerTemporizador();
-      sonido();
-      vibrar([300, 150, 300, 150, 600]);
-      aviso('¡Descanso terminado! Siguiente serie.', 'ok');
-    } else {
-      const domDisplay = document.getElementById('reg-timer-display');
-      const domCircle = document.getElementById('reg-timer-circle');
-      if (domDisplay) {
-        const total = Math.ceil(restante / 1000);
-        const m = Math.floor(total / 60), s = total % 60;
-        domDisplay.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
-      }
-      if (domCircle) {
-        const ratio = Math.max(0, Math.min(1, restante / duracion));
-        const offset = 722.5 * (1 - ratio);
-        domCircle.style.strokeDashoffset = offset.toString();
-      }
+/**
+ * Registra escuchadores de ciclo de vida (visibilitychange, focus, hashchange)
+ * para que el temporizador sobreviva al bloqueo del celular y al cambio de pantalla (C-01).
+ */
+function registrarListenersGlobalesTimer() {
+  if (listenersGlobalesRegistrados || typeof window === 'undefined') return;
+  listenersGlobalesRegistrados = true;
+
+  const alRecuperarVisibilidad = () => {
+    const estado = leerDatosTemporizador();
+    if (!estado) return;
+    if (document.visibilityState === 'visible') {
+      adquirirWakeLock();
     }
-  }, 500);
+    actualizarNodosTemporizador();
+    if (!intervaloTimer && leerDatosTemporizador()) {
+      iniciarLoopTemporizador();
+    }
+  };
+
+  document.addEventListener('visibilitychange', alRecuperarVisibilidad);
+  window.addEventListener('focus', alRecuperarVisibilidad);
+  window.addEventListener('hashchange', () => {
+    setTimeout(() => {
+      const estado = leerDatosTemporizador();
+      if (estado) sincronizarBarraFlotante(estado);
+    }, 60);
+  });
+}
+
+/**
+ * Verifica si hay un temporizador de descanso corriendo en localStorage,
+ * mantiene activa la barra flotante en cualquier pantalla y devuelve su estado (C-01).
+ * Puede ser invocada por app.js u otros módulos al cambiar de ruta.
+ * @returns {{activo: boolean, ejercicio: string, inicio: number, fin: number, duracion: number, restanteMs: number, restanteSeg: number}|null}
+ */
+export function temporizadorActivo() {
+  registrarListenersGlobalesTimer();
+  const estado = leerDatosTemporizador();
+  if (!estado) {
+    removerBarraFlotante();
+    return null;
+  }
+  if (estado.restante <= 0) {
+    actualizarNodosTemporizador();
+    return null;
+  }
+  inyectarEstilos();
+  if (!intervaloTimer) {
+    iniciarLoopTemporizador();
+  } else {
+    sincronizarBarraFlotante(estado);
+  }
+  return {
+    activo: true,
+    ejercicio: estado.ejercicio,
+    inicio: estado.inicio,
+    fin: estado.fin,
+    duracion: estado.duracion,
+    restanteMs: estado.restante,
+    restanteSeg: Math.ceil(estado.restante / 1000)
+  };
 }
 
 /**
@@ -272,7 +640,7 @@ async function obtenerTextoUltimaSesion(ejercicioId, fechaActual) {
     const primera = seriesSesion[0];
     const carga = primera.unidad === 'placa'
       ? `placa ${primera.kg}`
-      : (primera.kg !== null ? `${primera.kg}${primera.porLado ? ' kg/lado' : ''}` : 'PC');
+      : (primera.kg !== null ? `${primera.kg}${primera.porLado ? ' kg/lado' : ''}` : 'Peso corporal');
     const repsList = seriesSesion.map(s => s.reps).join(', ');
     return `La vez pasada: ${carga} × ${repsList}`;
   } catch (e) {
@@ -339,29 +707,26 @@ function renderBarraFecha() {
 }
 
 /**
- * Renderiza el widget de temporizador de descanso idéntico a Pantalla 3 de v2a.html.
+ * Renderiza el widget de temporizador de descanso idéntico a Pantalla 3 de DIRECCION_FORJA_v2.md.
  * @returns {HTMLElement|null}
  */
 function renderWidgetTemporizador() {
-  const iniStr = localStorage.getItem(STORAGE_TIMER_INICIO);
-  const durStr = localStorage.getItem(STORAGE_TIMER_DURACION);
-  const ejNom = localStorage.getItem(STORAGE_TIMER_EJERCICIO) || 'Descanso';
-  if (!iniStr || !durStr) return null;
+  const estado = leerDatosTemporizador();
+  if (!estado || estado.restante <= 0) return null;
 
-  const inicio = parseInt(iniStr, 10), duracion = parseInt(durStr, 10);
-  const transcurrido = Date.now() - inicio, restante = Math.max(0, duracion - transcurrido);
+  const { duracion, restante, ejercicio: ejNom } = estado;
   const total = Math.ceil(restante / 1000), m = Math.floor(total / 60), s = total % 60;
   const ratio = Math.max(0, Math.min(1, restante / duracion));
   const offset = 722.5 * (1 - ratio);
 
   return h('div', { class: 'tarjeta reg-descanso-container oscuro screen-descanso-content' },
     h('div', { class: 'descanso-header-box' },
-      h('span', { class: 'micro-label' }, 'RECUPERACIÓN ACTIVA'),
+      h('span', { class: 'micro-label' }, 'Recuperación activa'),
       h('h2', { class: 'descanso-quote' }, h('em', {}, 'Respira y prepara el agarre'))
     ),
     h('div', { class: 'timer-ring-container' },
       h('svg', { class: 'timer-ring-svg', viewBox: '0 0 260 260' },
-        h('circle', { cx: '130', cy: '130', r: '115', stroke: '#25252A', 'stroke-width': '3', fill: 'none' }),
+        h('circle', { cx: '130', cy: '130', r: '115', stroke: '#232328', 'stroke-width': '3', fill: 'none' }),
         h('circle', {
           id: 'reg-timer-circle',
           cx: '130', cy: '130', r: '115',
@@ -442,14 +807,14 @@ function renderMediaEjercicio(ej) {
 }
 
 /**
- * Renderiza la pantalla Modo Serie según el diseño de Pantalla 2 de v2a.html.
+ * Renderiza la pantalla Modo Serie según el diseño de Pantalla 2 de DIRECCION_FORJA_v2.md.
  * @returns {Promise<HTMLElement>}
  */
 async function renderModoSerie() {
   const contenedor = h('div', { class: 'col reg-modo-serie' });
 
   if (!estadoSerie.ejercicioId && listaEjercicios.length > 0) {
-    estadoSerie.ejercicioId = listaEjercicios[0].id;
+    await cargarEstadoParaEjercicio(listaEjercicios[0].id, fechaSeleccionada);
   }
   const ejAct = listaEjercicios.find(e => e.id === estadoSerie.ejercicioId);
   const { n, m } = await obtenerNumerosSerie(estadoSerie.ejercicioId, fechaSeleccionada);
@@ -461,7 +826,7 @@ async function renderModoSerie() {
     class: 'reg-select-ejercicio',
     on: {
       change: async (e) => {
-        estadoSerie.ejercicioId = e.target.value;
+        await cargarEstadoParaEjercicio(e.target.value, fechaSeleccionada);
         await actualizarUI();
       }
     }
@@ -492,9 +857,12 @@ async function renderModoSerie() {
   cardKg.appendChild(h('span', { class: 'counter-label' }, etiquetaKg));
 
   const valorKgTexto = estadoSerie.esPesoCorporal
-    ? 'PC'
+    ? 'Corporal'
     : (estadoSerie.kg % 1 === 0 ? String(estadoSerie.kg) : estadoSerie.kg.toFixed(1));
-  cardKg.appendChild(h('span', { class: 'counter-number grande', id: 'kgValue' }, valorKgTexto));
+  cardKg.appendChild(h('span', {
+    class: `counter-number grande ${estadoSerie.esPesoCorporal ? 'texto-corporal' : ''}`,
+    id: 'kgValue'
+  }, valorKgTexto));
 
   const modKg = async (delta) => {
     if (estadoSerie.esPesoCorporal) estadoSerie.esPesoCorporal = false;
@@ -584,22 +952,27 @@ async function renderModoSerie() {
     h('span', { class: 'effort-label' }, 'Esfuerzo percibido en reserva (RIR)'),
     h('div', { class: 'effort-pills-row' },
       h('button', {
+        type: 'button',
         class: `effort-pill ${!estadoSerie.fallo && estadoSerie.rir === 3 ? 'selected' : ''}`,
         on: { click: async () => { estadoSerie.fallo = false; estadoSerie.rir = 3; await actualizarUI(); } }
       }, 'Fácil 3'),
       h('button', {
+        type: 'button',
         class: `effort-pill ${!estadoSerie.fallo && estadoSerie.rir === 2 ? 'selected' : ''}`,
         on: { click: async () => { estadoSerie.fallo = false; estadoSerie.rir = 2; await actualizarUI(); } }
       }, '2'),
       h('button', {
+        type: 'button',
         class: `effort-pill ${!estadoSerie.fallo && estadoSerie.rir === 1 ? 'selected' : ''}`,
         on: { click: async () => { estadoSerie.fallo = false; estadoSerie.rir = 1; await actualizarUI(); } }
       }, '1'),
       h('button', {
+        type: 'button',
         class: `effort-pill ${!estadoSerie.fallo && estadoSerie.rir === 0 ? 'selected' : ''}`,
         on: { click: async () => { estadoSerie.fallo = false; estadoSerie.rir = 0; await actualizarUI(); } }
       }, '0'),
       h('button', {
+        type: 'button',
         class: `effort-pill fallo-pill ${estadoSerie.fallo ? 'selected' : ''}`,
         on: { click: async () => { estadoSerie.fallo = true; estadoSerie.rir = 0; await actualizarUI(); } }
       }, 'Fallo')
@@ -656,7 +1029,12 @@ async function renderModoSerie() {
         });
         aviso('Serie registrada', 'ok');
         const ej = listaEjercicios.find(e => e.id === estadoSerie.ejercicioId);
-        await iniciarTemporizador(ej ? ej.nombre : 'Descanso', obtenerDescansoSeg(estadoSerie.ejercicioId));
+        // M-02: Solo iniciar el temporizador si se está registrando en la fecha de hoy
+        if (fechaSeleccionada === hoyISO()) {
+          await iniciarTemporizador(ej ? ej.nombre : 'Descanso', obtenerDescansoSeg(estadoSerie.ejercicioId));
+        } else {
+          await actualizarUI();
+        }
       }
     }
   },
@@ -677,7 +1055,7 @@ function renderModoTexto() {
   const inputTexto = h('textarea', {
     class: 'reg-textarea',
     rows: '3',
-    placeholder: 'Ej: dorian 40/lado 6 6 5, martillo 10 4 · bayesiano 10kg 6 6, 7.5kg 7 · femoral placa 5 8 8 7'
+    placeholder: 'Ej: dorian 40/lado 6 6 5, martillo 10 4 · bayesiano 10kg 6 6, 7,5kg 7 · femoral placa 5 8 8 7'
   });
 
   const parsear = (val) => {
@@ -714,6 +1092,15 @@ function renderModoTexto() {
 
     vistaPreviaItems.forEach((item, itemIdx) => {
       const tarjeta = h('div', { class: 'reg-item-previa col' });
+      const etiquetasSeriesDom = [];
+
+      const formatearCargaSerie = (s) => {
+        const uSerie = s.unidad || item.unidad || 'kg';
+        const pesoSerie = (s.kg !== undefined && s.kg !== null) ? s.kg : item.kg;
+        return pesoSerie !== null
+          ? (uSerie === 'placa' ? `placa ${pesoSerie}` : `${pesoSerie}${item.porLado ? ' kg/lado' : ' kg'}`)
+          : 'Peso corporal';
+      };
 
       // Encabezado
       const encabezado = h('div', { class: 'fila reg-espacio-entre reg-alinear-centro reg-mb-half' },
@@ -766,19 +1153,29 @@ function renderModoTexto() {
         tarjeta.appendChild(chips);
       }
 
-      // Carga y Por lado
+      // Carga y Por lado (A-02: sincronizar s.kg de todas las series hijas al editar el peso general)
       const etiquetaCarga = item.unidad === 'placa' ? 'Placa / Pin:' : 'Kilos:';
       tarjeta.appendChild(h('div', { class: 'fila reg-mt-half reg-alinear-centro' },
         h('div', { class: 'col' },
           h('label', { class: 'sutil' }, etiquetaCarga),
           h('input', {
             type: 'number', step: '0.5', class: 'campo reg-input-num',
-            placeholder: item.unidad === 'placa' ? 'Placa' : 'PC',
+            placeholder: item.unidad === 'placa' ? 'Placa' : 'Corporal',
             value: item.kg !== null ? item.kg : '',
             on: {
               input: (e) => {
-                const v = parseFloat(e.target.value);
+                const v = parseFloat(String(e.target.value).replace(',', '.'));
                 item.kg = !isNaN(v) ? v : null;
+                if (Array.isArray(item.series)) {
+                  for (const s of item.series) {
+                    s.kg = item.kg;
+                  }
+                }
+                etiquetasSeriesDom.forEach(({ nodo, serie }) => {
+                  nodo.textContent = `${formatearCargaSerie(serie)} × `;
+                });
+              },
+              change: () => {
                 renderPrevia();
               }
             }
@@ -814,15 +1211,12 @@ function renderModoTexto() {
       // Series
       const filaSeries = h('div', { class: 'col reg-mt-half' }, h('label', { class: 'sutil' }, 'Series:'));
       item.series.forEach((s, sIdx) => {
-        const uSerie = s.unidad || item.unidad || 'kg';
-        const pesoSerie = (s.kg !== undefined && s.kg !== null) ? s.kg : item.kg;
-        const textoCargaSerie = pesoSerie !== null
-          ? (uSerie === 'placa' ? `placa ${pesoSerie}` : `${pesoSerie}${item.porLado ? ' kg/lado' : ' kg'}`)
-          : 'PC';
+        const nodoCarga = h('strong', {}, `${formatearCargaSerie(s)} × `);
+        etiquetasSeriesDom.push({ nodo: nodoCarga, serie: s });
 
         filaSeries.appendChild(h('div', { class: 'fila reg-alinear-centro reg-mb-half' },
           h('span', { class: 'sutil reg-mr-half' }, `S${sIdx + 1}:`),
-          h('strong', {}, `${textoCargaSerie} × `),
+          nodoCarga,
           h('input', {
             type: 'number', class: 'campo reg-input-num reg-ml-half', value: s.reps, min: '1', max: '100',
             on: { input: (e) => { s.reps = parseInt(e.target.value, 10) || 1; } }
@@ -893,7 +1287,8 @@ function renderModoTexto() {
             vistaPreviaItems = [];
             vistaPreviaDudas = [];
             renderPrevia();
-            if (ultimoId) {
+            // M-02: Solo iniciar el temporizador si la fecha activa es hoy
+            if (ultimoId && fechaSeleccionada === hoyISO()) {
               const ej = listaEjercicios.find(e => e.id === ultimoId);
               await iniciarTemporizador(ej ? ej.nombre : 'Descanso', obtenerDescansoSeg(ultimoId));
             } else {
@@ -929,6 +1324,9 @@ function renderModoTexto() {
       )
     ),
     inputTexto,
+    h('p', { class: 'sutil reg-nota-privacidad-voz' },
+      'El dictado por voz utiliza el motor del navegador (puede requerir conexión según la configuración de tu teléfono). Todo lo demás funciona 100% sin internet.'
+    ),
     h('div', { class: 'fila reg-espacio-entre reg-mt-half' },
       h('button', { class: 'btn primario', on: { click: () => parsear(inputTexto.value) } }, 'Interpretar'),
       h('button', { class: 'btn fantasma', on: { click: () => { inputTexto.value = ''; parsear(''); } } }, 'Limpiar')
@@ -1025,7 +1423,7 @@ async function renderListaSeries() {
 }
 
 /**
- * Diálogo interactivo para editar una serie ya guardada.
+ * Diálogo interactivo para editar una serie ya guardada (con scroll interno A-03 y refresco de etiqueta B-02).
  * @param {Object} s Serie a editar
  */
 async function editarSerieDialogo(s) {
@@ -1038,21 +1436,32 @@ async function editarSerieDialogo(s) {
   let nota = s.nota || '';
   let porLado = Boolean(s.porLado);
 
-  const cuerpo = h('div', { class: 'col' },
+  const etiquetaCargaEl = h('label', { class: 'sutil', id: 'reg-dialogo-label-carga' },
+    unidad === 'placa' ? 'Placa / Pin:' : 'Kilos (vacío para peso corporal):'
+  );
+
+  const cuerpo = h('div', { class: 'col reg-dialogo-cuerpo-scroll' },
     h('div', { class: 'fila reg-espacio-entre reg-alinear-centro' },
-      h('label', { class: 'sutil' }, unidad === 'placa' ? 'Placa / Pin:' : 'Kilos (vacío para peso corporal):'),
+      etiquetaCargaEl,
       h('label', { class: 'fila reg-alinear-centro reg-texto-chico' },
         h('input', {
           type: 'checkbox',
           checked: unidad === 'placa' ? 'checked' : undefined,
-          on: { change: (e) => { unidad = e.target.checked ? 'placa' : 'kg'; } }
+          on: {
+            change: (e) => {
+              unidad = e.target.checked ? 'placa' : 'kg';
+              etiquetaCargaEl.textContent = unidad === 'placa'
+                ? 'Placa / Pin:'
+                : 'Kilos (vacío para peso corporal):';
+            }
+          }
         }),
         h('span', { class: 'reg-ml-half' }, '¿Es placa/pin?')
       )
     ),
     h('input', {
       type: 'number', step: '0.5', class: 'campo', value: kg !== null ? kg : '',
-      on: { input: (e) => { const v = parseFloat(e.target.value); kg = !isNaN(v) ? v : null; } }
+      on: { input: (e) => { const v = parseFloat(String(e.target.value).replace(',', '.')); kg = !isNaN(v) ? v : null; } }
     }),
     h('label', { class: 'fila reg-alinear-centro reg-mt-half' },
       h('input', { type: 'checkbox', checked: porLado ? 'checked' : undefined, on: { change: (e) => { porLado = e.target.checked; } } }),
@@ -1107,13 +1516,27 @@ async function editarSerieDialogo(s) {
  * Inyecta los estilos de diseño canónico Forja v2 para la pantalla Registrar.
  */
 function inyectarEstilos() {
-  if (document.getElementById('forja-reg-styles')) return;
+  if (typeof document === 'undefined' || document.getElementById('forja-reg-styles')) return;
   document.head.appendChild(h('style', { id: 'forja-reg-styles' }, `
+    :root {
+      --tinta: #17171A;
+      --tinta-tarjeta: #232328;
+      --papel: #F3F0E8;
+      --papel-2: #E9E4D8;
+      --tinta-suave: #5D5951;
+      --lima: #C8F03C;
+    }
+
     .reg-pantalla { display: flex; flex-direction: column; gap: 16px; padding-bottom: 96px; max-width: 520px; margin: 0 auto; }
-    
+
+    /* Diálogo con scroll interno para móvil con teclado virtual (A-03) */
+    .dialogo-caja { max-height: 85dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .dialogo-cuerpo { overflow-y: visible; }
+    .reg-dialogo-cuerpo-scroll { max-height: 62dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 4px; }
+
     /* Barra de fecha */
-    .reg-barra-fecha { align-items: center; justify-content: space-between; padding: 12px 18px; border-radius: 999px; background-color: var(--superficie2, #E9E4D8); }
-    .reg-btn-fecha { width: 44px; height: 44px; border-radius: 999px; display: flex; align-items: center; justify-content: center; padding: 0; color: var(--texto, #17171A); }
+    .reg-barra-fecha { align-items: center; justify-content: space-between; padding: 10px 16px; border-radius: 999px; background-color: var(--superficie2, #E9E4D8); }
+    .reg-btn-fecha { width: 48px; height: 48px; min-width: 48px; min-height: 48px; border-radius: 999px; display: flex; align-items: center; justify-content: center; padding: 0; color: var(--texto, #17171A); border: none; }
     .reg-centro { align-items: center; text-align: center; }
     .reg-etiqueta-fecha { position: relative; cursor: pointer; font-weight: 600; font-size: 15px; }
     .reg-input-fecha-oculto { opacity: 0; position: absolute; inset: 0; cursor: pointer; width: 100%; height: 100%; }
@@ -1122,82 +1545,94 @@ function inyectarEstilos() {
     /* Selector de pestañas */
     .reg-pestanas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .reg-pestana { min-height: 48px; border-radius: 999px; font-weight: 600; font-size: 14px; cursor: pointer; border: none; }
-    .reg-pestana.activo { background-color: #17171A; color: #F3F0E8; }
+    .reg-pestana.activo { background-color: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }
     .reg-pestana.inactivo { background-color: var(--superficie2, #E9E4D8); color: var(--texto, #17171A); }
 
     /* Modo Serie: Top bar & Video */
     .registro-top-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
-    .reg-select-ejercicio { flex: 1; border-radius: 999px; border: none; background-color: var(--superficie2, #E9E4D8); color: var(--texto, #17171A); padding: 8px 14px; font-weight: 600; font-size: 14px; outline: none; }
+    .reg-select-ejercicio { flex: 1; min-height: 48px; border-radius: 999px; border: none; background-color: var(--superficie2, #E9E4D8); color: var(--texto, #17171A); padding: 8px 14px; font-weight: 600; font-size: 14px; outline: none; }
     .chip-serie-badge { background-color: var(--superficie2, #E9E4D8); border-radius: 999px; padding: 6px 14px; color: var(--texto, #17171A); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; white-space: nowrap; }
-    .registro-video-box { width: 100%; height: 160px; border-radius: 28px; overflow: hidden; position: relative; background-color: #17171A; margin-bottom: 4px; }
+    .registro-video-box { width: 100%; height: 160px; border-radius: 28px; overflow: hidden; position: relative; background-color: var(--tinta, #17171A); margin-bottom: 4px; }
     .foto-ejercicio { width: 100%; height: 100%; object-fit: cover; display: block; filter: contrast(1.05) saturate(0.9); }
     .reg-placeholder-media { display: flex; align-items: center; justify-content: center; height: 100%; background: linear-gradient(180deg, rgba(23,23,26,0.6) 0%, #17171A 100%); color: #F3F0E8; font-family: 'Instrument Serif', Georgia, serif; font-size: 22px; }
 
     /* Modo Serie: Inputs Grid y Héroes */
     .registro-inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
     .counter-card { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 16px 12px 14px; display: flex; flex-direction: column; align-items: center; text-align: center; }
-    .counter-label { font-size: 13px; font-weight: 500; color: var(--sutil, #6B675F); margin-bottom: 2px; }
+    .counter-label { font-size: 13px; font-weight: 500; color: var(--tinta-suave, #5D5951); margin-bottom: 2px; }
     .counter-number.grande, .counter-card .grande { font-family: 'Bricolage Grotesque', sans-serif; font-size: 76px; font-weight: 800; line-height: 0.95; color: var(--texto, #17171A); font-variant-numeric: tabular-nums; margin-bottom: 10px; letter-spacing: -0.03em; }
     @media (min-width: 420px) { .counter-number.grande, .counter-card .grande { font-size: 96px; } }
+    .counter-number.grande.texto-corporal { font-size: 32px; line-height: 1.2; margin: 18px 0 18px; letter-spacing: -0.02em; }
     .stepper-controls { display: flex; gap: 8px; width: 100%; justify-content: center; }
-    .btn-stepper { width: 48px; height: 48px; background-color: var(--superficie, #F3F0E8); border: none; border-radius: 999px; color: var(--texto, #17171A); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 120ms ease; }
+    .btn-stepper { width: 48px; height: 48px; min-width: 48px; min-height: 48px; background-color: var(--superficie, #F3F0E8); border: none; border-radius: 999px; color: var(--texto, #17171A); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 120ms ease; }
     .btn-stepper:active { transform: scale(0.93); }
 
-    /* Selector de esfuerzo en 5 píldoras */
+    /* Selector de esfuerzo en 5 píldoras (>= 48px ALTO-03 y grilla 360px MEDIO-04) */
     .effort-section { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
-    .effort-label { font-size: 13px; font-weight: 500; color: var(--sutil, #6B675F); padding-left: 4px; }
-    .effort-pills-row { display: flex; gap: 6px; }
-    .effort-pill { flex: 1; height: 44px; background-color: var(--superficie2, #E9E4D8); border-radius: 999px; border: none; color: var(--texto, #17171A); font-family: 'Bricolage Grotesque', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color 160ms, color 160ms, transform 120ms; }
+    .effort-label { font-size: 13px; font-weight: 500; color: var(--tinta-suave, #5D5951); padding-left: 4px; }
+    .effort-pills-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; width: 100%; }
+    .effort-pill { min-height: 48px; height: 48px; padding: 0 6px; background-color: var(--superficie2, #E9E4D8); border-radius: 999px; border: none; color: var(--texto, #17171A); font-family: 'Bricolage Grotesque', sans-serif; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color 160ms, color 160ms, transform 120ms; }
     .effort-pill:active { transform: scale(0.95); }
-    .effort-pill.selected { background-color: #17171A; color: #F3F0E8; }
-    .effort-pill.fallo-pill { color: #E2553A; }
-    .effort-pill.fallo-pill.selected { background-color: #E2553A; color: #F3F0E8; }
+    .effort-pill.selected { background-color: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }
+    .effort-pill.fallo-pill { color: #A02B14; }
+    .effort-pill.fallo-pill.selected { background-color: #E2553A; color: var(--papel, #F3F0E8); }
 
     /* Comparativa previa */
-    .previous-record-text { text-align: center; font-size: 14px; color: var(--sutil, #6B675F); margin: 6px 0 10px; font-weight: 400; }
+    .previous-record-text { text-align: center; font-size: 14px; color: var(--tinta-suave, #5D5951); margin: 6px 0 10px; font-weight: 400; }
 
     /* Botón Canónico Lima Píldora */
-    .btn-primary-lima { width: 100%; height: 60px; background-color: #C8F03C; border: none; border-radius: 999px; color: #17171A; font-family: 'Bricolage Grotesque', sans-serif; font-size: 17px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 26px; cursor: pointer; text-decoration: none; transition: transform 160ms cubic-bezier(.2,.8,.2,1); }
+    .btn-primary-lima { width: 100%; height: 60px; background-color: var(--lima, #C8F03C); border: none; border-radius: 999px; color: var(--tinta, #17171A); font-family: 'Bricolage Grotesque', sans-serif; font-size: 17px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 26px; cursor: pointer; text-decoration: none; transition: transform 160ms cubic-bezier(.2,.8,.2,1); }
     .btn-primary-lima:active { transform: scale(0.97); }
-    .btn-icon-bubble { width: 44px; height: 44px; background-color: #17171A; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #C8F03C; flex-shrink: 0; }
+    .btn-icon-bubble { width: 44px; height: 44px; background-color: var(--tinta, #17171A); border-radius: 999px; display: flex; align-items: center; justify-content: center; color: var(--lima, #C8F03C); flex-shrink: 0; }
 
-    /* Temporizador Descanso estilo Pantalla 3 (modo oscuro / fondo tinta) */
-    .screen-descanso-content.oscuro { background-color: #17171A; color: #F3F0E8; border-radius: 28px; padding: 24px 20px; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: 0 10px 30px rgba(23,23,26,.18); }
+    /* Temporizador Descanso estilo Pantalla 3 (modo oscuro / fondo tinta, paleta unificada BAJO-03) */
+    .screen-descanso-content.oscuro { background-color: var(--tinta, #17171A); color: var(--papel, #F3F0E8); border-radius: 28px; padding: 24px 20px; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: 0 10px 30px rgba(23,23,26,.18); }
     .descanso-header-box { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-    .descanso-header-box .micro-label { color: #C8F03C; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; }
-    .descanso-quote { font-family: 'Instrument Serif', Georgia, serif; font-size: 26px; color: #F3F0E8; font-weight: 400; }
+    .descanso-header-box .micro-label { color: var(--lima, #C8F03C); font-size: 12px; font-weight: 600; }
+    .descanso-quote { font-family: 'Instrument Serif', Georgia, serif; font-size: 26px; color: var(--papel, #F3F0E8); font-weight: 400; }
     .descanso-quote em { font-style: italic; }
     .timer-ring-container { position: relative; width: 240px; height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 12px 0; }
     .timer-ring-svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
     .timer-center-text { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; }
-    .timer-countdown.grande { font-family: 'Bricolage Grotesque', sans-serif; font-size: 76px; font-weight: 800; color: #F3F0E8; line-height: 0.95; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
-    .timer-caption { font-size: 13px; color: #8E8A82; margin-top: 6px; font-weight: 500; }
-    .next-set-card { width: 100%; background-color: #222226; border-radius: 28px; padding: 16px 20px; text-align: left; display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
-    .next-set-title { font-size: 15px; font-weight: 600; color: #F3F0E8; }
-    .next-set-sub { font-size: 13px; color: #8E8A82; line-height: 1.4; }
+    .timer-countdown.grande { font-family: 'Bricolage Grotesque', sans-serif; font-size: 76px; font-weight: 800; color: var(--papel, #F3F0E8); line-height: 0.95; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+    .timer-caption { font-size: 13px; color: var(--papel-2, #E9E4D8); opacity: 0.72; margin-top: 6px; font-weight: 500; }
+    .next-set-card { width: 100%; background-color: var(--tinta-tarjeta, #232328); border-radius: 28px; padding: 16px 20px; text-align: left; display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
+    .next-set-title { font-size: 15px; font-weight: 600; color: var(--papel, #F3F0E8); }
+    .next-set-sub { font-size: 13px; color: var(--papel-2, #E9E4D8); opacity: 0.75; line-height: 1.4; }
     .descanso-actions-row { width: 100%; display: flex; gap: 12px; }
-    .btn-timer-secondary { flex: 1; height: 56px; background-color: #26262B; border: none; border-radius: 999px; color: #F3F0E8; font-family: 'Bricolage Grotesque', sans-serif; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 140ms ease; }
+    .btn-timer-secondary { flex: 1; height: 56px; background-color: var(--tinta-tarjeta, #232328); border: none; border-radius: 999px; color: var(--papel, #F3F0E8); font-family: 'Bricolage Grotesque', sans-serif; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 140ms ease; }
     .btn-timer-secondary:active { transform: scale(0.97); }
-    .btn-timer-skip { flex: 1; height: 56px; background-color: #C8F03C; border: none; border-radius: 999px; color: #17171A; font-family: 'Bricolage Grotesque', sans-serif; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 140ms ease; }
+    .btn-timer-skip { flex: 1; height: 56px; background-color: var(--lima, #C8F03C); border: none; border-radius: 999px; color: var(--tinta, #17171A); font-family: 'Bricolage Grotesque', sans-serif; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 140ms ease; }
     .btn-timer-skip:active { transform: scale(0.97); }
+
+    /* Barra flotante global de descanso en otras pantallas (C-01) */
+    .reg-timer-flotante { position: fixed; left: 50%; transform: translateX(-50%); bottom: 92px; width: calc(100% - 32px); max-width: 480px; background-color: var(--tinta, #17171A); color: var(--papel, #F3F0E8); border-radius: 999px; padding: 8px 10px 8px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 10px 30px rgba(23,23,26,.18); z-index: 450; }
+    .reg-timer-flotante-info { display: flex; align-items: center; gap: 10px; background: none; border: none; color: inherit; cursor: pointer; padding: 0; text-align: left; min-width: 0; flex: 1; min-height: 44px; }
+    .reg-timer-flotante-icono { color: var(--lima, #C8F03C); display: inline-flex; align-items: center; flex-shrink: 0; }
+    .reg-timer-flotante-tiempo { font-family: 'Bricolage Grotesque', sans-serif; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--lima, #C8F03C); flex-shrink: 0; }
+    .reg-timer-flotante-ej { font-size: 13px; font-weight: 500; color: var(--papel, #F3F0E8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .reg-timer-flotante-acciones { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .reg-timer-flotante-btn { min-height: 40px; padding: 0 14px; border-radius: 999px; border: none; background-color: var(--tinta-tarjeta, #232328); color: var(--papel, #F3F0E8); font-family: 'Bricolage Grotesque', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .reg-timer-flotante-btn.lima { background-color: var(--lima, #C8F03C); color: var(--tinta, #17171A); }
 
     /* Chips y ajustes de Modo Serie */
     .reg-chips-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
-    .reg-chip-toggle { border-radius: 999px; border: none; padding: 6px 14px; font-size: 12px; font-weight: 600; background-color: var(--superficie, #F3F0E8); color: var(--texto, #17171A); cursor: pointer; }
-    .reg-chip-toggle.activo { background-color: #17171A; color: #F3F0E8; }
+    .reg-chip-toggle { border-radius: 999px; border: none; padding: 8px 14px; min-height: 36px; font-size: 12px; font-weight: 600; background-color: var(--superficie, #F3F0E8); color: var(--texto, #17171A); cursor: pointer; }
+    .reg-chip-toggle.activo { background-color: var(--tinta, #17171A); color: var(--papel, #F3F0E8); }
     .reg-campos-extra { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 14px 18px; margin-bottom: 6px; }
 
-    /* Modo Texto */
+    /* Modo Texto (radio canónico 28px MEDIO-02) */
     .reg-caja-texto { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
-    .reg-textarea { width: 100%; min-height: 80px; resize: vertical; border-radius: 18px; border: none; background-color: var(--superficie, #F3F0E8); color: var(--texto, #17171A); padding: 12px 14px; font-family: inherit; font-size: 15px; outline: none; }
+    .reg-textarea { width: 100%; min-height: 88px; resize: vertical; border-radius: 28px; border: none; background-color: var(--superficie, #F3F0E8); color: var(--texto, #17171A); padding: 16px 20px; font-family: inherit; font-size: 15px; outline: none; }
+    .reg-nota-privacidad-voz { font-size: 12px; line-height: 1.4; margin: 0; color: var(--tinta-suave, #5D5951); }
     .reg-item-previa { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 18px; margin-bottom: 12px; }
 
-    /* Lista de series */
+    /* Lista de series (sin bordes de 1px BAJO-01 y botones >= 48px ALTO-03) */
     .reg-tarjeta-ejercicio { background-color: var(--superficie2, #E9E4D8); border-radius: 28px; padding: 18px; margin-bottom: 12px; }
-    .reg-item-serie { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(23,23,26,0.06); }
-    .reg-item-serie:last-child { border-bottom: none; }
+    .reg-item-serie { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; margin-bottom: 6px; border-radius: 28px; background-color: var(--superficie, #F3F0E8); }
+    .reg-item-serie:last-child { margin-bottom: 0; }
     .reg-acciones-serie { display: flex; gap: 6px; }
-    .reg-btn-icono { width: 36px; height: 36px; border-radius: 999px; border: none; background-color: var(--superficie, #F3F0E8); color: var(--texto, #17171A); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .reg-btn-icono { min-width: 48px; min-height: 48px; width: 48px; height: 48px; padding: 12px; border-radius: 999px; border: none; background-color: var(--superficie2, #E9E4D8); color: var(--texto, #17171A); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 
     /* Utilidades */
     .reg-espacio-entre { justify-content: space-between; }
@@ -1225,6 +1660,7 @@ async function actualizarUI() {
   const timer = renderWidgetTemporizador();
   if (timer) {
     pantalla.appendChild(timer);
+    removerBarraFlotante();
   }
 
   pantalla.appendChild(renderSelectorModo());
@@ -1247,16 +1683,26 @@ async function actualizarUI() {
 export async function montar(contenedor, params = []) {
   contenedorRaiz = contenedor;
   inyectarEstilos();
+  registrarListenersGlobalesTimer();
+
   try {
     listaEjercicios = await ejercicios();
     if (!Array.isArray(listaEjercicios)) listaEjercicios = [];
   } catch (e) {
     listaEjercicios = [];
   }
+
+  let idElegido = estadoSerie.ejercicioId;
+  let debeRecargarEstado = false;
+
   if (params?.[0] && listaEjercicios.some(e => e.id === params[0])) {
-    estadoSerie.ejercicioId = params[0];
+    if (estadoSerie.ejercicioId !== params[0]) {
+      debeRecargarEstado = true;
+    }
+    idElegido = params[0];
     modoActivo = 'serie';
-  } else if (!estadoSerie.ejercicioId) {
+  } else if (!idElegido) {
+    debeRecargarEstado = true;
     // Sin ejercicio elegido: el primero de la rutina de hoy al que le falten series (fix 7-nov).
     try {
       const { rutina } = await import('./datos.js');
@@ -1265,26 +1711,54 @@ export async function montar(contenedor, params = []) {
       const delDia = r?.dias?.[dias[new Date().getDay()]]?.ejercicios || [];
       const hoy = await filtrar('series', s => s.fecha === hoyISO());
       const pendiente = delDia.find(x => hoy.filter(s => s.ejercicioId === x.id).length < (x.series || 3)) || delDia[0];
-      if (pendiente && listaEjercicios.some(e => e.id === pendiente.id)) estadoSerie.ejercicioId = pendiente.id;
+      if (pendiente && listaEjercicios.some(e => e.id === pendiente.id)) {
+        idElegido = pendiente.id;
+      }
     } catch (e) { /* si falla, queda el primero de la lista */ }
+
+    if (!idElegido && listaEjercicios.length > 0) {
+      idElegido = listaEjercicios[0].id;
+    }
   }
-  if (localStorage.getItem(STORAGE_TIMER_INICIO)) {
+
+  if (debeRecargarEstado && idElegido) {
+    await cargarEstadoParaEjercicio(idElegido, fechaSeleccionada);
+  }
+
+  if (leerDatosTemporizador()) {
     iniciarLoopTemporizador();
   }
   await actualizarUI();
 }
 
 /**
- * Desmonta la pantalla Registrar y libera recursos.
+ * Desmonta la pantalla Registrar y libera recursos locales de la vista,
+ * manteniendo vivo el temporizador de descanso en segundo plano y su barra flotante (C-01).
  */
 export function desmontar() {
   if (reconocimientoVoz && escuchandoVoz) {
     try { reconocimientoVoz.stop(); } catch (e) {}
     escuchandoVoz = false;
   }
-  if (intervaloTimer) {
+  contenedorRaiz = null;
+
+  const estado = leerDatosTemporizador();
+  if (estado && estado.restante > 0) {
+    sincronizarBarraFlotante(estado);
+    if (!intervaloTimer) {
+      iniciarLoopTemporizador();
+    }
+  } else if (intervaloTimer) {
     clearInterval(intervaloTimer);
     intervaloTimer = null;
   }
-  contenedorRaiz = null;
+}
+
+// Auto-inicialización pasiva si hay un descanso activo en localStorage al cargarse el módulo
+if (typeof window !== 'undefined') {
+  try {
+    if (localStorage.getItem(STORAGE_TIMER_FIN) || localStorage.getItem(STORAGE_TIMER_INICIO)) {
+      temporizadorActivo();
+    }
+  } catch (e) {}
 }

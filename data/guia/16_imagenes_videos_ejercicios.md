@@ -19,14 +19,12 @@
     *   *Tipo de multimedia:* **Fotos fijas en formato `.jpg`** (generalmente 2 tomas de alta calidad por ejercicio: posición inicial `0.jpg` y posición final `1.jpg`). No incluye videos ni GIFs.
     *   *Licencia exacta:* **The Unlicense** (dedicación total al dominio público). Permite copiar, modificar, publicar, comercializar y distribuir sin restricciones ni obligación legal de dar crédito.
     *   *Enlace:* Repositorio en GitHub: [free-exercise-db](https://github.com/yuhonas/free-exercise-db).
-    *   *Cómo descargar las imágenes:* Clonando el repositorio con `git clone https://github.com/yuhonas/free-exercise-db.git` (carpeta `/exercises/`, ~60-80 MB), descargando el archivo comprimido `.zip` desde GitHub, o cargando las fotos bajo demanda usando la dirección cruda (*raw CDN*): `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/<NombreEjercicio>/0.jpg`.
 
 *   **wger (wger Workout Manager):**
     *   *Cantidad de ejercicios:* **Entre 800 y 900+ ejercicios** en la base de datos comunitaria activa de `wger.de` (las instalaciones locales de base suelen incluir entre 100 y 500 registros iniciales).
     *   *Tipo de multimedia:* **Fotos (`.png`, `.jpg`), esquemas anatómicos y videos cortos demostrativos (`.mp4`, `.webm`)**.
     *   *Licencia exacta:* Contenido multimedia y descripciones bajo **Creative Commons Attribution-ShareAlike (CC-BY-SA 4.0)** (requiere dar crédito al autor y compartir obras derivadas bajo la misma licencia). El código del sistema es **AGPL-3.0**.
     *   *Enlace:* Repositorio en GitHub: [wger](https://github.com/wger-project/wger) y API REST pública: [wger API v2](https://wger.de/api/v2/).
-    *   *Cómo descargar las imágenes:* Consumiendo su API REST mediante peticiones `GET` a `https://wger.de/api/v2/exerciseimage/` o `https://wger.de/api/v2/video/` para obtener las URLs del CDN y guardarlas localmente mediante un script simple.
 
 *   **ExerciseDB (RapidAPI / AscendAPI):**
     *   *Cantidad de ejercicios:* La base original abierta histórica recopilaba **~1.300 ejercicios**; la versión actual comercial (V2 en RapidAPI) cataloga **más de 11.000 ejercicios**.
@@ -53,7 +51,6 @@
     *   *Cantidad de ejercicios:* **Más de 2.000 ejercicios** filmados profesionalmente con modelos masculinos y femeninos.
     *   *Tipo de multimedia:* Videos en alta definición en bucle corto (`.mp4`), mapas musculares interactivos e imágenes estáticas.
     *   *Licencia exacta:* **100% Propietaria / Todos los derechos reservados (*All Rights Reserved*)**. No tiene ninguna licencia libre ni de código abierto.
-    *   *Enlace:* [MuscleWiki](https://musclewiki.com/) y [MuscleWiki Developers](https://musclewiki.com/developers).
     *   *Cómo descargar las imágenes:* **No se pueden descargar legalmente**. Sus términos legales prohíben explícitamente almacenar, raspar (*scrape*), alojar en servidores propios o redistribuir sus videos e imágenes. Solo ofrecen planes de pago corporativos para reproducir video por *streaming* directo desde sus servidores.
 
 ---
@@ -140,3 +137,6 @@ Para colorear en pantalla los músculos que entrena cada ejercicio (por ejemplo:
 12. **A systematic review, meta-analysis and meta-regression of the effect of protein supplementation on resistance training-induced gains in muscle mass and strength** | Morton, R. W., Murphy, K. T., McKellar, S. R., et al. | 2018 | https://pubmed.ncbi.nlm.nih.gov/28698222/ | *Metaanálisis y revisión sistemática sobre ingesta diaria de proteínas*.
 13. **International Society of Sports Nutrition Position Stand: safety and efficacy of creatine supplementation in exercise, sport, and medicine** | Kreider, R. B., Kalman, D. S., Antonio, J., et al. | 2017 | https://pubmed.ncbi.nlm.nih.gov/28615996/ | *Posición oficial de consenso de la Sociedad Internacional de Nutrición Deportiva (ISSN)*.
 14. **Influence of Resistance Training Proximity-to-Failure on Skeletal Muscle Hypertrophy: A Systematic Review with Meta-analysis** | Refalo, M. C., Helms, E. R., Trexler, E. T., Hamilton, D. L., & Fyfe, J. J. | 2023 | https://pubmed.ncbi.nlm.nih.gov/36334976/ | *Metaanálisis y revisión sistemática sobre proximidad al fallo muscular (RIR/RPE)*.
+
+
+> Fuentes revisadas automáticamente el 7-nov-2026 contra Crossref: se quitaron 3 enlaces que no existían o no correspondían al tema.

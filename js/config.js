@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    FORJA - Configuración Global (js/config.js)
    Firmas y constantes exactas según CONTRATOS.md y ENCARGO_APP.md
    ========================================================================== */
@@ -9,7 +9,7 @@ export const VERSION = '1.0.0';
 export const MEDIAPIPE_VERSION = '1.2.2';   // comprobado en npm el 7-nov-2026
 export const MEDIAPIPE_JS = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/vision_bundle.mjs`;
 export const MEDIAPIPE_WASM = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`;
-export const MEDIAPIPE_MODELO = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task';
+export const MEDIAPIPE_MODELO = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task';
 
 // IA local en el navegador (WebLLM)
 // Versión y modelos comprobados en npm el 7-nov-2026. El modelo final se elige con la prueba de sus preguntas.

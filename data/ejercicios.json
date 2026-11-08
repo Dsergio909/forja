@@ -1,78 +1,5 @@
 [
  {
-  "id": "colgado_pasivo_barra",
-  "nombre": "Colgado pasivo en barra de dominadas",
-  "nombre_en": "Dead hang",
-  "musculos_principales": [
-   "flexores de los dedos (agarre de soporte)",
-   "dorsal ancho",
-   "flexores de los dedos"
-  ],
-  "musculos_secundarios": [
-   "dorsal ancho",
-   "antebrazos",
-   "trapecios",
-   "romboides",
-   "trapecio inferior",
-   "pectorales"
-  ],
-  "equipo": "barra de dominadas",
-  "tipo": "estiramiento",
-  "nivel": "principiante",
-  "pasos": [
-   "Colócate debajo de la barra de dominadas y tómala con un agarre en pronación (palmas al frente) al ancho de los hombros sin usar straps.",
-   "Retira los pies del soporte o flexiona las rodillas para dejar que todo el peso corporal cuelgue libremente.",
-   "Relaja los hombros permitiendo que suban de forma natural hacia las orejas para descomprimir la columna y elongar la cintura escapular.",
-   "Concéntrate en cerrar los dedos con fuerza máxima alrededor del tubo metálico evitando que la piel de la palma pellizque dolorosamente.",
-   "Mantén la posición estática hasta alcanzar el tiempo fijado y apoya los pies con suavidad para salir de la barra."
-  ],
-  "claves_tecnica": [
-   "Rodear la barra con el pulgar por debajo para afianzar el agarre completo.",
-   "Mantener el cuerpo quieto sin balanceos oscilatorios.",
-   "Respirar con calma para tolerar la fatiga isométrica y el estiramiento escapular."
-  ],
-  "errores_comunes": [
-   "Balancear las piernas o patear en el aire intentando reducir la sensación de esfuerzo.",
-   "Saltar bruscamente al suelo cuando el agarre falla, provocando impacto en los meniscos.",
-   "Usar agarre falso (sin pulgar) restándole estabilidad al soporte manual."
-  ],
-  "respiracion": "Respiraciones lentas y profundas por la nariz con exhalaciones controladas por la boca durante todo el sostenimiento.",
-  "tempo": "isométrico sostenido",
-  "series_reps_hipertrofia": "3 x 30-45 segundos sostenidos",
-  "series_reps_fuerza": "3-5 x 15-20 segundos con lastre",
-  "descanso_seg": 90,
-  "rir_recomendado": "1-2",
-  "progresion": "Aumentar 5 segundos por semana a la serie hasta alcanzar 60 segundos sostenidos continuos con peso corporal.",
-  "alternativas": [
-   "colgado activo en barra (retrayendo escápulas)",
-   "colgado con toalla enrollada para agarre grueso",
-   "colgado asistido con pies apoyados",
-   "colgado en máquina de dominadas asistidas"
-  ],
-  "seguridad": "Asegúrate de colocar un banco o escalón debajo para descender de forma segura cuando los dedos comiencen a abrirse.",
-  "descripcion_visual": "Inicio: colgado de la barra de dominadas con brazos estirados, cuerpo vertical relajado y pies suspendidos en el aire. Final: misma posición manteniendo los dedos firmemente cerrados alrededor de la barra hasta que el antebrazo se encuentre en máxima congestión vascular.",
-  "busqueda_video": "Dead hang proper form grip benefits spine decompression",
-  "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/31342424/",
-  "temas": [
-   "brazos_antebrazos",
-   "columna_postura_altura"
-  ],
-  "alias": [
-   "colgado pasivo barra",
-   "colgado pasivo en barra de dominadas",
-   "dead hang"
-  ],
-  "imagen": "media/fotos/colgado_pasivo_barra_0.jpg",
-  "imagenes": [
-   "media/fotos/colgado_pasivo_barra_0.jpg",
-   "media/fotos/colgado_pasivo_barra_1.jpg"
-  ],
-  "foto_fuente": "free-exercise-db: One_Handed_Hang (dominio público)",
-  "video": "media/videos/colgado_pasivo_barra.mp4",
-  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
- },
- {
   "id": "curl_bayesiano_polea",
   "nombre": "Curl bayesiano en polea",
   "nombre_en": "Bayesian cable curl",
@@ -463,7 +390,9 @@
    "media/fotos/extension_muneca_mancuerna_0.jpg",
    "media/fotos/extension_muneca_mancuerna_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Seated_Dumbbell_Palms-Down_Wrist_Curl (dominio público)"
+  "foto_fuente": "free-exercise-db: Seated_Dumbbell_Palms-Down_Wrist_Curl (dominio público)",
+  "video": "media/videos/extension_muneca_mancuerna.mp4",
+  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
  },
  {
   "id": "extension_triceps_sobre_cabeza_polea",
@@ -542,7 +471,7 @@
    "pectoral mayor (haz inferior)",
    "deltoides anterior"
   ],
-  "equipo": "barra de dominadas",
+  "equipo": "barras paralelas",
   "tipo": "compuesto",
   "nivel": "intermedio",
   "pasos": [
@@ -591,7 +520,8 @@
    "media/fotos/fondos_paralelas_banco_0.jpg",
    "media/fotos/fondos_paralelas_banco_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Bench_Dips (dominio público)"
+  "foto_fuente": "free-exercise-db: Dips_-_Triceps_Version (dominio público)",
+  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
  },
  {
   "id": "paseo_del_granjero",
@@ -648,14 +578,17 @@
   "alias": [
    "dumbbell farmer's walk",
    "paseo del granjero",
-   "paseo del granjero con mancuernas"
+   "paseo del granjero con mancuernas",
+   "paseo del granjero mancuernas"
   ],
   "imagen": "media/fotos/paseo_del_granjero_0.jpg",
   "imagenes": [
    "media/fotos/paseo_del_granjero_0.jpg",
    "media/fotos/paseo_del_granjero_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Farmers_Walk (dominio público)"
+  "foto_fuente": "free-exercise-db: Farmers_Walk (dominio público)",
+  "video": "media/videos/paseo_del_granjero.mp4",
+  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
  },
  {
   "id": "press_frances_barra_z",
@@ -718,7 +651,9 @@
    "media/fotos/press_frances_barra_z_0.jpg",
    "media/fotos/press_frances_barra_z_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: EZ-Bar_Skullcrusher (dominio público)"
+  "foto_fuente": "free-exercise-db: EZ-Bar_Skullcrusher (dominio público)",
+  "video": "media/videos/press_frances_barra_z.mp4",
+  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
  },
  {
   "id": "pushdown_triceps_polea",
@@ -902,12 +837,8 @@
    "chin tuck",
    "retraccion cervical en suelo o pared"
   ],
-  "imagen": "media/fotos/chin_tuck_0.jpg",
-  "imagenes": [
-   "media/fotos/chin_tuck_0.jpg",
-   "media/fotos/chin_tuck_1.jpg"
-  ],
-  "foto_fuente": "free-exercise-db: Chin_To_Chest_Stretch (dominio público)"
+  "video": "media/videos/chin_tuck.mp4",
+  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
  },
  {
   "id": "curl_up_mcgill",
@@ -1079,128 +1010,6 @@
   ]
  },
  {
-  "id": "pajaros_posteriores_inclinado",
-  "nombre": "Elevaciones posteriores con mancuernas en banco inclinado",
-  "nombre_en": "Prone incline dumbbell reverse fly",
-  "musculos_principales": [
-   "deltoides posterior",
-   "romboides"
-  ],
-  "musculos_secundarios": [
-   "trapecio medio e inferior",
-   "infraespinoso"
-  ],
-  "equipo": "mancuernas",
-  "tipo": "aislamiento",
-  "nivel": "intermedio",
-  "pasos": [
-   "Paso 1: Coloca un banco inclinable en un ángulo de 30 a 45 grados y recuéstate boca abajo con el pecho apoyado en el respaldo.",
-   "Paso 2: Sujeta un par de mancuernas livianas con agarre neutro (palmas enfrentadas) y deja los brazos colgando hacia el suelo con una ligera flexión de codos.",
-   "Paso 3: Abre los brazos en un arco amplio hacia los lados, conduciendo con el dorso de las manos y los codos.",
-   "Paso 4: Eleva las mancuernas hasta la altura de los hombros o el torso, apretando la parte posterior de los hombros y las escápulas durante 1 segundo.",
-   "Paso 5: Desciende las mancuernas de forma lenta y controlada en 2 segundos hasta la posición inicial."
-  ],
-  "claves_tecnica": [
-   "Mantén el pecho firmemente pegado al respaldo para anular cualquier balanceo del cuerpo",
-   "Conserva el mismo ángulo fijo de flexión en los codos (10-15°) durante toda la serie",
-   "No encojas los hombros hacia el cuello; enfócate en separar las mancuernas hacia los extremos de la sala"
-  ],
-  "errores_comunes": [
-   "Usar demasiado peso y transformar el movimiento en un remo descontrolado con codos pegados",
-   "Despegar el torso del banco usando impulso lumbar",
-   "Girar las muñecas hacia adentro durante el ascenso"
-  ],
-  "respiracion": "Inhala antes de iniciar y exhala al abrir los brazos lateralmente; inhala al bajar las mancuernas con control.",
-  "tempo": "2-0-1-1 (2 segundos bajada, 1 segundo contracción arriba)",
-  "series_reps_hipertrofia": "3 x 10-15",
-  "series_reps_fuerza": "3 x 8-10",
-  "descanso_seg": 90,
-  "rir_recomendado": "1-2",
-  "progresion": "Aumentar primero el número de repeticiones (de 10 a 15) o la pausa arriba antes de subir el peso de las mancuernas.",
-  "alternativas": [
-   "pájaros posteriores en polea baja",
-   "aperturas posteriores con cables cruzados"
-  ],
-  "seguridad": "El banco inclinado neutraliza el estrés lumbar, haciendo este ejercicio muy seguro para la columna mientras aísla la cadena posterior alta.",
-  "descripcion_visual": "Inicio: pecho contra el banco a 30°, brazos colgando con mancuernas casi rozándose. Final: brazos abiertos en cruz en forma de T con codos a la altura de los hombros.",
-  "busqueda_video": "Chest supported dumbbell rear delt fly form tutorial",
-  "evidencia": "fuerte",
-  "fuente": "https://pubmed.ncbi.nlm.nih.gov/38462217/",
-  "temas": [
-   "columna_postura_altura"
-  ],
-  "alias": [
-   "elevaciones posteriores con mancuernas en banco inclinado",
-   "pajaros posteriores inclinado",
-   "prone incline dumbbell reverse fly"
-  ]
- },
- {
-  "id": "paseo_del_granjero_mancuernas",
-  "nombre": "Paseo del granjero con mancuernas",
-  "nombre_en": "Dumbbell farmer's walk",
-  "musculos_principales": [
-   "trapecio superior",
-   "flexores del antebrazo",
-   "oblicuos"
-  ],
-  "musculos_secundarios": [
-   "glúteo medio",
-   "erectores espinales",
-   "gemelos"
-  ],
-  "equipo": "mancuernas",
-  "tipo": "compuesto",
-  "nivel": "intermedio",
-  "pasos": [
-   "Paso 1: Coloca dos mancuernas pesadas en el suelo a ambos lados de tus pies.",
-   "Paso 2: Flexiona caderas y rodillas manteniendo la espalda neutral para agarrar firmemente las mancuernas y levantarte extendiendo piernas.",
-   "Paso 3: Adopta una postura militar orgullosa: pecho arriba, hombros atrás y abajo, mirada al frente y abdomen tenso.",
-   "Paso 4: Camina hacia adelante en línea recta dando pasos cortos, estables y controlados (talón a punta) sin permitir balanceo lateral de las cargas.",
-   "Paso 5: Al terminar la distancia, frena con control y deposita las mancuernas en el suelo con técnica de bisagra de cadera segura."
-  ],
-  "claves_tecnica": [
-   "Mantén las mancuernas ligeramente separadas de los muslos sin permitir que choquen ni balanceen con el paso",
-   "No dejes que los hombros colapsen hacia adelante en protracción",
-   "La velocidad debe ser constante y metódica, nunca corriendo ni perdiendo la verticalidad"
-  ],
-  "errores_comunes": [
-   "Dar pasos largos e inestables que desestabilizan la pelvis",
-   "Encorvar la espalda al levantar o apoyar las mancuernas en el suelo",
-   "Inclinarse de lado a lado compensando debilidad en los estabilizadores laterales"
-  ],
-  "respiracion": "Respira de manera rítmica superficial mediante 'bracing' abdominal activo manteniendo la caja torácica firme.",
-  "tempo": "Pasos constantes y lentos (unos 30-40 segundos de caminata continua por serie)",
-  "series_reps_hipertrofia": "3 series de 30-40 metros (o 30-45 segundos)",
-  "series_reps_fuerza": "3-4 series de 20 metros con carga muy pesada",
-  "descanso_seg": 120,
-  "rir_recomendado": "2",
-  "progresion": "Subir la carga de las mancuernas de forma progresiva manteniendo la distancia fija y la postura totalmente erguida.",
-  "alternativas": [
-   "caminata de granjero con una sola mancuerna (unilateral suitcase carry)",
-   "paseo de granjero con barra trampa"
-  ],
-  "seguridad": "Levantar y bajar el peso siempre doblando las rodillas y manteniendo la columna lumbar neutra como en un peso muerto.",
-  "descripcion_visual": "Inicio: de pie perfectamente erguido con una mancuerna pesada en cada mano a los costados. Final: desplazándose en línea recta con pasos firmes sin flexión de tronco.",
-  "busqueda_video": "Farmer's walk dumbbell proper form posture core stability",
-  "evidencia": "fuerte",
-  "fuente": "https://www.backfitpro.com/books/low-back-disorders/",
-  "temas": [
-   "columna_postura_altura"
-  ],
-  "alias": [
-   "dumbbell farmer's walk",
-   "paseo del granjero con mancuernas",
-   "paseo del granjero mancuernas"
-  ],
-  "imagen": "media/fotos/paseo_del_granjero_mancuernas_0.jpg",
-  "imagenes": [
-   "media/fotos/paseo_del_granjero_mancuernas_0.jpg",
-   "media/fotos/paseo_del_granjero_mancuernas_1.jpg"
-  ],
-  "foto_fuente": "free-exercise-db: Farmers_Walk (dominio público)"
- },
- {
   "id": "puente_lateral_mcgill",
   "nombre": "Plancha lateral de McGill",
   "nombre_en": "McGill side bridge",
@@ -1261,7 +1070,9 @@
    "media/fotos/puente_lateral_mcgill_0.jpg",
    "media/fotos/puente_lateral_mcgill_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Side_Bridge (dominio público)"
+  "foto_fuente": "free-exercise-db: Side_Bridge (dominio público)",
+  "video": "media/videos/puente_lateral_mcgill.mp4",
+  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
  },
  {
   "id": "crunch_en_polea",
@@ -1323,7 +1134,9 @@
    "media/fotos/crunch_en_polea_0.jpg",
    "media/fotos/crunch_en_polea_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Cable_Crunch (dominio público)"
+  "foto_fuente": "free-exercise-db: Cable_Crunch (dominio público)",
+  "video": "media/videos/crunch_en_polea.mp4",
+  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
  },
  {
   "id": "elevacion_de_piernas_colgado",
@@ -1454,7 +1267,9 @@
    "media/fotos/extension_de_cuello_con_arnes_0.jpg",
    "media/fotos/extension_de_cuello_con_arnes_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Seated_Head_Harness_Neck_Resistance (dominio público)"
+  "foto_fuente": "free-exercise-db: Seated_Head_Harness_Neck_Resistance (dominio público)",
+  "video": "media/videos/extension_de_cuello_con_arnes.mp4",
+  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
  },
  {
   "id": "extension_de_cuello_con_disco",
@@ -1761,7 +1576,9 @@
    "media/fotos/plancha_abdominal_rkc_0.jpg",
    "media/fotos/plancha_abdominal_rkc_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Plank (dominio público)"
+  "foto_fuente": "free-exercise-db: Plank (dominio público)",
+  "video": "media/videos/plancha_abdominal_rkc.mp4",
+  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
  },
  {
   "id": "press_pallof",
@@ -2415,12 +2232,15 @@
   ],
   "alias": [
    "chest-supported plate-loaded row",
+   "chest-supported row with loaded stretch",
    "dorian",
    "remo bajo",
+   "remo con soporte de pecho con enfasis en estiramiento excentrico",
    "remo con soporte de pecho en maquina de discos",
    "remo de pecho apoyado",
    "remo dorian",
-   "remo soporte pecho"
+   "remo soporte pecho",
+   "remo soporte pecho estiramiento"
   ],
   "imagen": "media/fotos/remo_soporte_pecho_0.jpg",
   "imagenes": [
@@ -2892,8 +2712,11 @@
   ],
   "alias": [
    "chest-supported rear delt dumbbell fly",
+   "elevaciones posteriores con mancuernas en banco inclinado",
    "pajaros con mancuernas en banco inclinado (pecho apoyado)",
-   "pajaros pecho apoyado mancuernas"
+   "pajaros pecho apoyado mancuernas",
+   "pajaros posteriores inclinado",
+   "prone incline dumbbell reverse fly"
   ],
   "imagen": "media/fotos/pajaros_pecho_apoyado_mancuernas_0.jpg",
   "imagenes": [
@@ -3096,7 +2919,7 @@
    "media/fotos/remo_al_menton_polea_agarre_ancho_0.jpg",
    "media/fotos/remo_al_menton_polea_agarre_ancho_1.jpg"
   ],
-  "foto_fuente": "free-exercise-db: Dumbbell_One-Arm_Upright_Row (dominio público)"
+  "foto_fuente": "free-exercise-db: Upright_Cable_Row (dominio público)"
  },
  {
   "id": "rotacion_externa_mancuerna_costado",
@@ -3331,13 +3154,23 @@
   ],
   "alias": [
    "colgado",
+   "colgado pasivo barra",
    "colgado pasivo barra dorsal",
    "colgado pasivo en barra de dominadas",
    "colgarme",
    "colgarse",
+   "dead hang",
    "estiramiento de dorsal",
    "passive dead hang"
-  ]
+  ],
+  "imagen": "media/fotos/colgado_pasivo_barra_0.jpg",
+  "imagenes": [
+   "media/fotos/colgado_pasivo_barra_0.jpg",
+   "media/fotos/colgado_pasivo_barra_1.jpg"
+  ],
+  "foto_fuente": "free-exercise-db: One_Handed_Hang (dominio público)",
+  "video": "media/videos/colgado_pasivo_barra.mp4",
+  "video_fuente": "Generado con IA (Wan 2.2 Fun Control) siguiendo el esqueleto de 2 fotos reales"
  },
  {
   "id": "curl_predicador_maquina_longitud",
@@ -3809,70 +3642,6 @@
   ]
  },
  {
-  "id": "remo_soporte_pecho_estiramiento",
-  "nombre": "Remo con soporte de pecho con énfasis en estiramiento excéntrico",
-  "nombre_en": "Chest-supported row with loaded stretch",
-  "musculos_principales": [
-   "dorsal ancho",
-   "trapecio medio",
-   "romboides"
-  ],
-  "musculos_secundarios": [
-   "bíceps braquial",
-   "deltoides posterior",
-   "braquial anterior"
-  ],
-  "equipo": "máquina de discos con soporte de pecho",
-  "tipo": "compuesto",
-  "nivel": "intermedio",
-  "pasos": [
-   "Paso 1: Ajusta la altura del asiento para que el soporte de pecho quede contra la parte media del esternón. Usa straps en los agarres para fijar la carga sin fatigar el antebrazo.",
-   "Paso 2: Inicia el jalón traccionando con los codos hacia atrás y hacia las caderas, retrayendo firmemente las escápulas al final del recorrido concéntrico.",
-   "Paso 3: En la fase excéntrica, baja el peso controlando la carga durante 3 segundos.",
-   "Paso 4: En el punto más bajo, permite deliberadamente que las escápulas protraigan y se separen, sintiendo un estiramiento profundo y con carga en los dorsales durante 1 segundo antes de iniciar la siguiente repetición."
-  ],
-  "claves_tecnica": [
-   "El pecho no debe despegarse del soporte en ningún momento de la serie.",
-   "Aprovecha el soporte para eliminar la fatiga de la espalda baja y concentrarte en el estiramiento dorsal.",
-   "Tira pensando en llevar los codos hacia los bolsillos del pantalón, no en jalar con las manos."
-  ],
-  "errores_comunes": [
-   "Rebotar el pecho contra la almohadilla para impulsar el peso con inercia.",
-   "Cortar el rango de movimiento abajo sin permitir que el dorsal se estire por completo.",
-   "Encoger los hombros hacia las orejas usando el trapecio superior en lugar del dorsal."
-  ],
-  "respiracion": "Inhala profundamente mientras bajas el peso y sientes el estiramiento; exhala con fuerza al traccionar los codos hacia atrás.",
-  "tempo": "3-1-1-0",
-  "series_reps_hipertrofia": "3 x 5-8",
-  "series_reps_fuerza": "3-4 x 4-6",
-  "descanso_seg": 150,
-  "rir_recomendado": "1-2 (fallo solo en la última serie)",
-  "progresion": "Sobrecarga progresiva doble: mantener 5-8 reps; al completar 3 series de 8 con técnica estricta, subir 2.5 a 5 kg en discos.",
-  "alternativas": [
-   "Remo en polea baja con soporte de pecho",
-   "Remo con mancuernas apoyado en banco inclinado"
-  ],
-  "seguridad": "Asegúrate de que los discos estén asegurados con collarines si los soportes de la máquina no tienen inclinación de retención.",
-  "descripcion_visual": "Inicio con brazos extendidos hacia adelante y escápulas completamente abiertas estirando la espalda; final con codos pegados a los costados y escápulas pellizcadas.",
-  "busqueda_video": "chest supported row form loaded stretch hypertrophy",
-  "evidencia": "fuerte",
-  "fuente": "https://doi.org/10.1016/j.smhs.2025.03.001",
-  "temas": [
-   "movilidad_estiramiento"
-  ],
-  "alias": [
-   "chest-supported row with loaded stretch",
-   "remo con soporte de pecho con enfasis en estiramiento excentrico",
-   "remo soporte pecho estiramiento"
-  ],
-  "imagen": "media/fotos/remo_soporte_pecho_estiramiento_0.jpg",
-  "imagenes": [
-   "media/fotos/remo_soporte_pecho_estiramiento_0.jpg",
-   "media/fotos/remo_soporte_pecho_estiramiento_1.jpg"
-  ],
-  "foto_fuente": "free-exercise-db: Lying_T-Bar_Row (dominio público)"
- },
- {
   "id": "rotacion_cadera_90_90",
   "nombre": "Rotación de cadera sentada 90/90",
   "nombre_en": "90/90 hip switches",
@@ -4175,13 +3944,7 @@
    "deficit push-ups",
    "flexiones con deficit",
    "flexiones con deficit para estiramiento profundo"
-  ],
-  "imagen": "media/fotos/flexiones_con_deficit_0.jpg",
-  "imagenes": [
-   "media/fotos/flexiones_con_deficit_0.jpg",
-   "media/fotos/flexiones_con_deficit_1.jpg"
-  ],
-  "foto_fuente": "free-exercise-db: Decline_Push-Up (dominio público)"
+  ]
  },
  {
   "id": "flexiones_declinadas",
@@ -4553,7 +4316,7 @@
   "descripcion_visual": "Inicio: Rodillas juntas en el centro en contacto con las almohadillas externas, placas separadas. Final: Piernas ampliamente separadas en forma de V, glúteo superior contraído fuertemente, espalda fija.",
   "busqueda_video": "seated hip abduction machine form glute medius hypertrophy",
   "evidencia": "moderada",
-  "fuente": "https://www.frontiersin.org/articles/10.3389/fphys.2023.1197920/full",
+  "fuente": "",
   "temas": [
    "pierna_gluteo"
   ],
@@ -5016,7 +4779,7 @@
   "descripcion_visual": "Inicio: Glúteos rozando el suelo, espalda media contra el banco, mancuerna en la pelvis, mirada al frente. Final: Pelvis arriba formando una mesa plana de rodillas a hombros, tibias verticales a 90 grados, glúteos contraídos como rocas.",
   "busqueda_video": "how to hip thrust correctly Bret Contreras glutes",
   "evidencia": "fuerte",
-  "fuente": "https://www.frontiersin.org/articles/10.3389/fphys.2023.1197920/full",
+  "fuente": "",
   "temas": [
    "pierna_gluteo"
   ],

@@ -14,6 +14,11 @@
      "reps": "10-12"
     },
     {
+     "id": "press_militar_mancuernas_sentado",
+     "series": 2,
+     "reps": "6-8"
+    },
+    {
      "id": "press_pecho_en_polea",
      "series": 3,
      "reps": "8-10"
@@ -22,11 +27,6 @@
      "id": "extension_triceps_sobre_cabeza_polea",
      "series": 3,
      "reps": "8-10"
-    },
-    {
-     "id": "press_militar_mancuernas_sentado",
-     "series": 2,
-     "reps": "6-8"
     },
     {
      "id": "aperturas_en_polea_media",
@@ -44,6 +44,11 @@
    "nombre": "Pierna y abdomen",
    "ejercicios": [
     {
+     "id": "sentadilla_hack",
+     "series": 3,
+     "reps": "6-8"
+    },
+    {
      "id": "sentadilla_hack_inversa",
      "series": 3,
      "reps": "6-8"
@@ -60,7 +65,7 @@
     },
     {
      "id": "extension_cuadriceps_maquina",
-     "series": 2,
+     "series": 3,
      "reps": "10-12"
     },
     {
@@ -126,7 +131,8 @@
     {
      "id": "colgado_pasivo_barra_dorsal",
      "series": 1,
-     "reps": "30-45 s"
+     "reps": "30-45",
+     "nota": "segundos colgado"
     }
    ]
   },

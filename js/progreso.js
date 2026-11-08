@@ -1,15 +1,14 @@
 // js/progreso.js - Pantalla «Progreso» de Forja (Dirección de Arte v2 «Revista de Sala»)
-// Gráficas de 1RM, peso máximo y volumen por ejercicio con PRs,
+// Gráficas de 1RM (o repeticiones máximas en peso corporal), peso máximo y volumen por ejercicio con récords,
 // series duras semanales por músculo contra la meta (10-20),
 // récord personal con titular Instrument Serif cursivo y números héroe en .grande.
 
-import { todos, filtrar, obtener } from './db.js';
-import { h, aviso, fechaBonita, formatoKg, hoyISO } from './ui.js';
-import { ejercicios, ejercicio } from './datos.js';
-import { unoRM, epley, brzycki, seriesPorMusculo, prs, normalizarMusculo } from './calculos.js';
+import { todos } from './db.js';
+import { h, fechaBonita, formatoKg, hoyISO } from './ui.js';
+import { ejercicios } from './datos.js';
+import { epley, brzycki, seriesPorMusculo, prs, normalizarMusculo } from './calculos.js';
 import { lineas, barras } from './graficas.js';
 import { FORMULA_1RM, SERIES_META } from './config.js';
-import { ir } from './app.js';
 import { icono } from './iconos.js';
 
 let cleanupFn = null;
@@ -40,7 +39,7 @@ export async function montar(contenedor, params = []) {
 
   const pantalla = h('div', { class: 'pantalla progreso-pantalla' });
 
-  // Estilos editoriales v2: Papel, Papel 2, Tinta, Lima de tiza, radios 28px y 999px
+  // Estilos editoriales v2: Papel, Papel 2, Tinta, Lima de tiza, radios 28px y 999px, botones >= 48px
   const estilo = h('style', {}, `
     .progreso-pantalla {
       display: flex;
@@ -59,7 +58,7 @@ export async function montar(contenedor, params = []) {
     }
     .progreso-saludo {
       font-size: 14px;
-      color: var(--sutil, #6B675F);
+      color: var(--sutil, #5D5951);
       font-weight: 500;
     }
     .progreso-titular-seccion {
@@ -82,10 +81,11 @@ export async function montar(contenedor, params = []) {
     }
     .progreso-tab-btn {
       flex: 1;
-      height: 40px;
+      min-height: 48px;
+      height: 48px;
       border: none;
       background: transparent;
-      color: var(--sutil, #6B675F);
+      color: var(--sutil, #5D5951);
       font-family: 'Bricolage Grotesque', sans-serif;
       font-weight: 600;
       font-size: 13px;
@@ -112,8 +112,9 @@ export async function montar(contenedor, params = []) {
       display: none;
     }
     .progreso-subtab-chip {
-      height: 38px;
-      padding: 0 16px;
+      min-height: 48px;
+      height: 48px;
+      padding: 0 18px;
       border-radius: 999px;
       border: none;
       background: var(--superficie2, #E9E4D8);
@@ -136,6 +137,11 @@ export async function montar(contenedor, params = []) {
       display: flex;
       flex-direction: column;
       gap: 12px;
+    }
+    .subtitulo-seccion-card {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--sutil, #5D5951);
     }
     .progreso-record-hero {
       background-color: #17171A;
@@ -229,11 +235,32 @@ export async function montar(contenedor, params = []) {
     }
     .progreso-racha-caption {
       font-size: 13px;
-      color: var(--sutil, #6B675F);
+      color: var(--sutil, #5D5951);
       font-weight: 500;
       display: flex;
       align-items: center;
       gap: 6px;
+    }
+    .progreso-cal-nav {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .progreso-cal-btn {
+      min-width: 48px;
+      min-height: 48px;
+      border-radius: 999px;
+      border: none;
+      background-color: var(--fondo, #F3F0E8);
+      color: var(--texto, #17171A);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 0 12px;
     }
     .progreso-cal-grid {
       display: grid;
@@ -268,6 +295,7 @@ export async function montar(contenedor, params = []) {
     }
     .progreso-select-ej {
       width: 100%;
+      min-height: 48px;
       height: 48px;
       background-color: var(--superficie2, #E9E4D8);
       border: none;
@@ -295,7 +323,7 @@ export async function montar(contenedor, params = []) {
     }
     .progreso-sesion-reps {
       font-size: 13px;
-      color: var(--sutil, #6B675F);
+      color: var(--sutil, #5D5951);
     }
   `);
   pantalla.appendChild(estilo);
@@ -313,6 +341,7 @@ export async function montar(contenedor, params = []) {
   let ejercicioSeleccionadoId = (params && params[0]) ? params[0] : null;
   let metricaSeleccionada = '1rm'; // '1rm' | 'peso' | 'volumen'
   let formulaActiva = (typeof FORMULA_1RM === 'string' ? FORMULA_1RM.toLowerCase() : 'epley');
+  let mesVisualizadoOffset = 0; // Navegación entre meses en calendario (M-05)
 
   // Si no hay ejercicio por parámetro, elegir el que tenga más series
   if (!ejercicioSeleccionadoId) {
@@ -447,9 +476,9 @@ export async function montar(contenedor, params = []) {
       const tarjetaMusculos = h('div', { class: 'progreso-card-papel' },
         h('div', { class: 'fila', style: 'justify-content: space-between; align-items: flex-start;' },
           h('div', { class: 'col', style: 'gap: 2px;' },
-            h('span', { class: 'micro-label', style: 'color: var(--sutil, #6B675F);' }, 'SEMANA EN CURSO'),
+            h('span', { class: 'subtitulo-seccion-card' }, 'Semana en curso'),
             h('h3', { style: 'font-size: 20px; font-weight: 700; color: #17171A; margin-top: 2px;' }, 'Series duras por músculo'),
-            h('span', { style: 'font-size: 13px; color: var(--sutil, #6B675F);' },
+            h('span', { style: 'font-size: 13px; color: var(--sutil, #5D5951);' },
               `Del ${fechaBonita(lunesISO)} al ${fechaBonita(hoyStr)}`
             )
           ),
@@ -457,7 +486,7 @@ export async function montar(contenedor, params = []) {
             style: 'background-color: var(--lima, #C8F03C); color: #17171A; border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 700;'
           }, `${enMeta} en meta`)
         ),
-        h('p', { style: 'font-size: 13px; color: var(--sutil, #6B675F); line-height: 1.4;' },
+        h('p', { style: 'font-size: 13px; color: var(--sutil, #5D5951); line-height: 1.4;' },
           `Meta semanal: ${metaMin} a ${metaMax} series duras (RIR ≤ 3 o fallo). Principal cuenta 1, secundario 0.5.`
         ),
         // Gráfica de barras en Tinta y Lima
@@ -474,7 +503,7 @@ export async function montar(contenedor, params = []) {
           ),
           h('div', { class: 'fila', style: 'align-items: center; gap: 6px;' },
             h('span', { style: 'width: 10px; height: 10px; border-radius: 999px; background: rgba(23,23,26,0.12);' }),
-            h('span', { style: 'color: var(--sutil, #6B675F);' }, 'Sin series')
+            h('span', { style: 'color: var(--sutil, #5D5951);' }, 'Sin series')
           )
         )
       );
@@ -488,9 +517,21 @@ export async function montar(contenedor, params = []) {
     else if (tabActiva === 'ejercicio') {
       const mapaPRs = prs(todasSeries);
       const prActual = ejercicioSeleccionadoId ? mapaPRs[ejercicioSeleccionadoId] : null;
-      // La serie real del récord (para mostrar «40 kg/lado» o «placa 5», no solo «40»; fix 7-nov)
-      const seriePR = prActual ? todasSeries.find(s => s.ejercicioId === ejercicioSeleccionadoId &&
-        s.kg === prActual.kg && s.reps === prActual.reps && (!prActual.fecha || s.fecha === prActual.fecha)) : null;
+      const ejActual = mapaEjercicios.get(ejercicioSeleccionadoId);
+
+      // Series históricas del ejercicio seleccionado
+      const seriesEsteEj = todasSeries
+        .filter(s => s && s.ejercicioId === ejercicioSeleccionadoId)
+        .sort((a, b) => (a.fecha > b.fecha ? 1 : a.fecha < b.fecha ? -1 : (a.hora || 0) - (b.hora || 0)));
+
+      // Detectar si el ejercicio es de peso corporal sin lastre (A-05 y MEDIO-05)
+      const esCorporalPuro = (seriesEsteEj.length > 0 && seriesEsteEj.every(s => s.kg == null || Number(s.kg) === 0)) ||
+        (seriesEsteEj.length === 0 && ((ejActual?.equipo || '').toLowerCase().includes('peso corporal') || (ejActual?.equipo || '').toLowerCase().includes('barra de dominadas')));
+
+      // La serie real del récord (para mostrar «40 kg/lado» o «placa 5»)
+      const seriePR = prActual ? seriesEsteEj.find(s =>
+        s.kg === prActual.kg && s.reps === prActual.reps && (!prActual.fecha || s.fecha === prActual.fecha)
+      ) : null;
 
       // Selector estilizado
       const ejerciciosConSeries = new Set(todasSeries.map(s => s.ejercicioId).filter(Boolean));
@@ -519,35 +560,41 @@ export async function montar(contenedor, params = []) {
       );
       cuerpoSeccion.appendChild(selectorEj);
 
-      // Subtabs de métricas en píldoras
+      // Subtabs de métricas en píldoras (adaptadas si es peso corporal: A-05)
+      const etiquetaTab1 = esCorporalPuro
+        ? 'Reps máximas'
+        : `1RM (${formulaActiva === 'brzycki' ? 'Brzycki' : 'Epley'})`;
+      const etiquetaTab2 = esCorporalPuro ? 'Mejor serie' : 'Peso máximo';
+      const etiquetaTab3 = esCorporalPuro ? 'Reps totales' : 'Volumen total';
+
       const subtabsMetrica = h('div', { class: 'progreso-subtabs' },
         h('button', {
           class: `progreso-subtab-chip ${metricaSeleccionada === '1rm' ? 'activo' : ''}`,
           on: { click: () => { metricaSeleccionada = '1rm'; renderizar(); } }
-        }, `1RM (${formulaActiva === 'brzycki' ? 'Brzycki' : 'Epley'})`),
+        }, etiquetaTab1),
         h('button', {
           class: `progreso-subtab-chip ${metricaSeleccionada === 'peso' ? 'activo' : ''}`,
           on: { click: () => { metricaSeleccionada = 'peso'; renderizar(); } }
-        }, 'Peso máximo'),
+        }, etiquetaTab2),
         h('button', {
           class: `progreso-subtab-chip ${metricaSeleccionada === 'volumen' ? 'activo' : ''}`,
           on: { click: () => { metricaSeleccionada = 'volumen'; renderizar(); } }
-        }, 'Volumen total')
+        }, etiquetaTab3)
       );
       cuerpoSeccion.appendChild(subtabsMetrica);
 
-      // Si es 1RM, alternador de fórmula en píldoras finas
-      if (metricaSeleccionada === '1rm') {
+      // Si es 1RM con peso externo, alternador de fórmula en píldoras táctiles
+      if (metricaSeleccionada === '1rm' && !esCorporalPuro) {
         const toggleFormula = h('div', { class: 'fila', style: 'justify-content: flex-end; align-items: center; gap: 8px;' },
-          h('span', { style: 'font-size: 12px; color: var(--sutil, #6B675F); font-weight: 500;' }, 'Fórmula:'),
+          h('span', { style: 'font-size: 12px; color: var(--sutil, #5D5951); font-weight: 500;' }, 'Fórmula:'),
           h('button', {
             class: `progreso-subtab-chip ${formulaActiva === 'epley' ? 'activo' : ''}`,
-            style: 'height: 28px; padding: 0 12px; font-size: 11px;',
+            style: 'min-height: 40px; height: 40px; padding: 0 14px; font-size: 12px;',
             on: { click: () => { formulaActiva = 'epley'; renderizar(); } }
           }, 'Epley'),
           h('button', {
             class: `progreso-subtab-chip ${formulaActiva === 'brzycki' ? 'activo' : ''}`,
-            style: 'height: 28px; padding: 0 12px; font-size: 11px;',
+            style: 'min-height: 40px; height: 40px; padding: 0 14px; font-size: 12px;',
             on: { click: () => { formulaActiva = 'brzycki'; renderizar(); } }
           }, 'Brzycki')
         );
@@ -555,7 +602,21 @@ export async function montar(contenedor, params = []) {
       }
 
       // TARJETA HÉROE DE RÉCORD PERSONAL: titular serif cursivo y números grandes en .grande
-      const nombreEjSel = mapaEjercicios.get(ejercicioSeleccionadoId)?.nombre || ejercicioSeleccionadoId;
+      // Corrección A-05: en ejercicios de peso corporal no mostrar «1RM estimado: 0 kg»
+      const nombreEjSel = ejActual?.nombre || ejercicioSeleccionadoId;
+      const esRecordCorporal = prActual && (prActual.kg == null || Number(prActual.kg) === 0);
+
+      let textoPildoraRecord = '';
+      if (prActual) {
+        if (esRecordCorporal) {
+          textoPildoraRecord = `Récord de repeticiones: ${prActual.reps} reps (peso corporal)`;
+        } else if (prActual.unidad === 'placa') {
+          textoPildoraRecord = `1RM aprox: ${prActual.unoRM} placas`;
+        } else {
+          textoPildoraRecord = `1RM estimado: ${prActual.unoRM} kg`;
+        }
+      }
+
       const cardRecord = h('div', { class: 'progreso-record-hero' },
         h('span', { class: 'micro-label' }, 'HITO HISTÓRICO'),
         h('h3', { class: 'progreso-record-serif' },
@@ -563,30 +624,21 @@ export async function montar(contenedor, params = []) {
         ),
         h('span', { style: 'font-size: 14px; color: var(--lima, #C8F03C); font-weight: 600;' }, nombreEjSel),
         prActual ? h('div', { class: 'progreso-record-metric' },
-          h('span', { class: 'grande' }, prActual.kg != null ? String(prActual.kg) + ' × ' + prActual.reps : `${prActual.reps} reps`),
-          h('span', { class: 'sutil', style: 'display:block;font-size:14px;margin-top:4px;' },
-            seriePR ? formatearCargaSerie(seriePR) + (seriePR.porLado ? ' (el 1RM cuenta los dos lados)' : '') : ''),
+          h('span', { class: 'grande' }, !esRecordCorporal ? `${prActual.kg} × ${prActual.reps}` : `${prActual.reps} reps`),
+          h('span', { class: 'sutil', style: 'display: block; font-size: 14px; margin-top: 4px; color: #B5B0A6;' },
+            seriePR ? formatearCargaSerie(seriePR) + (seriePR.porLado ? ' (el 1RM cuenta los dos lados)' : '') : (esRecordCorporal ? 'peso corporal' : '')),
           h('svg', { class: 'record-underline-svg', viewBox: '0 0 230 18' },
             h('path', { class: 'record-underline-path', d: 'M 6 13 C 65 5, 120 15, 222 8' })
           ),
-          h('div', { class: 'record-pill-fuerza' },
-            prActual.unidad === 'placa'
-              ? `1RM aprox: ${prActual.unoRM} placas`
-              : `1RM estimado: ${prActual.unoRM} kg`
-          ),
-          prActual.fecha ? h('span', { style: 'font-size: 12px; color: #8E8A82; margin-top: 6px;' },
+          h('div', { class: 'record-pill-fuerza' }, textoPildoraRecord),
+          prActual.fecha ? h('span', { style: 'font-size: 12px; color: #B5B0A6; margin-top: 6px;' },
             `Logrado el ${fechaBonita(prActual.fecha)}`
           ) : null
-        ) : h('div', { style: 'margin: 16px 0; font-size: 14px; color: #8E8A82;' },
+        ) : h('div', { style: 'margin: 16px 0; font-size: 14px; color: #B5B0A6;' },
           'Aún no has registrado series de este ejercicio.'
         )
       );
       cuerpoSeccion.appendChild(cardRecord);
-
-      // Series históricas del ejercicio
-      const seriesEsteEj = todasSeries
-        .filter(s => s && s.ejercicioId === ejercicioSeleccionadoId)
-        .sort((a, b) => (a.fecha > b.fecha ? 1 : a.fecha < b.fecha ? -1 : (a.hora || 0) - (b.hora || 0)));
 
       const usaPlacas = seriesEsteEj.some(s => s.unidad === 'placa');
 
@@ -605,27 +657,55 @@ export async function montar(contenedor, params = []) {
       for (const [fecha, arrSeries] of sesionesPorFecha.entries()) {
         let valorCalculado = 0;
         let esPR = false;
+        const sesionCorporal = arrSeries.every(s => s.kg == null || Number(s.kg) === 0);
 
         if (metricaSeleccionada === '1rm') {
-          for (const s of arrSeries) {
-            const kgEfectivo = s.kg != null ? (s.porLado ? s.kg * 2 : s.kg) : 0;
-            const r = Number(s.reps || 0);
-            const val1rm = formulaActiva === 'brzycki' ? brzycki(kgEfectivo, r) : epley(kgEfectivo, r);
-            if (val1rm > valorCalculado) valorCalculado = val1rm;
-          }
-          if (prActual && prActual.fecha === fecha && Math.abs(valorCalculado - prActual.unoRM) < 0.2) {
-            esPR = true;
+          if (esCorporalPuro || sesionCorporal) {
+            // Corrección A-05: en peso corporal graficar las repeticiones máximas de la sesión en vez de 0
+            for (const s of arrSeries) {
+              const r = Number(s.reps || 0);
+              if (r > valorCalculado) valorCalculado = r;
+            }
+            if (prActual && prActual.fecha === fecha && valorCalculado === prActual.reps) {
+              esPR = true;
+            }
+          } else {
+            for (const s of arrSeries) {
+              const kgEfectivo = s.kg != null ? (s.porLado ? s.kg * 2 : s.kg) : 0;
+              const r = Number(s.reps || 0);
+              const val1rm = formulaActiva === 'brzycki' ? brzycki(kgEfectivo, r) : epley(kgEfectivo, r);
+              if (val1rm > valorCalculado) valorCalculado = val1rm;
+            }
+            if (prActual && prActual.fecha === fecha && Math.abs(valorCalculado - prActual.unoRM) < 0.2) {
+              esPR = true;
+            }
           }
         } else if (metricaSeleccionada === 'peso') {
-          for (const s of arrSeries) {
-            const kg = Number(s.kg || 0);
-            if (kg > valorCalculado) valorCalculado = kg;
+          if (esCorporalPuro || sesionCorporal) {
+            for (const s of arrSeries) {
+              const r = Number(s.reps || 0);
+              if (r > valorCalculado) valorCalculado = r;
+            }
+            if (prActual && prActual.fecha === fecha && valorCalculado === prActual.reps) {
+              esPR = true;
+            }
+          } else {
+            for (const s of arrSeries) {
+              const kg = Number(s.kg || 0);
+              if (kg > valorCalculado) valorCalculado = kg;
+            }
           }
         } else if (metricaSeleccionada === 'volumen') {
+          // Corrección M-04 (porLado * 2) y MEDIO-05 (volumen de reps en peso corporal)
           for (const s of arrSeries) {
-            const kg = Number(s.kg || 0);
             const reps = Number(s.reps || 0);
-            valorCalculado += kg * reps;
+            if (esCorporalPuro || sesionCorporal) {
+              valorCalculado += reps;
+            } else {
+              const kgBase = Number(s.kg || 0);
+              const kgTotalSerie = s.porLado ? kgBase * 2 : kgBase;
+              valorCalculado += kgTotalSerie * reps;
+            }
           }
           valorCalculado = Math.round(valorCalculado);
         }
@@ -639,19 +719,23 @@ export async function montar(contenedor, params = []) {
       }
 
       let unidadMetrica = 'kg';
-      if (usaPlacas) {
+      if (esCorporalPuro) {
+        unidadMetrica = metricaSeleccionada === 'volumen' ? 'reps tot' : 'reps';
+      } else if (usaPlacas) {
         unidadMetrica = metricaSeleccionada === 'volumen' ? 'placas tot' : 'placas';
       } else if (metricaSeleccionada === 'volumen') {
         unidadMetrica = 'kg tot';
       }
 
+      const tituloGrafica = esCorporalPuro
+        ? (metricaSeleccionada === 'volumen' ? 'Volumen total de repeticiones' : 'Evolución de repeticiones máximas')
+        : (metricaSeleccionada === '1rm' ? 'Evolución de 1RM' : (metricaSeleccionada === 'peso' ? 'Carga máxima levantada' : 'Volumen total de sesión'));
+
       // Gráfica de líneas en Papel 2, línea Lima (#C8F03C), sin cuadrícula pesada
       const cardGrafica = h('div', { class: 'progreso-card-papel' },
         h('div', { class: 'fila', style: 'justify-content: space-between; align-items: baseline;' },
-          h('h4', { style: 'font-size: 16px; font-weight: 700; color: #17171A; margin: 0;' },
-            metricaSeleccionada === '1rm' ? 'Evolución de 1RM' : (metricaSeleccionada === 'peso' ? 'Carga máxima levantada' : 'Volumen total de sesión')
-          ),
-          h('span', { style: 'font-size: 12px; color: var(--sutil, #6B675F); font-weight: 600;' },
+          h('h4', { style: 'font-size: 16px; font-weight: 700; color: #17171A; margin: 0;' }, tituloGrafica),
+          h('span', { style: 'font-size: 12px; color: var(--sutil, #5D5951); font-weight: 600;' },
             `${puntosGrafica.length} sesiones`
           )
         ),
@@ -691,13 +775,14 @@ export async function montar(contenedor, params = []) {
     }
 
     // ==========================================
-    // TAB 3: RACHA Y CALENDARIO
+    // TAB 3: RACHA Y CALENDARIO (con navegación mensual: M-05)
     // ==========================================
     else if (tabActiva === 'calendario') {
       const hoyStr = hoyISO();
       const fechaActual = new Date(hoyStr + 'T12:00:00');
-      const anioActual = fechaActual.getFullYear();
-      const mesActual = fechaActual.getMonth();
+      const fechaMesVista = new Date(fechaActual.getFullYear(), fechaActual.getMonth() + mesVisualizadoOffset, 1);
+      const anioVista = fechaMesVista.getFullYear();
+      const mesVista = fechaMesVista.getMonth();
 
       const nombresMeses = [
         'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -706,11 +791,11 @@ export async function montar(contenedor, params = []) {
 
       const fechasEntrenadas = new Set(todasSeries.map(s => s.fecha).filter(Boolean));
 
-      // Entrenamientos del mes
+      // Entrenamientos del mes visualizado
       let entrenosDelMes = 0;
       fechasEntrenadas.forEach(f => {
         const d = new Date(f + 'T12:00:00');
-        if (d.getFullYear() === anioActual && d.getMonth() === mesActual) {
+        if (d.getFullYear() === anioVista && d.getMonth() === mesVista) {
           entrenosDelMes++;
         }
       });
@@ -760,15 +845,15 @@ export async function montar(contenedor, params = []) {
           h('span', { class: 'grande' }, String(entrenosDelMes)),
           h('span', { class: 'progreso-racha-caption' },
             icono('pesas'),
-            `Sesiones en ${nombresMeses[mesActual]}`
+            `Sesiones en ${nombresMeses[mesVista]}`
           )
         )
       );
       cuerpoSeccion.appendChild(cardRacha);
 
-      // Calendario mensual en tarjeta Papel 2
-      const primerDiaMes = new Date(anioActual, mesActual, 1);
-      const ultimoDiaMes = new Date(anioActual, mesActual + 1, 0);
+      // Calendario mensual en tarjeta Papel 2 con navegación entre meses (M-05)
+      const primerDiaMes = new Date(anioVista, mesVista, 1);
+      const ultimoDiaMes = new Date(anioVista, mesVista + 1, 0);
       const diasEnMes = ultimoDiaMes.getDate();
       const diaInicio = primerDiaMes.getDay();
       const offsetInicio = diaInicio === 0 ? 6 : diaInicio - 1;
@@ -776,10 +861,42 @@ export async function montar(contenedor, params = []) {
       const cardCalendario = h('div', { class: 'progreso-card-papel' },
         h('div', { class: 'fila', style: 'justify-content: space-between; align-items: center;' },
           h('h3', { style: 'font-size: 18px; font-weight: 700; color: #17171A; margin: 0;' },
-            `${nombresMeses[mesActual]} ${anioActual}`
+            `${nombresMeses[mesVista]} ${anioVista}`
           ),
-          h('span', { style: 'font-size: 13px; color: var(--sutil, #6B675F); font-weight: 600;' },
-            'Días entrenados'
+          h('div', { class: 'progreso-cal-nav' },
+            h('button', {
+              class: 'progreso-cal-btn',
+              type: 'button',
+              'aria-label': 'Mes anterior',
+              on: {
+                click: () => {
+                  mesVisualizadoOffset--;
+                  renderizar();
+                }
+              }
+            }, icono('atras', 18)),
+            mesVisualizadoOffset !== 0 ? h('button', {
+              class: 'progreso-cal-btn',
+              type: 'button',
+              style: 'background-color: var(--lima, #C8F03C);',
+              on: {
+                click: () => {
+                  mesVisualizadoOffset = 0;
+                  renderizar();
+                }
+              }
+            }, 'Hoy') : null,
+            h('button', {
+              class: 'progreso-cal-btn',
+              type: 'button',
+              'aria-label': 'Mes siguiente',
+              on: {
+                click: () => {
+                  mesVisualizadoOffset++;
+                  renderizar();
+                }
+              }
+            }, icono('flecha', 18))
           )
         )
       );
@@ -788,7 +905,7 @@ export async function montar(contenedor, params = []) {
       const iniciales = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
       iniciales.forEach(txt => {
         gridCal.appendChild(h('span', {
-          style: 'font-size: 12px; font-weight: 700; color: var(--sutil, #6B675F); padding-bottom: 2px;'
+          style: 'font-size: 12px; font-weight: 700; color: var(--sutil, #5D5951); padding-bottom: 2px;'
         }, txt));
       });
 
@@ -798,8 +915,8 @@ export async function montar(contenedor, params = []) {
 
       for (let dia = 1; dia <= diasEnMes; dia++) {
         const diaStr = String(dia).padStart(2, '0');
-        const mesStr = String(mesActual + 1).padStart(2, '0');
-        const fechaISO = `${anioActual}-${mesStr}-${diaStr}`;
+        const mesStr = String(mesVista + 1).padStart(2, '0');
+        const fechaISO = `${anioVista}-${mesStr}-${diaStr}`;
 
         const entreno = fechasEntrenadas.has(fechaISO);
         const esHoy = fechaISO === hoyStr;

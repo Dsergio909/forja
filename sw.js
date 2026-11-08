@@ -1,13 +1,17 @@
 /* ==========================================================================
    FORJA - Service Worker (sw.js)
-   Versión de caché: forja-v3
+   Versión de caché: forja-v4
    Garantiza funcionamiento 100% offline y actualizaciones sin fricción.
    Estrategia:
-   - RED PRIMERO con respaldo en caché para: index.html, js/*.js, styles.css, fonts/* y data/*.json.
-   - CACHÉ PRIMERO para: multimedia (media/) y librerías/modelos externos (CDN).
+   - EXCLUIR (dejar pasar sin interceptar ni clonar): modelos de WebLLM/HuggingFace/GitHub
+     y cualquier dominio que no sea de la app ni del CDN de librerías (SW-01).
+   - RED PRIMERO (con tiempo límite de 3 s y respaldo en caché) para: index.html, js/*.js,
+     styles.css, fonts/* y data/*.json (SW-02).
+   - CACHÉ PRIMERO para: multimedia local (media/) y librerías del CDN permitido.
    ========================================================================== */
 
-const CACHE_NAME = 'forja-20261107-1807';
+const CACHE_NAME = 'forja-20261107-1916';
+const TIEMPO_LIMITE_RED_MS = 3000;
 
 // Lista completa de archivos de la app para precaché
 const ARCHIVOS_APP = [
@@ -66,7 +70,7 @@ const ARCHIVOS_APP = [
   './data/guia/16_imagenes_videos_ejercicios.md'
 ];
 
-// Dominios CDN externos permitidos (MediaPipe, WebLLM, etc.)
+// Dominios CDN externos de librerías permitidos (MediaPipe, paquete JS de WebLLM)
 const CDNS_PERMITIDOS = [
   'cdn.jsdelivr.net',
   'esm.run',
@@ -118,19 +122,38 @@ self.addEventListener('fetch', (evento) => {
     return;
   }
 
-  const url = new URL(request.url);
+  let url;
+  try {
+    url = new URL(request.url);
+  } catch (_) {
+    return;
+  }
 
-  // 1. CACHÉ PRIMERO para multimedia (media/) y librerías/modelos de CDNs
-  const esCDN = CDNS_PERMITIDOS.some((host) => url.hostname.includes(host));
-  const esMedia = url.pathname.includes('/media/');
+  const host = url.hostname;
+  const esMismoOrigen = url.origin === self.location.origin;
+  const esCDN = CDNS_PERMITIDOS.some((cdn) => host === cdn || host.endsWith('.' + cdn));
 
+  // 0. SW-01: Dejar pasar SIN tocar ni clonar todos los archivos de modelos de WebLLM/HuggingFace/GitHub
+  // y cualquier petición que no sea de la app ni del CDN de librerías.
+  if (
+    host.includes('huggingface.co') ||
+    host.includes('hf.co') ||
+    host.includes('githubusercontent.com') ||
+    url.pathname.endsWith('.bin') ||
+    (!esMismoOrigen && !esCDN)
+  ) {
+    return;
+  }
+
+  // 1. CACHÉ PRIMERO para multimedia local (media/) y librerías del CDN permitido
+  const esMedia = esMismoOrigen && url.pathname.includes('/media/');
   if (esCDN || esMedia) {
     evento.respondWith(manejarCachePrimero(request));
     return;
   }
 
-  // 2. RED PRIMERO para todo lo demás: index.html, js/*.js, styles.css, fonts/*, data/*.json,
-  // manifest, iconos y artículos de la guía (con respaldo de caché si no hay internet)
+  // 2. RED PRIMERO (con tope de 3 s) para archivos de la app: index.html, js/*.js,
+  // styles.css, fonts/*, data/*.json, manifest, iconos y artículos de la guía
   evento.respondWith(manejarRedPrimero(request));
 });
 
@@ -157,20 +180,26 @@ async function manejarCachePrimero(request) {
 }
 
 /**
- * Estrategia: Red Primero con respaldo en Caché.
- * Prioriza la red para obtener de inmediato las últimas actualizaciones de código y datos.
- * Si no hay conexión o la red falla, entrega la copia almacenada en caché.
+ * Estrategia: Red Primero con tiempo límite de 3 s (SW-02) y respaldo en Caché.
+ * Prioriza la red para obtener actualizaciones de código y datos sin bloquearse en conexiones lentas.
+ * Si la red tarda más de 3 s o no hay conexión, entrega inmediatamente la copia en caché.
  */
 async function manejarRedPrimero(request) {
   const cache = await caches.open(CACHE_NAME);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIEMPO_LIMITE_RED_MS);
+
   try {
-    const respuestaRed = await fetch(request);
+    const respuestaRed = await fetch(request, { signal: controller.signal });
+    clearTimeout(timer);
     if (respuestaRed && respuestaRed.status === 200) {
       cache.put(request, respuestaRed.clone());
     }
     return respuestaRed;
   } catch (error) {
-    // Si la red falló, buscar en caché
+    clearTimeout(timer);
+
+    // Si la red falló o superó los 3 s, buscar en caché
     const respuestaCache = await cache.match(request);
     if (respuestaCache) {
       return respuestaCache;

@@ -1,5 +1,5 @@
 // js/graficas.js - Generador de gráficas SVG propio, ligero, responsive y editorial
-// Dirección de arte Forja v2: paleta en Tinta (#17171A), Tinta suave (#6B675F),
+// Dirección de arte Forja v2: paleta en Tinta (#17171A), Tinta suave (#5D5951),
 // Papel 2 (#E9E4D8) y Lima de tiza (#C8F03C), sin cuadrículas pesadas, radios 999px.
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -46,7 +46,7 @@ export function lineas(datos, opciones = {}) {
   const ancho = opciones.ancho || 360;
   const alto = opciones.alto || 180;
   const unidad = opciones.unidad != null ? opciones.unidad : 'kg';
-  const colorLinea = opciones.color || 'var(--lima, #C8F03C)';
+  const colorLinea = opciones.color || 'var(--lima, var(--ok, #C8F03C))';
   const mostrarPuntos = opciones.mostrarPuntos !== false;
   const mostrarArea = opciones.mostrarArea !== false;
   const padding = { top: 22, right: 20, bottom: 26, left: 38 };
@@ -85,7 +85,7 @@ export function lineas(datos, opciones = {}) {
       x: ancho / 2,
       y: alto / 2,
       'text-anchor': 'middle',
-      fill: 'var(--tinta-suave, #6B675F)',
+      fill: 'var(--sutil, var(--tinta-suave, #5D5951))',
       'font-size': '13',
       'font-weight': '500'
     }, ['Sin registros aún']);
@@ -145,7 +145,7 @@ export function lineas(datos, opciones = {}) {
       x: padding.left - 6,
       y: yPos + 3.5,
       'text-anchor': 'end',
-      fill: 'var(--tinta-suave, #6B675F)',
+      fill: 'var(--sutil, var(--tinta-suave, #5D5951))',
       'font-size': '10',
       'font-variant-numeric': 'tabular-nums'
     }, [etiqueta]));
@@ -159,7 +159,7 @@ export function lineas(datos, opciones = {}) {
       y1: yMeta,
       x2: ancho - padding.right,
       y2: yMeta,
-      stroke: 'var(--lima, #C8F03C)',
+      stroke: 'var(--lima, var(--ok, #C8F03C))',
       'stroke-width': '1.5',
       'stroke-dasharray': '3,3'
     }));
@@ -167,7 +167,7 @@ export function lineas(datos, opciones = {}) {
       x: ancho - padding.right,
       y: yMeta - 4,
       'text-anchor': 'end',
-      fill: 'var(--tinta, #17171A)',
+      fill: 'var(--texto, var(--tinta, #17171A))',
       'font-size': '9',
       'font-weight': '700'
     }, ['Meta']));
@@ -217,7 +217,7 @@ export function lineas(datos, opciones = {}) {
     }));
   }
 
-  // Puntos individuales y marcadores de PR
+  // Puntos individuales y marcadores de récord personal
   if (mostrarPuntos) {
     coordenadas.forEach((pt) => {
       const gPunto = crearNodoSVG('g', { class: 'punto-grafica' });
@@ -228,45 +228,45 @@ export function lineas(datos, opciones = {}) {
       gPunto.appendChild(title);
 
       if (pt.datos.pr) {
-        // Halo de PR en Lima
+        // Halo de récord en Lima
         gPunto.appendChild(crearNodoSVG('circle', {
           cx: pt.x,
           cy: pt.y,
           r: '7',
           fill: 'none',
-          stroke: '#C8F03C',
+          stroke: 'var(--lima, #C8F03C)',
           'stroke-width': '2',
           'stroke-opacity': '0.45'
         }));
 
-        // Punto central de PR
+        // Punto central de récord
         gPunto.appendChild(crearNodoSVG('circle', {
           cx: pt.x,
           cy: pt.y,
           r: '4.5',
-          fill: '#C8F03C',
-          stroke: '#17171A',
+          fill: 'var(--lima, #C8F03C)',
+          stroke: 'var(--texto, var(--tinta, #17171A))',
           'stroke-width': '2'
         }));
 
-        // Etiqueta flotante 'PR' en serif cursivo
+        // Etiqueta flotante 'Récord' en serif cursivo (español latino: MEDIO-05)
         gPunto.appendChild(crearNodoSVG('text', {
           x: pt.x,
           y: pt.y - 9,
           'text-anchor': 'middle',
-          fill: 'var(--tinta, #17171A)',
+          fill: 'var(--texto, var(--tinta, #17171A))',
           'font-family': '"Instrument Serif", Georgia, serif',
           'font-style': 'italic',
           'font-size': '11',
           'font-weight': 'bold'
-        }, ['PR']));
+        }, ['Récord']));
       } else {
         // Punto regular
         gPunto.appendChild(crearNodoSVG('circle', {
           cx: pt.x,
           cy: pt.y,
           r: '3.5',
-          fill: 'var(--papel, #F3F0E8)',
+          fill: 'var(--fondo, var(--papel, #F3F0E8))',
           stroke: colorLinea,
           'stroke-width': '2'
         }));
@@ -308,7 +308,7 @@ export function lineas(datos, opciones = {}) {
         x: pt.x,
         y: yEjeX,
         'text-anchor': alineacion,
-        fill: 'var(--tinta-suave, #6B675F)',
+        fill: 'var(--sutil, var(--tinta-suave, #5D5951))',
         'font-size': '10',
         'font-variant-numeric': 'tabular-nums'
       }, [txtFecha]));
@@ -358,7 +358,7 @@ export function barras(datos, opciones = {}) {
       x: ancho / 2,
       y: alto / 2,
       'text-anchor': 'middle',
-      fill: 'var(--tinta-suave, #6B675F)',
+      fill: 'var(--sutil, var(--tinta-suave, #5D5951))',
       'font-size': '13',
       'font-weight': '500'
     }, ['Sin series registradas esta semana']));
@@ -383,14 +383,14 @@ export function barras(datos, opciones = {}) {
   const yInicioZona = padding.top - 4;
   const altoZona = items.length * altoFila + 8;
 
-  // Fondo sutil de zona meta
+  // Fondo sutil de zona meta con radio canónico 999px (MEDIO-02)
   svg.appendChild(crearNodoSVG('rect', {
     x: xMetaMin,
     y: yInicioZona,
     width: Math.max(2, xMetaMax - xMetaMin),
     height: altoZona,
     fill: 'rgba(23, 23, 26, 0.035)',
-    rx: '4'
+    rx: '999'
   }));
 
   // Guía sutil en la meta mínima (10)
@@ -399,7 +399,7 @@ export function barras(datos, opciones = {}) {
     y1: yInicioZona,
     x2: xMetaMin,
     y2: yInicioZona + altoZona,
-    stroke: '#C8F03C',
+    stroke: 'var(--lima, #C8F03C)',
     'stroke-width': '1',
     'stroke-dasharray': '2,3',
     opacity: '0.85'
@@ -416,9 +416,9 @@ export function barras(datos, opciones = {}) {
     let colorBarra = item.color;
     if (!colorBarra) {
       if (valor >= metaMin) {
-        colorBarra = '#C8F03C'; // Lima de tiza
+        colorBarra = 'var(--lima, var(--ok, #C8F03C))'; // Lima de tiza
       } else if (valor > 0) {
-        colorBarra = '#17171A'; // Tinta
+        colorBarra = 'var(--texto, var(--tinta, #17171A))'; // Tinta
       } else {
         colorBarra = 'transparent';
       }
@@ -432,7 +432,7 @@ export function barras(datos, opciones = {}) {
       x: xInicioBarra - 8,
       y: yFila + 10,
       'text-anchor': 'end',
-      fill: valor > 0 ? 'var(--tinta, #17171A)' : 'var(--tinta-suave, #6B675F)',
+      fill: valor > 0 ? 'var(--texto, var(--tinta, #17171A))' : 'var(--sutil, var(--tinta-suave, #5D5951))',
       'font-size': '11',
       'font-weight': valor >= metaMin ? '600' : '400'
     }, [labelCapitalizado]));
@@ -443,7 +443,7 @@ export function barras(datos, opciones = {}) {
       y: yFila,
       width: anchoZonaBarras,
       height: alturaBarra,
-      fill: 'var(--papel-2, #E9E4D8)',
+      fill: 'var(--superficie2, var(--papel-2, #E9E4D8))',
       rx: '999'
     }));
 
@@ -462,7 +462,9 @@ export function barras(datos, opciones = {}) {
 
     // Valor numérico a la derecha en tabular-nums
     const valorFormateado = valor % 1 === 0 ? valor : valor.toFixed(1);
-    const colorTextoValor = valor >= metaMin ? '#17171A' : (valor > 0 ? '#17171A' : 'var(--tinta-suave, #6B675F)');
+    const colorTextoValor = valor > 0
+      ? 'var(--texto, var(--tinta, #17171A))'
+      : 'var(--sutil, var(--tinta-suave, #5D5951))';
 
     gFila.appendChild(crearNodoSVG('text', {
       x: ancho - padding.right,
@@ -483,7 +485,7 @@ export function barras(datos, opciones = {}) {
     x: xMetaMin,
     y: yLeyenda,
     'text-anchor': 'middle',
-    fill: 'var(--tinta, #17171A)',
+    fill: 'var(--texto, var(--tinta, #17171A))',
     'font-size': '9',
     'font-weight': '600'
   }, [`${metaMin} mín`]));
@@ -492,7 +494,7 @@ export function barras(datos, opciones = {}) {
     x: xMetaMax,
     y: yLeyenda,
     'text-anchor': 'middle',
-    fill: 'var(--tinta-suave, #6B675F)',
+    fill: 'var(--sutil, var(--tinta-suave, #5D5951))',
     'font-size': '9'
   }, [`${metaMax} máx`]));
 

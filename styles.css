@@ -2,10 +2,10 @@
    FORJA - Dirección de Arte v2 «Revista de sala» (styles.css)
    Cumple rigurosamente con CONTRATOS.md y DIRECCION_FORJA_v2.md
    - Tipografía: Instrument Serif (titulares) + Bricolage Grotesque (cuerpo y números)
-   - Paleta canónica: Papel #F3F0E8, Papel 2 #E9E4D8, Tinta #17171A, Tinta suave #6B675F,
+   - Paleta canónica: Papel #F3F0E8, Papel 2 #E9E4D8, Tinta #17171A, Tinta suave #5D5951,
      Lima #C8F03C, Alerta #E2553A.
    - Radios permitidos: SOLO 28px (tarjetas y fotos) y 999px (píldoras, botones y chips).
-   - Sin bordes en cajas · Sombra única en barra flotante y modales.
+   - Sin bordes en cajas · Cero backdrop-filter · Cero monospace.
    - Modo claro por defecto · Clase .oscuro para temporizador y cámara.
    ========================================================================== */
 
@@ -14,10 +14,14 @@
   /* Paleta Revista de sala */
   --papel: #F3F0E8;
   --papel2: #E9E4D8;
+  --papel-2: #E9E4D8;
   --tinta: #17171A;
-  --tinta-suave: #6B675F;
+  --tinta-fija: #17171A;
+  --tinta-suave: #5D5951; /* Contraste WCAG AA 5.35:1 sobre Papel 2 (#E9E4D8) */
+  --tinta-tarjeta: #232328;
   --lima: #C8F03C;
   --alerta: #E2553A;
+  --alerta-texto: #A02B14; /* Contraste WCAG AA 4.65:1 sobre fondo alerta translúcido */
 
   /* Alias obligatorios de CONTRATOS.md */
   --fondo: var(--papel);
@@ -28,10 +32,10 @@
   --acento: var(--lima);
   --acento-hover: #b8e030;
   --ok: var(--lima);
-  --ok-bg: rgba(200, 240, 60, 0.22);
-  --alerta-bg: rgba(226, 85, 58, 0.15);
+  --ok-bg: var(--lima);
+  --alerta-bg: rgba(226, 85, 58, 0.14);
   --peligro: var(--alerta);
-  --peligro-bg: rgba(226, 85, 58, 0.15);
+  --peligro-bg: rgba(226, 85, 58, 0.14);
 
   /* Radios canónicos estrictos (SOLO 28px y 999px) */
   --radio: 28px;
@@ -56,10 +60,12 @@
 .oscuro,
 .phone-viewport.theme-dark {
   --papel: #17171A;
-  --papel2: #222226;
+  --papel2: #232328;
+  --papel-2: #232328;
   --tinta: #F3F0E8;
-  --tinta-suave: #8E8A82;
+  --tinta-suave: #9E9A91;
   --superficie2: #2B2B31;
+  --alerta-texto: #FF8A73;
 
   --fondo: var(--papel);
   --superficie: var(--papel2);
@@ -78,6 +84,12 @@
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prohibición estricta de fuentes monoespaciadas (ALTO-05) */
+pre, code, kbd, samp {
+  font-family: var(--fuente);
+  font-variant-numeric: tabular-nums;
 }
 
 html, body {
@@ -181,9 +193,12 @@ html, body {
   gap: 10px;
 }
 
+/* ALTO-02: Área táctil mínima de 48x48 px en botones de cabecera */
 .btn-icono-cabecera {
-  width: 42px;
-  height: 42px;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
   border-radius: 999px;
   background-color: var(--papel2);
   color: var(--tinta);
@@ -221,7 +236,7 @@ html, body {
 
 /* ==========================================================================
    BARRA DE NAVEGACIÓN FLOTANTE (Canónica Forja v2)
-   Píldora tinta con el activo en círculo lima
+   Píldora tinta con el activo en círculo lima y objetivos táctiles de 48x48 px
    ========================================================================== */
 .floating-navbar,
 #barra-abajo {
@@ -230,7 +245,7 @@ html, body {
   left: 20px;
   right: 20px;
   height: 64px;
-  background-color: var(--tinta);
+  background-color: var(--tinta-fija);
   border-radius: 999px;
   box-shadow: 0 10px 30px rgba(23, 23, 26, 0.18);
   display: flex;
@@ -242,12 +257,15 @@ html, body {
   user-select: none;
 }
 
+/* ALTO-01: Área táctil mínima de 48x48 px en botones de la barra inferior */
 .floating-navbar .nav-item,
 #barra-abajo .nav-item {
-  width: 46px;
-  height: 46px;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
   border-radius: 999px;
-  color: var(--papel);
+  color: #F3F0E8;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -267,7 +285,7 @@ html, body {
 .floating-navbar .nav-item.active,
 #barra-abajo .nav-item.active {
   background-color: var(--lima);
-  color: var(--tinta);
+  color: var(--tinta-fija);
 }
 
 .floating-navbar .nav-item .nav-label,
@@ -360,14 +378,18 @@ html, body {
   border: none;
 }
 
+/* CRÍTICO-01: Fondo lima con texto tinta fija (#17171A) para contraste 13.5:1 */
 .chip.ok {
-  background-color: var(--ok-bg);
-  color: var(--tinta);
+  background-color: var(--lima);
+  color: var(--tinta-fija);
+  font-weight: 700;
 }
 
+/* ALTO-04: Texto de alerta oscurecido (#A02B14) para cumplir contraste WCAG AA >= 4.5:1 */
 .chip.alerta {
   background-color: var(--alerta-bg);
-  color: var(--alerta);
+  color: var(--alerta-texto);
+  font-weight: 700;
 }
 
 /* 8. .btn y variantes: píldoras con radio 999px */
@@ -402,13 +424,13 @@ html, body {
   transform: none;
 }
 
-/* Botón principal canónico: Lima 60px con texto 17px en tinta */
+/* Botón principal canónico: Lima 60px con texto 17px en tinta fija (#17171A) */
 .btn.primario,
 .btn-primary-lima {
   min-height: 60px;
   height: 60px;
   background-color: var(--lima);
-  color: var(--tinta);
+  color: var(--tinta-fija);
   font-size: 17px;
   font-weight: 600;
   padding: 0 24px;
@@ -432,10 +454,15 @@ html, body {
   transform: scale(0.97);
 }
 
+/* BAJO-01: Sin borde de 1px; separación por tono translúcido suave */
 .btn.fantasma {
-  background-color: transparent;
+  background-color: rgba(23, 23, 26, 0.05);
   color: var(--tinta);
-  border: 1px solid rgba(23, 23, 26, 0.12);
+  border: none;
+}
+
+.oscuro .btn.fantasma {
+  background-color: rgba(243, 240, 232, 0.08);
 }
 
 .btn.fantasma:active {
@@ -503,7 +530,14 @@ textarea:focus {
   box-shadow: 0 0 0 2px rgba(23, 23, 26, 0.15);
 }
 
-/* Casillas y radios con color lima */
+.oscuro input:focus,
+.oscuro select:focus,
+.oscuro textarea:focus {
+  background-color: #2B2B31;
+  box-shadow: 0 0 0 2px rgba(200, 240, 60, 0.35);
+}
+
+/* Casillas y radios con color tinta */
 input[type="checkbox"],
 input[type="radio"] {
   width: auto;
@@ -642,8 +676,8 @@ h1 em, h2 em, h3 em {
   align-items: center;
   gap: 12px;
   padding: 14px 20px;
-  background-color: var(--tinta);
-  color: var(--papel);
+  background-color: var(--tinta-fija);
+  color: #F3F0E8;
   border-radius: 999px;
   box-shadow: 0 10px 30px rgba(23, 23, 26, 0.22);
   font-size: 14px;
@@ -689,20 +723,22 @@ h1 em, h2 em, h3 em {
   pointer-events: none;
 }
 
+/* ALTO-06: Cero backdrop-filter; superposición limpia en canal alfa con Tinta */
 .dialogo-overlay,
 .modal-forja-overlay {
   pointer-events: auto;
-  position: absolute;
+  position: fixed;
   inset: 0;
-  background-color: rgba(23, 23, 26, 0.55);
-  backdrop-filter: blur(4px);
+  background-color: rgba(23, 23, 26, 0.76);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
+  z-index: 500;
   animation: fadeOverlay 0.2s ease forwards;
 }
 
+/* A-03 (pantallas_flujo): Scroll interno habilitado para modales largos con teclado móvil */
 .dialogo-caja {
   background-color: var(--papel);
   border: none;
@@ -710,6 +746,9 @@ h1 em, h2 em, h3 em {
   padding: 28px 24px;
   width: 100%;
   max-width: 380px;
+  max-height: 85dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   box-shadow: 0 16px 40px rgba(23, 23, 26, 0.25);
   display: flex;
   flex-direction: column;
@@ -730,6 +769,7 @@ h1 em, h2 em, h3 em {
   font-size: 15px;
   color: var(--tinta-suave);
   line-height: 1.5;
+  overflow-y: visible;
 }
 
 .dialogo-botones {

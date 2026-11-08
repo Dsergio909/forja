@@ -1,14 +1,13 @@
 /**
  * comida.js - Sección 6: Comida y Nutrición de Forja (Dirección de Arte v2 «Revista de Sala»)
  *
- * Características v2:
+ * Características v2 y Correcciones de Auditoría:
  * - Totales del día con número grande héroe (Bricolage Grotesque 64px, tabular-nums) y barra lima (#C8F03C).
- * - Lista limpia sin bordes toscos, paleta papel (#F3F0E8) y papel 2 (#E9E4D8), texto tinta (#17171A).
+ * - Lista limpia sin bordes toscos, paleta papel (#F3F0E8) y papel 2 (#E9E4D8), texto tinta (#17171A) y tinta suave accesible (#5D5951).
  * - Titulares en Instrument Serif cursivo, radios estrictos de 28px (tarjetas) y 999px (píldoras).
- * - Sin emojis: iconos vectoriales limpios vía icono() de ./iconos.js.
- * - Registro rápido con parser de lenguaje natural y catálogo colombiano (USDA / ICBF).
- * - Promedio móvil de 7 días, contador de vasos de agua y método de la mano sin pesar.
- * - Cumple con CONTRATOS.md y correcciones de REVISION.md (3.2 fechas locales, 3.5 llamadas async).
+ * - Sin emojis ni backdrop-filter: iconos vectoriales limpios vía icono() de ./iconos.js y botones >= 48px.
+ * - Catálogo de alimentos y Método de la mano (M-01): permite elegir porción, agregar múltiples alimentos al borrador y guardarlos juntos como un solo plato.
+ * - Sincronización de fecha activa en sessionStorage (B-04) y soporte de coma decimal en cantidades.
  */
 
 import { guardar, borrar, todos, filtrar, ajuste, ponerAjuste, nuevoId } from './db.js';
@@ -17,11 +16,35 @@ import { alimentos as cargarAlimentos, perfil as cargarPerfil } from './datos.js
 import { ir } from './app.js';
 import { icono } from './iconos.js';
 
+const CLAVE_FECHA_SESION = 'forja_fecha_activa';
+
 let contenedorActual = null;
 let fechaSeleccionada = hoyISO();
 let catalogoAlimentos = [];
 let perfilUsuario = null;
-let itemsBorrador = []; // Ítems interpretados listos para guardar
+let itemsModalBorrador = []; // Ítems agregados desde el catálogo o método de la mano
+let itemsTextoBorrador = []; // Ítems interpretados desde el campo de texto libre
+let itemsBorrador = [];      // Unión de ítems listos para guardar en un mismo plato
+
+function sincronizarBorrador() {
+  itemsBorrador = [...itemsModalBorrador, ...itemsTextoBorrador];
+}
+
+function leerFechaSesion() {
+  try {
+    const f = sessionStorage.getItem(CLAVE_FECHA_SESION);
+    if (f && /^\d{4}-\d{2}-\d{2}$/.test(f)) return f;
+  } catch (_) {}
+  return null;
+}
+
+function guardarFechaSesion(fechaIso) {
+  try {
+    if (fechaIso && /^\d{4}-\d{2}-\d{2}$/.test(fechaIso)) {
+      sessionStorage.setItem(CLAVE_FECHA_SESION, fechaIso);
+    }
+  } catch (_) {}
+}
 
 /**
  * Monta la pantalla de comida
@@ -30,7 +53,8 @@ let itemsBorrador = []; // Ítems interpretados listos para guardar
  */
 export async function montar(contenedor, params = []) {
   contenedorActual = contenedor;
-  fechaSeleccionada = (params && params[0]) ? params[0] : hoyISO();
+  fechaSeleccionada = (params && params[0]) ? params[0] : (leerFechaSesion() || hoyISO());
+  guardarFechaSesion(fechaSeleccionada);
 
   try {
     catalogoAlimentos = await cargarAlimentos();
@@ -49,6 +73,8 @@ export async function montar(contenedor, params = []) {
  */
 export function desmontar() {
   contenedorActual = null;
+  itemsModalBorrador = [];
+  itemsTextoBorrador = [];
   itemsBorrador = [];
 }
 
@@ -109,7 +135,7 @@ function normalizar(texto) {
 }
 
 /**
- * Convierte un objeto Date a formato local ISO 'AAAA-MM-DD' (Error 3.2: sin UTC toISOString)
+ * Convierte un objeto Date a formato local ISO 'AAAA-MM-DD' (sin UTC toISOString)
  */
 function fechaALocalISO(d) {
   const anio = d.getFullYear();
@@ -119,7 +145,7 @@ function fechaALocalISO(d) {
 }
 
 /**
- * Parsea una cadena 'AAAA-MM-DD' a Date en hora local a mediodía (Error 3.2: evita desfase)
+ * Parsea una cadena 'AAAA-MM-DD' a Date en hora local a mediodía (evita desfase UTC-5)
  */
 function parsearFechaLocal(fechaIso) {
   if (!fechaIso) return new Date();
@@ -158,14 +184,40 @@ function buscarAlimento(termino) {
 }
 
 /**
- * Interpreta texto libre de comida («2 huevos, arroz 1 taza, 150g pechuga»)
+ * Construye un ítem de borrador a partir de un alimento del catálogo y su cantidad/porción
+ */
+function crearItemAlimento(alimento, cantidad = 1, unidad = 'porcion') {
+  const cantNum = Math.max(0.1, Math.round((Number(cantidad) || 1) * 100) / 100);
+  const esGramos = /^(g|gr|gramos|ml)$/i.test(unidad);
+  const factor = esGramos ? cantNum / (alimento.gramos || 100) : cantNum;
+
+  return {
+    alimentoId: alimento.id,
+    nombre: alimento.nombre,
+    porcionBase: alimento.porcion || `${alimento.gramos || 100} g`,
+    cantidadOriginal: cantNum,
+    unidadOriginal: unidad,
+    gramos: esGramos ? Math.round(cantNum) : Math.round((alimento.gramos || 100) * factor),
+    kcal: Math.round((alimento.kcal || 0) * factor),
+    proteina: Math.round((alimento.proteina || 0) * factor * 10) / 10,
+    carbos: Math.round((alimento.carbos || 0) * factor * 10) / 10,
+    grasa: Math.round((alimento.grasa || 0) * factor * 10) / 10,
+    reconocido: true
+  };
+}
+
+/**
+ * Interpreta texto libre de comida («2 huevos, arroz 1,5 tazas, 150g pechuga»)
  * @param {string} texto
  * @returns {Array} lista de ítems interpretados
  */
 export function parsearTextoComida(texto) {
   if (!texto || !texto.trim()) return [];
 
-  const partes = texto
+  // Proteger comas decimales (ej. "1,5 tazas") convirtiéndolas a punto antes de separar por coma
+  const textoNormalizado = texto.replace(/(\d),(\d)/g, '$1.$2');
+
+  const partes = textoNormalizado
     .split(/,|\n|\by\b/gi)
     .map(p => p.trim())
     .filter(Boolean);
@@ -193,27 +245,7 @@ export function parsearTextoComida(texto) {
     const alimento = buscarAlimento(nombreAlimento);
 
     if (alimento) {
-      let factor = 1;
-      const esGramos = /^(g|gr|gramos|ml)$/i.test(unidad);
-
-      if (esGramos) {
-        factor = cantidad / (alimento.gramos || 100);
-      } else {
-        factor = cantidad;
-      }
-
-      resultados.push({
-        alimentoId: alimento.id,
-        nombre: alimento.nombre,
-        cantidadOriginal: cantidad,
-        unidadOriginal: unidad,
-        gramos: esGramos ? Math.round(cantidad) : Math.round(alimento.gramos * factor),
-        kcal: Math.round(alimento.kcal * factor),
-        proteina: Math.round(alimento.proteina * factor * 10) / 10,
-        carbos: Math.round((alimento.carbos || 0) * factor * 10) / 10,
-        grasa: Math.round((alimento.grasa || 0) * factor * 10) / 10,
-        reconocido: true
-      });
+      resultados.push(crearItemAlimento(alimento, cantidad, unidad));
     } else {
       resultados.push({
         alimentoId: null,
@@ -221,10 +253,10 @@ export function parsearTextoComida(texto) {
         cantidadOriginal: cantidad,
         unidadOriginal: unidad,
         gramos: 100,
-        kcal: 150 * cantidad,
-        proteina: 5 * cantidad,
-        carbos: 15 * cantidad,
-        grasa: 5 * cantidad,
+        kcal: Math.round(150 * cantidad),
+        proteina: Math.round(5 * cantidad * 10) / 10,
+        carbos: Math.round(15 * cantidad * 10) / 10,
+        grasa: Math.round(5 * cantidad * 10) / 10,
         reconocido: false
       });
     }
@@ -333,8 +365,16 @@ async function renderizar() {
       letter-spacing: 0.12em;
       text-transform: uppercase;
       font-weight: 700;
-      color: #6B675F;
+      color: #5D5951;
       line-height: 1;
+    }
+    .v2-subtitulo-card {
+      font-size: 13px;
+      font-weight: 600;
+      color: #5D5951;
+      text-transform: none;
+      letter-spacing: normal;
+      line-height: 1.2;
     }
     .v2-numero-heroe {
       font-size: 64px;
@@ -376,7 +416,7 @@ async function renderizar() {
     .v2-chip-macro .rotulo {
       font-size: 11px;
       font-weight: 600;
-      color: #6B675F;
+      color: #5D5951;
     }
     .v2-chip-macro .valor {
       font-size: 15px;
@@ -385,6 +425,7 @@ async function renderizar() {
       font-variant-numeric: tabular-nums;
     }
     .v2-btn-pildora {
+      min-height: 48px;
       height: 48px;
       border-radius: 999px;
       border: none;
@@ -410,6 +451,7 @@ async function renderizar() {
       color: #17171A;
       font-size: 16px;
       font-weight: 600;
+      min-height: 56px;
       height: 56px;
       width: 100%;
     }
@@ -444,14 +486,14 @@ async function renderizar() {
     }
   `);
 
-  // 1. Selector de fecha editorial en píldora
+  // 1. Selector de fecha editorial en píldora (único kicker permitido en pantalla)
   const selectorFecha = h('div', {
     class: 'v2-tarjeta',
     style: 'flex-direction: row; justify-content: space-between; align-items: center; padding: 12px 18px;'
   },
     h('button', {
       class: 'v2-btn-pildora',
-      style: 'width: 44px; height: 44px; padding: 0;',
+      style: 'width: 48px; height: 48px; min-width: 48px; min-height: 48px; padding: 0;',
       title: 'Día anterior',
       on: { click: async () => { await cambiarFecha(-1); } }
     }, iconoNodo('izq', ICONOS_SVGS.izq)),
@@ -463,11 +505,14 @@ async function renderizar() {
       fechaSeleccionada !== hoyISO()
         ? h('button', {
             class: 'v2-btn-pildora',
-            style: 'height: 26px; padding: 0 10px; font-size: 11px; margin-top: 4px; background-color: #F3F0E8;',
+            style: 'min-height: 48px; height: 48px; padding: 0 14px; font-size: 12px; margin-top: 4px; background-color: #F3F0E8;',
             on: {
               click: async () => {
                 fechaSeleccionada = hoyISO();
-                itemsBorrador = [];
+                guardarFechaSesion(fechaSeleccionada);
+                itemsModalBorrador = [];
+                itemsTextoBorrador = [];
+                sincronizarBorrador();
                 await renderizar();
               }
             }
@@ -477,7 +522,7 @@ async function renderizar() {
 
     h('button', {
       class: 'v2-btn-pildora',
-      style: 'width: 44px; height: 44px; padding: 0;',
+      style: 'width: 48px; height: 48px; min-width: 48px; min-height: 48px; padding: 0;',
       title: 'Día siguiente',
       on: { click: async () => { await cambiarFecha(1); } }
     }, iconoNodo('der', ICONOS_SVGS.der))
@@ -487,11 +532,11 @@ async function renderizar() {
   const tarjetaHeroe = h('div', { class: 'v2-tarjeta' },
     h('div', { style: 'display: flex; justify-content: space-between; align-items: baseline;' },
       h('h2', { class: 'v2-serif-title' }, 'Total de ', h('em', {}, 'energía')),
-      h('span', { class: 'v2-micro-label' }, `PROM. 7D: ${stats.promKcal7d} KCAL`)
+      h('span', { class: 'v2-subtitulo-card' }, `Promedio 7d: ${stats.promKcal7d} kcal`)
     ),
     h('div', { style: 'display: flex; align-items: baseline; gap: 8px;' },
       h('span', { class: 'v2-numero-heroe' }, `${stats.totalKcal}`),
-      h('span', { style: 'font-size: 18px; color: #6B675F; font-weight: 500;' }, `/ ${metaKcal} kcal`)
+      h('span', { style: 'font-size: 18px; color: #5D5951; font-weight: 500;' }, `/ ${metaKcal} kcal`)
     ),
     h('div', { class: 'v2-barra-track' },
       h('div', {
@@ -526,13 +571,13 @@ async function renderizar() {
         iconoNodo('gota', ICONOS_SVGS.gota),
         h('div', {},
           h('h3', { class: 'v2-serif-title', style: 'font-size: 22px;' }, 'Vasos de ', h('em', {}, 'agua')),
-          h('div', { style: 'font-size: 13px; color: #6B675F;' }, `${stats.aguaVasos} de ${metaAgua} vasos (${stats.aguaVasos * 250} ml)`)
+          h('div', { style: 'font-size: 13px; color: #5D5951;' }, `${stats.aguaVasos} de ${metaAgua} vasos (${stats.aguaVasos * 250} ml)`)
         )
       ),
       h('div', { style: 'display: flex; gap: 8px;' },
         h('button', {
           class: 'v2-btn-pildora',
-          style: 'padding: 0 14px;',
+          style: 'min-width: 48px; padding: 0 14px;',
           title: 'Restar vaso',
           on: { click: async () => { await modificarAgua(-1); } }
         }, iconoNodo('menos', ICONOS_SVGS.menos)),
@@ -560,8 +605,8 @@ async function renderizar() {
 
   const tarjetaEntrada = h('div', { class: 'v2-tarjeta' },
     h('h3', { class: 'v2-serif-title', style: 'font-size: 24px;' }, 'Registrar ', h('em', {}, 'alimento')),
-    h('p', { style: 'font-size: 14px; color: #6B675F;' },
-      'Escribe en lenguaje natural o añade directo con las porciones de la mano:'
+    h('p', { style: 'font-size: 14px; color: #5D5951;' },
+      'Escribe en lenguaje natural o arma tu plato desde el catálogo y las porciones de la mano:'
     ),
     campoTexto,
     contenedorBorrador,
@@ -589,10 +634,10 @@ async function renderizar() {
   const tarjetaLista = h('div', { class: 'v2-tarjeta' },
     h('div', { style: 'display: flex; justify-content: space-between; align-items: baseline;' },
       h('h3', { class: 'v2-serif-title', style: 'font-size: 24px;' }, 'Comidas del ', h('em', {}, 'día')),
-      h('span', { class: 'v2-micro-label' }, `${stats.comidasDia.length} REGISTROS`)
+      h('span', { class: 'v2-subtitulo-card' }, `${stats.comidasDia.length} ${stats.comidasDia.length === 1 ? 'registro' : 'registros'}`)
     ),
     stats.comidasDia.length === 0
-      ? h('div', { style: 'padding: 32px 16px; text-align: center; color: #6B675F;' },
+      ? h('div', { style: 'padding: 32px 16px; text-align: center; color: #5D5951;' },
           h('div', { style: 'margin-bottom: 8px; opacity: 0.6;' }, iconoNodo('plato', ICONOS_SVGS.plato)),
           h('div', { class: 'v2-serif-title', style: 'font-size: 20px;' }, 'Sin comidas registradas'),
           h('p', { style: 'font-size: 13px; margin-top: 4px;' }, 'Ingresa tus alimentos arriba para calcular tus calorías.')
@@ -610,34 +655,35 @@ async function renderizar() {
   );
 
   contenedorActual.appendChild(vista);
+  renderizarContenedorBorrador();
 }
 
 /**
- * Renderiza una comida individual registrada con diseño limpio
+ * Renderiza una comida individual registrada con diseño limpio y botones >= 48px
  */
 function renderizarFilaComida(comida) {
   const horaTexto = comida.hora ? new Date(comida.hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
   const descItems = (comida.items && comida.items.length > 0)
-    ? comida.items.map(it => `${it.nombre} (${it.cantidadOriginal || it.cantidad || ''} ${it.unidadOriginal || ''})`).join(', ')
+    ? comida.items.map(it => `${it.nombre} (${it.cantidadOriginal || it.cantidad || 1} ${it.unidadOriginal || it.unidad || 'porcion'})`).join(', ')
     : comida.texto;
 
   return h('div', { class: 'v2-item-comida' },
     h('div', { style: 'flex: 1;' },
       h('div', { style: 'font-weight: 600; font-size: 15px; color: #17171A; line-height: 1.3;' }, descItems),
-      h('div', { style: 'font-size: 12px; color: #6B675F; margin-top: 4px; font-variant-numeric: tabular-nums;' },
+      h('div', { style: 'font-size: 12px; color: #5D5951; margin-top: 4px; font-variant-numeric: tabular-nums;' },
         `${horaTexto ? horaTexto + ' · ' : ''}${comida.kcal || 0} kcal · ${comida.proteina || 0}g proteína`
       )
     ),
     h('div', { style: 'display: flex; gap: 6px;' },
       h('button', {
         class: 'v2-btn-pildora',
-        style: 'height: 38px; padding: 0 12px; font-size: 12px; background-color: #E9E4D8;',
+        style: 'min-height: 48px; height: 48px; padding: 0 14px; font-size: 13px; background-color: #E9E4D8;',
         title: 'Ver detalle',
         on: { click: async () => { await verDetalleComida(comida); } }
       }, iconoNodo('ojo', ICONOS_SVGS.ojo), 'Ver'),
       h('button', {
         class: 'v2-btn-pildora',
-        style: 'height: 38px; width: 38px; padding: 0; background-color: #E9E4D8; color: #E2553A;',
+        style: 'min-height: 48px; min-width: 48px; height: 48px; width: 48px; padding: 0; background-color: #E9E4D8; color: #E2553A;',
         title: 'Eliminar comida',
         on: { click: async () => { await eliminarComida(comida.id); } }
       }, iconoNodo('basura', ICONOS_SVGS.basura))
@@ -646,13 +692,16 @@ function renderizarFilaComida(comida) {
 }
 
 /**
- * Cambia la fecha activa por desplazamiento de días
+ * Cambia la fecha activa por desplazamiento de días y sincroniza en sessionStorage (B-04)
  */
 async function cambiarFecha(deltaDias) {
   const d = parsearFechaLocal(fechaSeleccionada);
   d.setDate(d.getDate() + deltaDias);
   fechaSeleccionada = fechaALocalISO(d);
-  itemsBorrador = [];
+  guardarFechaSesion(fechaSeleccionada);
+  itemsModalBorrador = [];
+  itemsTextoBorrador = [];
+  sincronizarBorrador();
   await renderizar();
 }
 
@@ -668,33 +717,71 @@ async function modificarAgua(delta) {
 }
 
 /**
- * Previsualiza los alimentos interpretados mientras el usuario teclea
+ * Renderiza el contenedor de borrador combinando ítems del catálogo/mano y del texto libre
  */
-function previsualizarTexto(texto) {
+function renderizarContenedorBorrador() {
   const contenedor = document.getElementById('contenedor-borrador');
   if (!contenedor) return;
   contenedor.innerHTML = '';
 
-  itemsBorrador = parsearTextoComida(texto);
+  sincronizarBorrador();
   if (itemsBorrador.length === 0) return;
 
-  const chips = itemsBorrador.map(it => {
+  const totalKcal = itemsBorrador.reduce((acc, it) => acc + (it.kcal || 0), 0);
+  const totalProt = Math.round(itemsBorrador.reduce((acc, it) => acc + (it.proteina || 0), 0) * 10) / 10;
+
+  const chips = itemsBorrador.map((it, idx) => {
+    const esDeModal = idx < itemsModalBorrador.length;
+    const etiquetaCant = `${it.cantidadOriginal || 1} ${it.unidadOriginal === 'porcion' ? (it.cantidadOriginal === 1 ? 'porción' : 'porciones') : (it.unidadOriginal || 'porción')}`;
+
     return h('div', {
-      style: `display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; margin: 4px 6px 2px 0; font-size: 12px; font-weight: 500; background-color: ${it.reconocido ? '#C8F03C' : '#E9E4D8'}; color: #17171A;`
+      style: `display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; margin: 4px 6px 2px 0; font-size: 12px; font-weight: 600; background-color: ${it.reconocido ? '#C8F03C' : '#E9E4D8'}; color: #17171A;`
     },
-      h('span', {}, `${it.nombre}: ${it.kcal} kcal | ${it.proteina}g prot`),
-      !it.reconocido ? iconoNodo('alerta', ICONOS_SVGS.alerta) : ''
+      h('span', {}, `${it.nombre} (${etiquetaCant}): ${it.kcal} kcal · ${it.proteina}g prot`),
+      !it.reconocido ? iconoNodo('alerta', ICONOS_SVGS.alerta) : '',
+      esDeModal
+        ? h('button', {
+            type: 'button',
+            title: 'Quitar alimento del plato',
+            style: 'border: none; background: rgba(23,23,26,0.12); color: #17171A; border-radius: 999px; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; font-size: 12px; font-weight: 700;',
+            on: {
+              click: () => {
+                itemsModalBorrador.splice(idx, 1);
+                renderizarContenedorBorrador();
+              }
+            }
+          }, '×')
+        : ''
     );
   });
 
-  contenedor.appendChild(h('div', { style: 'margin-top: 8px;' }, ...chips));
+  const barraResumen = itemsBorrador.length > 0
+    ? h('div', {
+        style: 'font-size: 12px; font-weight: 600; color: #5D5951; margin-top: 6px; font-variant-numeric: tabular-nums;'
+      }, `Plato listo para guardar (${itemsBorrador.length} ${itemsBorrador.length === 1 ? 'alimento' : 'alimentos'}): ${totalKcal} kcal · ${totalProt}g proteína`)
+    : null;
+
+  contenedor.appendChild(h('div', { style: 'margin-top: 8px;' }, ...chips, barraResumen));
+}
+
+/**
+ * Previsualiza los alimentos interpretados mientras el usuario teclea
+ */
+function previsualizarTexto(texto) {
+  itemsTextoBorrador = parsearTextoComida(texto);
+  renderizarContenedorBorrador();
 }
 
 /**
  * Guarda la comida registrada en IndexedDB store 'comidas'
  */
 async function guardarComida(inputElement) {
-  const texto = inputElement.value.trim();
+  const texto = inputElement ? inputElement.value.trim() : '';
+  if (texto && itemsTextoBorrador.length === 0) {
+    itemsTextoBorrador = parsearTextoComida(texto);
+  }
+  sincronizarBorrador();
+
   if (!texto && itemsBorrador.length === 0) {
     aviso('Escribe o selecciona algún alimento primero', 'error');
     return;
@@ -711,11 +798,15 @@ async function guardarComida(inputElement) {
   const totalCarbos = Math.round(items.reduce((acc, it) => acc + (it.carbos || 0), 0) * 10) / 10;
   const totalGrasa = Math.round(items.reduce((acc, it) => acc + (it.grasa || 0), 0) * 10) / 10;
 
+  const descripcionGenerada = items
+    .map(i => `${i.nombre} (${i.cantidadOriginal || 1} ${i.unidadOriginal || 'porcion'})`)
+    .join(', ');
+
   const comidaObj = {
     id: nuevoId(),
     fecha: fechaSeleccionada,
     hora: Date.now(),
-    texto: texto || items.map(i => i.nombre).join(', '),
+    texto: descripcionGenerada || texto,
     items: items.map(it => ({
       alimentoId: it.alimentoId,
       nombre: it.nombre,
@@ -734,8 +825,10 @@ async function guardarComida(inputElement) {
   };
 
   await guardar('comidas', comidaObj);
-  itemsBorrador = [];
-  inputElement.value = '';
+  itemsModalBorrador = [];
+  itemsTextoBorrador = [];
+  sincronizarBorrador();
+  if (inputElement) inputElement.value = '';
   aviso('Comida guardada con éxito', 'ok');
   await renderizar();
 }
@@ -769,9 +862,32 @@ async function verDetalleComida(comida) {
 }
 
 /**
- * Diálogo interactivo: Método de la mano (sin pesar nada)
+ * Agrega un alimento con su porción elegida al borrador sin cerrar el modal (Corrección M-01)
+ */
+function agregarAlimentoABorrador(alimento, cantidad = 1) {
+  const cantNum = Math.max(0.25, Math.round((Number(cantidad) || 1) * 100) / 100);
+  const existente = itemsModalBorrador.find(
+    it => it.alimentoId === alimento.id && it.unidadOriginal === 'porcion'
+  );
+
+  if (existente) {
+    const nuevaCant = Math.round((existente.cantidadOriginal + cantNum) * 100) / 100;
+    const actualizado = crearItemAlimento(alimento, nuevaCant, 'porcion');
+    Object.assign(existente, actualizado);
+  } else {
+    itemsModalBorrador.push(crearItemAlimento(alimento, cantNum, 'porcion'));
+  }
+
+  sincronizarBorrador();
+  renderizarContenedorBorrador();
+}
+
+/**
+ * Diálogo interactivo: Método de la mano (sin pesar nada, permite elegir porción y agregar varios - M-01)
  */
 async function abrirMetodoMano() {
+  let porcionActiva = 1;
+
   const porcionesMano = [
     {
       titulo: 'Palma de la mano (Proteínas)',
@@ -800,24 +916,88 @@ async function abrirMetodoMano() {
     }
   ];
 
-  const contenido = h('div', { style: 'max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;' },
+  const badgeContador = h('div', {
+    style: 'background-color: #E9E4D8; border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 600; color: #17171A; display: flex; justify-content: space-between; align-items: center;'
+  });
+
+  const btnListoModal = h('button', {
+    class: 'v2-btn-pildora v2-btn-lima',
+    style: 'margin-top: 8px;',
+    on: {
+      click: () => {
+        document.querySelector('.v2-modal-overlay')?.remove();
+        renderizarContenedorBorrador();
+      }
+    }
+  });
+
+  function actualizarResumenModal() {
+    sincronizarBorrador();
+    const n = itemsBorrador.length;
+    const kcal = itemsBorrador.reduce((a, b) => a + (b.kcal || 0), 0);
+    const prot = Math.round(itemsBorrador.reduce((a, b) => a + (b.proteina || 0), 0) * 10) / 10;
+    badgeContador.textContent = n === 0
+      ? 'Ningún alimento seleccionado aún'
+      : `${n} ${n === 1 ? 'alimento seleccionado' : 'alimentos seleccionados'} · ${kcal} kcal · ${prot}g prot`;
+    btnListoModal.textContent = n > 0
+      ? `Listo · Añadir al registro (${n})`
+      : 'Cerrar';
+  }
+
+  const opcionesPorcion = [0.5, 1, 1.5, 2];
+  const contenedorPorciones = h('div', {
+    style: 'display: flex; align-items: center; justify-content: space-between; gap: 8px; background-color: #E9E4D8; border-radius: 999px; padding: 6px 12px;'
+  });
+
+  function renderSelectorPorcion() {
+    contenedorPorciones.innerHTML = '';
+    contenedorPorciones.append(
+      h('span', { style: 'font-size: 12px; font-weight: 600; color: #5D5951; padding-left: 6px;' }, 'Porción a agregar:'),
+      h('div', { style: 'display: flex; gap: 4px;' },
+        ...opcionesPorcion.map(val => h('button', {
+          type: 'button',
+          class: 'v2-btn-pildora',
+          style: `min-height: 48px; height: 48px; padding: 0 12px; font-size: 13px; background-color: ${porcionActiva === val ? '#C8F03C' : '#F3F0E8'}; font-weight: 700;`,
+          on: {
+            click: () => {
+              porcionActiva = val;
+              renderSelectorPorcion();
+            }
+          }
+        }, val === 0.5 ? '½' : `${val}x`))
+      )
+    );
+  }
+
+  renderSelectorPorcion();
+  actualizarResumenModal();
+
+  const listaGrupos = h('div', { style: 'max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;' },
     porcionesMano.map(p => {
       return h('div', {
         style: 'background-color: #E9E4D8; border-radius: 28px; padding: 16px;'
       },
         h('div', { class: 'v2-serif-title', style: 'font-size: 19px;' }, p.titulo),
-        h('div', { style: 'font-size: 12px; color: #6B675F; margin: 4px 0 10px;' }, p.desc),
+        h('div', { style: 'font-size: 12px; color: #5D5951; margin: 4px 0 10px;' }, p.desc),
         h('div', { style: 'display: flex; flex-wrap: wrap; gap: 6px;' },
           ...p.alimentosRecomendados.map(id => {
             const al = catalogoAlimentos.find(a => a.id === id);
             if (!al) return null;
             return h('button', {
               class: 'v2-btn-pildora',
-              style: 'height: 36px; padding: 0 12px; font-size: 12px; background-color: #F3F0E8;',
+              style: 'min-height: 48px; height: 48px; padding: 0 14px; font-size: 13px; background-color: #F3F0E8;',
               on: {
-                click: async () => {
-                  await agregarAlimentoDirecto(al, 1);
-                  document.querySelector('.v2-modal-overlay')?.remove();
+                click: (e) => {
+                  agregarAlimentoABorrador(al, porcionActiva);
+                  actualizarResumenModal();
+                  const btn = e.currentTarget;
+                  const textoOriginal = `+ ${al.nombre}`;
+                  btn.style.backgroundColor = '#C8F03C';
+                  btn.textContent = `✓ ${al.nombre} (${porcionActiva}x)`;
+                  setTimeout(() => {
+                    btn.style.backgroundColor = '#F3F0E8';
+                    btn.textContent = textoOriginal;
+                  }, 700);
                 }
               }
             }, `+ ${al.nombre}`);
@@ -827,21 +1007,60 @@ async function abrirMetodoMano() {
     })
   );
 
+  const contenido = h('div', { style: 'display: flex; flex-direction: column; gap: 10px;' },
+    badgeContador,
+    contenedorPorciones,
+    listaGrupos,
+    btnListoModal
+  );
+
   mostrarModalV2('Porciones con la mano', contenido);
 }
 
 /**
- * Catálogo visual y buscador con filtro
+ * Catálogo visual y buscador con filtro, selector de porción y selección múltiple (Corrección M-01)
  */
 async function abrirCatalogoVisual() {
+  const porcionesPorAlimento = new Map();
+
   const inputBusqueda = h('input', {
     type: 'search',
     class: 'v2-input-redondo',
     placeholder: 'Escribe para filtrar (huevo, pechuga, arroz)...',
-    style: 'margin-bottom: 12px;'
+    style: 'background-color: #E9E4D8;'
   });
 
-  const contenedorLista = h('div', { style: 'max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;' });
+  const badgeContador = h('div', {
+    style: 'background-color: #E9E4D8; border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 600; color: #17171A; display: flex; justify-content: space-between; align-items: center;'
+  });
+
+  const btnListoModal = h('button', {
+    class: 'v2-btn-pildora v2-btn-lima',
+    style: 'margin-top: 4px;',
+    on: {
+      click: () => {
+        document.querySelector('.v2-modal-overlay')?.remove();
+        renderizarContenedorBorrador();
+      }
+    }
+  });
+
+  function actualizarResumenModal() {
+    sincronizarBorrador();
+    const n = itemsBorrador.length;
+    const kcal = itemsBorrador.reduce((a, b) => a + (b.kcal || 0), 0);
+    const prot = Math.round(itemsBorrador.reduce((a, b) => a + (b.proteina || 0), 0) * 10) / 10;
+    badgeContador.textContent = n === 0
+      ? 'Selecciona varios alimentos y ajusta su porción'
+      : `${n} ${n === 1 ? 'alimento seleccionado' : 'alimentos seleccionados'} · ${kcal} kcal · ${prot}g prot`;
+    btnListoModal.textContent = n > 0
+      ? `Listo · Añadir al registro (${n})`
+      : 'Cerrar';
+  }
+
+  const contenedorLista = h('div', {
+    style: 'max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;'
+  });
 
   function actualizarFiltro(termino) {
     contenedorLista.innerHTML = '';
@@ -852,86 +1071,123 @@ async function abrirCatalogoVisual() {
     });
 
     if (filtrados.length === 0) {
-      contenedorLista.appendChild(h('div', { style: 'text-align: center; padding: 24px; color: #6B675F; font-size: 14px;' }, 'No se encontraron alimentos colombianos.'));
+      contenedorLista.appendChild(
+        h('div', { style: 'text-align: center; padding: 24px; color: #5D5951; font-size: 14px;' }, 'No se encontraron alimentos colombianos.')
+      );
       return;
     }
 
     filtrados.forEach(al => {
+      if (!porcionesPorAlimento.has(al.id)) {
+        porcionesPorAlimento.set(al.id, 1);
+      }
+
+      const infoDetalle = h('div', {
+        style: 'font-size: 11px; color: #5D5951; font-variant-numeric: tabular-nums; margin-top: 2px;'
+      });
+      const etiquetaCant = h('span', {
+        style: 'min-width: 38px; text-align: center; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;'
+      });
+
+      function refrescarFila() {
+        const cant = porcionesPorAlimento.get(al.id) || 1;
+        const gramosCalc = Math.round((al.gramos || 100) * cant);
+        const kcalCalc = Math.round((al.kcal || 0) * cant);
+        const protCalc = Math.round((al.proteina || 0) * cant * 10) / 10;
+        etiquetaCant.textContent = `${cant}x`;
+        infoDetalle.textContent = `${al.porcion} (${gramosCalc}g) · ${kcalCalc} kcal · ${protCalc}g prot`;
+      }
+
+      refrescarFila();
+
+      const btnMenos = h('button', {
+        type: 'button',
+        class: 'v2-btn-pildora',
+        title: 'Reducir porción',
+        style: 'min-width: 48px; min-height: 48px; width: 48px; height: 48px; padding: 0; background-color: #E9E4D8; font-size: 16px; font-weight: 700;',
+        on: {
+          click: () => {
+            const actual = porcionesPorAlimento.get(al.id) || 1;
+            const nuevo = Math.max(0.5, Math.round((actual - 0.5) * 10) / 10);
+            porcionesPorAlimento.set(al.id, nuevo);
+            refrescarFila();
+          }
+        }
+      }, '−');
+
+      const btnMas = h('button', {
+        type: 'button',
+        class: 'v2-btn-pildora',
+        title: 'Aumentar porción',
+        style: 'min-width: 48px; min-height: 48px; width: 48px; height: 48px; padding: 0; background-color: #E9E4D8; font-size: 16px; font-weight: 700;',
+        on: {
+          click: () => {
+            const actual = porcionesPorAlimento.get(al.id) || 1;
+            const nuevo = Math.min(20, Math.round((actual + 0.5) * 10) / 10);
+            porcionesPorAlimento.set(al.id, nuevo);
+            refrescarFila();
+          }
+        }
+      }, '+');
+
+      const btnAgregar = h('button', {
+        type: 'button',
+        class: 'v2-btn-pildora',
+        style: 'min-height: 48px; height: 48px; padding: 0 14px; font-size: 13px; background-color: #C8F03C; font-weight: 700;',
+        on: {
+          click: () => {
+            const cant = porcionesPorAlimento.get(al.id) || 1;
+            agregarAlimentoABorrador(al, cant);
+            actualizarResumenModal();
+            btnAgregar.textContent = '✓ Agregado';
+            setTimeout(() => {
+              btnAgregar.textContent = '+ Agregar';
+            }, 650);
+          }
+        }
+      }, '+ Agregar');
+
       const fila = h('div', {
         class: 'v2-item-comida',
-        style: 'margin-bottom: 0; padding: 12px 16px;'
+        style: 'margin-bottom: 0; padding: 12px 16px; background-color: #E9E4D8; flex-wrap: wrap;'
       },
-        h('div', { style: 'flex: 1;' },
+        h('div', { style: 'flex: 1; min-width: 150px;' },
           h('div', { style: 'font-weight: 600; font-size: 14px; color: #17171A;' }, al.nombre),
-          h('div', { style: 'font-size: 11px; color: #6B675F; font-variant-numeric: tabular-nums;' },
-            `${al.porcion} · ${al.kcal} kcal · ${al.proteina}g prot`
-          )
+          infoDetalle
         ),
-        h('button', {
-          class: 'v2-btn-pildora',
-          style: 'height: 36px; padding: 0 14px; font-size: 12px; background-color: #C8F03C; font-weight: 700;',
-          on: {
-            click: async () => {
-              await agregarAlimentoDirecto(al, 1);
-              document.querySelector('.v2-modal-overlay')?.remove();
-            }
-          }
-        }, '+ Agregar')
+        h('div', { style: 'display: flex; align-items: center; gap: 6px;' },
+          h('div', {
+            style: 'display: inline-flex; align-items: center; background-color: #F3F0E8; border-radius: 999px; padding: 0 2px;'
+          }, btnMenos, etiquetaCant, btnMas),
+          btnAgregar
+        )
       );
       contenedorLista.appendChild(fila);
     });
   }
 
   inputBusqueda.addEventListener('input', (e) => actualizarFiltro(e.target.value));
+  actualizarResumenModal();
   actualizarFiltro('');
 
-  const modalBody = h('div', {}, inputBusqueda, contenedorLista);
+  const modalBody = h('div', { style: 'display: flex; flex-direction: column; gap: 10px;' },
+    badgeContador,
+    inputBusqueda,
+    contenedorLista,
+    btnListoModal
+  );
   mostrarModalV2('Catálogo de alimentos colombianos', modalBody);
 }
 
 /**
- * Agrega un alimento directo desde los modales al borrador o lo guarda
- */
-async function agregarAlimentoDirecto(alimento, cantidad = 1) {
-  const item = {
-    alimentoId: alimento.id,
-    nombre: alimento.nombre,
-    cantidadOriginal: cantidad,
-    unidadOriginal: 'porcion',
-    gramos: alimento.gramos * cantidad,
-    kcal: Math.round(alimento.kcal * cantidad),
-    proteina: Math.round(alimento.proteina * cantidad * 10) / 10,
-    carbos: Math.round((alimento.carbos || 0) * cantidad * 10) / 10,
-    grasa: Math.round((alimento.grasa || 0) * cantidad * 10) / 10,
-    reconocido: true
-  };
-
-  const comidaObj = {
-    id: nuevoId(),
-    fecha: fechaSeleccionada,
-    hora: Date.now(),
-    texto: `${alimento.nombre} (${alimento.porcion})`,
-    items: [item],
-    kcal: item.kcal,
-    proteina: item.proteina,
-    carbos: item.carbos,
-    grasa: item.grasa
-  };
-
-  await guardar('comidas', comidaObj);
-  aviso(`Agregado: ${alimento.nombre}`, 'ok');
-  await renderizar();
-}
-
-/**
- * Modal flotante auxiliar con estética Forja v2 (Revista de sala)
+ * Modal flotante auxiliar con estética Forja v2 (Revista de sala, sin backdrop-filter)
  */
 function mostrarModalV2(titulo, contenidoNodo) {
   document.querySelector('.v2-modal-overlay')?.remove();
 
   const overlay = h('div', {
     class: 'v2-modal-overlay',
-    style: 'position: fixed; inset: 0; background: rgba(23,23,26,0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;'
+    style: 'position: fixed; inset: 0; background: rgba(23, 23, 26, 0.76); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;'
   },
     h('div', {
       style: 'width: 100%; max-width: 480px; max-height: 90vh; background-color: #F3F0E8; border-radius: 28px; padding: 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 10px 30px rgba(23,23,26,.18); font-family: "Bricolage Grotesque", sans-serif;'
@@ -940,7 +1196,7 @@ function mostrarModalV2(titulo, contenidoNodo) {
         h('h3', { class: 'v2-serif-title', style: 'font-size: 26px;' }, titulo),
         h('button', {
           class: 'v2-btn-pildora',
-          style: 'width: 40px; height: 40px; padding: 0;',
+          style: 'width: 48px; height: 48px; min-width: 48px; min-height: 48px; padding: 0; background-color: #E9E4D8;',
           on: { click: () => overlay.remove() }
         }, iconoNodo('cerrar', ICONOS_SVGS.cerrar))
       ),

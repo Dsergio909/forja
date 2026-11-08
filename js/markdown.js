@@ -4,19 +4,20 @@
  * Dirección de arte Forja v2 («Revista de sala»).
  *
  * Características:
- * - Escapa HTML de entrada para prevenir XSS.
+ * - Escapa HTML de entrada (incluyendo comillas dobles y simples en atributos) para prevenir XSS.
  * - Títulos (# a ######).
  * - Negrita (**texto** o __texto__) y Cursiva (*texto* o _texto_).
- * - Código inline (`código`) y bloques de código (```lenguaje ... ```).
+ * - Código inline (`código`) y bloques de código (```lenguaje ... ```) protegidos con tokens sin guiones bajos.
  * - Listas desordenadas (*, -, +) y ordenadas (1., 2.).
  * - Tablas estilo GitHub (| col | col | con divisor |---|---|).
  * - Citas (> blockquote).
- * - Enlaces seguros con target="_blank" y rel="noopener noreferrer".
+ * - Enlaces seguros (únicamente http:// y https://) con target="_blank" y rel="noopener noreferrer", soportando múltiples enlaces por línea.
+ * - Soporte de notaciones científicas simples (superíndices como H^+ y subíndices como pO_2).
  * - Líneas divisorias (---, ***).
  */
 
 /**
- * Escapa caracteres especiales de HTML para prevenir inyecciones XSS.
+ * Escapa caracteres especiales de HTML (incluyendo comillas para atributos) para prevenir inyecciones XSS.
  * @param {string} str
  * @returns {string}
  */
@@ -31,75 +32,77 @@ function escaparHtml(str) {
 }
 
 /**
- * Limpia y valida que una URL sea segura para un enlace <a>.
- * Bloquea protocolos peligrosos como javascript: o vbscript:.
+ * Limpia y valida que una URL sea estrictamente http:// o https:// para un enlace <a>.
+ * Bloquea cualquier otro protocolo (javascript:, data:, vbscript:, mailto:, etc.) y escapa comillas.
  * @param {string} url
  * @returns {string}
  */
 function urlSegura(url) {
-  if (!url) return '#';
+  if (!url || typeof url !== 'string') return '#';
   const limpia = url.trim();
-  const protoRegex = /^([a-z0-9+.-]+):/i;
-  const match = limpia.match(protoRegex);
-  if (match) {
-    const proto = match[1].toLowerCase();
-    if (proto !== 'http' && proto !== 'https' && proto !== 'mailto' && proto !== 'tel') {
-      return '#';
-    }
+  if (!/^https?:\/\//i.test(limpia)) {
+    return '#';
   }
   return escaparHtml(limpia);
 }
 
 /**
  * Procesa el formato inline (negrita, cursiva, enlaces, código inline) de una línea de texto.
+ * Utiliza marcadores %%TOKEN%% libres de guiones bajos y asteriscos para que el formateo
+ * de cursivas/negritas nunca corrompa tokens de código ni múltiples enlaces en la misma línea.
  * @param {string} texto
  * @returns {string}
  */
 function formatearInline(texto) {
   if (!texto) return '';
 
-  // 1. Extraer código inline `...` para protegerlo de formateos
+  // 1. Extraer código inline `...` para protegerlo de formateos posteriores
   const inlineCodes = [];
   let conTokens = texto.replace(/`([^`\n]+)`/g, (_m, code) => {
     const idx = inlineCodes.length;
     inlineCodes.push(`<code>${escaparHtml(code)}</code>`);
-    return `@@INLINE_CODE_${idx}@@`;
+    return `%%INLINECODE${idx}%%`;
   });
 
-  // 2. Extraer enlaces [texto](url) antes de escapar HTML
+  // 2. Extraer enlaces [texto](url) antes de escapar el resto del HTML (soporta varios por línea)
   const enlaces = [];
-  conTokens = conTokens.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, (_m, txt, href) => {
+  conTokens = conTokens.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, (_m, txt, href, titulo) => {
     const idx = enlaces.length;
     const destino = urlSegura(href);
     const label = escaparHtml(txt);
-    enlaces.push(`<a href="${destino}" target="_blank" rel="noopener noreferrer">${label}</a>`);
-    return `@@ENLACE_${idx}@@`;
+    const attrTitulo = titulo ? ` title="${escaparHtml(titulo)}"` : '';
+    enlaces.push(`<a href="${destino}"${attrTitulo} target="_blank" rel="noopener noreferrer">${label}</a>`);
+    return `%%ENLACE${idx}%%`;
   });
 
-  // 3. Escapar el resto del texto
+  // 3. Escapar el resto del texto (incluyendo comillas dobles y simples)
   let res = escaparHtml(conTokens);
 
-  // 4. Negritas y cursivas
+  // 4. Notaciones científicas simples (ej. H^+ -> H<sup>+</sup>, pO_2 -> pO<sub>2</sub>)
+  res = res.replace(/([A-Za-z0-9])\^(\d*[+-]?|\+)/g, '$1<sup>$2</sup>');
+  res = res.replace(/\b([A-Za-z]+)_(\d+)\b/g, '$1<sub>$2</sub>');
+
+  // 5. Negritas y cursivas
   // Negrita + cursiva: ***texto*** o ___texto___
   res = res.replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>');
-  res = res.replace(/___([^_]+)___/g, '<strong><em>$1</em></strong>');
+  res = res.replace(/(^|[^\w])___([^_\n]+)___(?=[^\w]|$)/g, '$1<strong><em>$2</em></strong>');
 
   // Negrita: **texto** o __texto__
   res = res.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  res = res.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+  res = res.replace(/(^|[^\w])__([^_\n]+)__(?=[^\w]|$)/g, '$1<strong>$2</strong>');
 
   // Cursiva: *texto* o _texto_
   res = res.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-  res = res.replace(/_([^_]+)_/g, '<em>$1</em>');
+  res = res.replace(/(^|[^\w])_([^_\n]+)_(?=[^\w]|$)/g, '$1<em>$2</em>');
 
   // Tachado: ~~texto~~
   res = res.replace(/~~([^~]+)~~/g, '<del>$1</del>');
 
-  // 5. Restaurar enlaces
-  res = res.replace(/@@ENLACE_(\d+)@@/g, (_m, idx) => enlaces[Number(idx)] || '');
+  // 6. Restaurar enlaces (pueden contener código inline en su etiqueta si existiera)
+  res = res.replace(/%%ENLACE(\d+)%%/g, (_m, idx) => enlaces[Number(idx)] || '');
 
-  // 6. Restaurar código inline
-  res = res.replace(/@@INLINE_CODE_(\d+)@@/g, (_m, idx) => inlineCodes[Number(idx)] || '');
+  // 7. Restaurar código inline
+  res = res.replace(/%%INLINECODE(\d+)%%/g, (_m, idx) => inlineCodes[Number(idx)] || '');
 
   return res;
 }
@@ -115,7 +118,7 @@ export function mdAHtml(texto) {
   // Normalizar saltos de línea
   const crudo = texto.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-  // 1. Extraer bloques de código con ``` ... ```
+  // 1. Extraer bloques de código con ``` ... ``` usando token sin guiones bajos
   const bloquesCodigo = [];
   const sinBloquesCodigo = crudo.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (_match, lang, code) => {
     const idx = bloquesCodigo.length;
@@ -123,7 +126,7 @@ export function mdAHtml(texto) {
     const claseLang = langLimpio ? ` class="language-${escaparHtml(langLimpio)}"` : '';
     const bloqueHtml = `<pre><code${claseLang}>${escaparHtml(code.trimEnd())}</code></pre>`;
     bloquesCodigo.push(bloqueHtml);
-    return `\n\n@@BLOQUE_CODIGO_${idx}@@\n\n`;
+    return `\n\n%%BLOQUECODIGO${idx}%%\n\n`;
   });
 
   const lineas = sinBloquesCodigo.split('\n');
@@ -142,7 +145,7 @@ export function mdAHtml(texto) {
     }
 
     // Placeholder de bloque de código
-    const matchBloque = lineaTrim.match(/^@@BLOQUE_CODIGO_(\d+)@@$/);
+    const matchBloque = lineaTrim.match(/^%%BLOQUECODIGO(\d+)%%$/);
     if (matchBloque) {
       const idx = Number(matchBloque[1]);
       salida.push(bloquesCodigo[idx] || '');
@@ -284,7 +287,7 @@ export function mdAHtml(texto) {
       const cur = lineas[i];
       const curTrim = cur.trim();
       if (!curTrim) break;
-      if (curTrim.match(/^@@BLOQUE_CODIGO_\d+@@$/)) break;
+      if (curTrim.match(/^%%BLOQUECODIGO\d+%%$/)) break;
       if (cur.match(/^(#{1,6})\s+/)) break;
       if (/^(?:---|\*\*\*|___)\s*$/.test(curTrim)) break;
       if (cur.startsWith('>')) break;

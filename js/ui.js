@@ -217,12 +217,19 @@ export function confirmar(texto) {
 
 /**
  * Retorna la fecha actual o la fecha provista en formato ISO local 'AAAA-MM-DD'.
- * Usa componentes locales de calendario para evitar desfases de zona horaria.
+ * Si recibe una cadena con formato 'AAAA-MM-DD', la devuelve directamente sin pasarla
+ * por new Date() en UTC para evitar restar un día en Colombia (UTC-5).
  * @param {Date|string|number} [fecha] Fecha opcional (por defecto hoy)
  * @returns {string} Fecha en formato 'AAAA-MM-DD'
  */
 export function hoyISO(fecha) {
-  const d = fecha ? (fecha instanceof Date ? fecha : new Date(fecha)) : new Date();
+  if (typeof fecha === 'string') {
+    const match = fecha.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      return `${match[1]}-${match[2]}-${match[3]}`;
+    }
+  }
+  const d = fecha instanceof Date ? fecha : (typeof fecha === 'number' ? new Date(fecha) : new Date());
   if (isNaN(d.getTime())) {
     const ahora = new Date();
     const a = ahora.getFullYear();

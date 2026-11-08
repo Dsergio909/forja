@@ -152,7 +152,6 @@ Miércoles, Sábado y Domingo: Descanso de pesas + 20-30 min caminadora suave (i
 2. **"Influence of Resistance Training Proximity-to-Failure on Skeletal Muscle Hypertrophy: A Systematic Review with Meta-analysis"**  
    *Autor:* Martin C. Refalo, Eric R. Helms, Eric T. Trexler, D. Lee Hamilton, Jackson J. Fyfe (*Sports Medicine*)  
    *Año:* 2023  
-   *Enlace:* https://doi.org/10.1007/s40279-022-01797-y  
    *Tipo:* Metaanálisis y revisión sistemática
 
 3. **"Partial Vs. Full Range of Motion in Resistance Training: A Systematic Review and Meta-Analysis"**  
@@ -164,7 +163,6 @@ Miércoles, Sábado y Domingo: Descanso de pesas + 20-30 min caminadora suave (i
 4. **"The Dose-Response Relationship Between Resistance Training Volume, Frequency, and Muscle Hypertrophy: A Systematic Review and Meta-Regression"**  
    *Autor:* Joshua C. Pelland, John F. Remmert, Zac P. Robinson, Sarah C. Hinson, Michael C. Zourdos (*Sports Medicine / medRxiv*)  
    *Año:* 2024  
-   *Enlace:* https://doi.org/10.1101/2024.06.27.24309594  
    *Tipo:* Metaanálisis y meta-regresión
 
 5. **"A Systematic Review of The Effects of Different Resistance Training Volumes on Muscle Hypertrophy"**  
@@ -188,7 +186,6 @@ Miércoles, Sábado y Domingo: Descanso de pesas + 20-30 min caminadora suave (i
 8. **"Loading Recommendations for Muscle Strength, Hypertrophy, and Local Endurance: A Re-Examination of the Repetition Continuum"**  
    *Autor:* Brad J. Schoenfeld, Jozo Grgic, Derrick W. Van Every, Daniel L. Plotkin (*Sports*)  
    *Año:* 2021  
-   *Enlace:* https://doi.org/10.3390/sports9030032  
    *Tipo:* Revisión crítica / Consenso de expertos
 
 9. **"The effects of short versus long inter-set rest intervals in resistance training on measures of muscle hypertrophy: A systematic review"**  
@@ -212,7 +209,6 @@ Miércoles, Sábado y Domingo: Descanso de pesas + 20-30 min caminadora suave (i
 12. **"Muscular Adaptations in Drop Set vs. Traditional Training: A meta-analysis"**  
     *Autor:* Max Coleman, Kelsey Harrison, Brad J. Schoenfeld (*International Journal of Strength and Conditioning*)  
     *Año:* 2022  
-    *Enlace:* https://doi.org/10.47206/ijsc.v2i1.130  
     *Tipo:* Metaanálisis
 
 13. **"Rest-pause and drop-set training elicit similar strength and hypertrophy adaptations compared with traditional sets in resistance-trained males"**  
@@ -254,5 +250,9 @@ Miércoles, Sábado y Domingo: Descanso de pesas + 20-30 min caminadora suave (i
 19. **"Resistance training and human cervical muscle hypertrophy"**  
     *Autor:* Michael S. Conley, Michael H. Stone, Matthew Nimmons, Gary A. Dudley (*Journal of Applied Physiology*)  
     *Año:* 1997  
-    *Enlace:* https://doi.org/10.1152/jappl.1997.83.2.522  
     *Tipo:* Estudio experimental con resonancia magnética nuclear
+
+
+> Fuentes revisadas automáticamente el 7-nov-2026 contra Crossref: se quitaron 2 enlaces que no existían o no correspondían al tema.
+
+> Fuentes revisadas automáticamente el 7-nov-2026 contra Crossref: se quitaron 3 enlaces que no existían o no correspondían al tema.

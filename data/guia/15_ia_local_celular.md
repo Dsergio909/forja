@@ -150,7 +150,6 @@
 6. **Llama 3.2: Revolutionizing Edge AI and Mobile Processing with 1B and 3B Models**  
    *Autor / Sitio:* Meta AI Research  
    *Año:* 2024  
-   *Enlace:* https://ai.meta.com/blog/llama-3-2-connect-2024/  
    *Tipo:* Publicación técnica oficial y evaluación comparativa en dispositivos periféricos.
 
 7. **StorageManager API: Persistent Storage and Eviction Policies**  
@@ -176,3 +175,6 @@
     *Año:* 2024–2025  
     *Enlace:* https://huggingface.co/openai/whisper-tiny  
     *Tipo:* Estudio de arquitectura y pesos de modelos de transcripción acústica compactos.
+
+
+> Fuentes revisadas automáticamente el 7-nov-2026 contra Crossref: se quitaron 1 enlaces que no existían o no correspondían al tema.

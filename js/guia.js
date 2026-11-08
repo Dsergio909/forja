@@ -5,9 +5,12 @@
  * - Cuadrícula de fotos/videos con radio 28 y nombre debajo.
  * - Ficha con video grande arriba (o animación de 2 fotos), titular en Instrument Serif,
  *   pasos numerados con números grandes en lima, chips de músculos en papel2.
+ * - Metadatos adaptables a 360 px sin deformación elíptica (radio 28 en textos largos a ancho completo,
+ *   radio 999 en píldoras cortas de una línea).
  * - Botón a YouTube para ver técnica.
  * - Sección Aprender estilo revista con titulares serif y tipografía editorial.
  * - Cero emojis: íconos SVG vectoriales vía icono() de ./iconos.js.
+ * - Mitigación completa de XSS reflejado y almacenado escapando HTML en parámetros y datos.
  */
 
 import { h, aviso } from './ui.js';
@@ -27,6 +30,21 @@ let estado = {
 };
 
 let contenedorRaiz = null;
+
+/**
+ * Escapa caracteres especiales de HTML para prevenir XSS reflejado o basado en DOM.
+ * @param {string} str
+ * @returns {string}
+ */
+function escaparHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 /**
  * Renderiza un ícono SVG invocando icono() de ./iconos.js.
@@ -72,6 +90,7 @@ function renderIcono(nombre, { tam = 20, clase = '', color = 'currentColor', tra
 
 /**
  * Inyecta los estilos específicos para la pantalla Guía según Forja v2 («Revista de sala»).
+ * Radios estrictos: SOLO 28px y 999px. Cero backdrop-filter. Touch targets >= 48px.
  */
 function asegurarEstilos() {
   if (document.getElementById('estilos-guia-v2')) return;
@@ -89,7 +108,7 @@ function asegurarEstilos() {
       font-family: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
     }
 
-    /* Pestañas de cabecera en píldora tinta/papel */
+    /* Pestañas de cabecera en píldora tinta/papel (touch target 48px) */
     .guia-tabs {
       display: flex;
       gap: 6px;
@@ -100,13 +119,14 @@ function asegurarEstilos() {
     }
     .guia-tab {
       flex: 1;
+      min-height: 48px;
       padding: 9px 14px;
       text-align: center;
       font-weight: 600;
       font-size: 14px;
       border-radius: 999px;
       cursor: pointer;
-      color: var(--tinta-suave, #6B675F);
+      color: var(--tinta-suave, #5D5951);
       background: transparent;
       border: none;
       display: inline-flex;
@@ -133,7 +153,7 @@ function asegurarEstilos() {
       left: 16px;
       top: 50%;
       transform: translateY(-50%);
-      color: var(--tinta-suave, #6B675F);
+      color: var(--tinta-suave, #5D5951);
       pointer-events: none;
       display: flex;
       align-items: center;
@@ -173,7 +193,7 @@ function asegurarEstilos() {
       background: var(--papel2, #E9E4D8);
       color: var(--tinta, #17171A);
       border: none;
-      height: 40px;
+      min-height: 48px;
       padding: 0 14px;
       border-radius: 999px;
       font-size: 13px;
@@ -194,20 +214,19 @@ function asegurarEstilos() {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      min-height: 36px;
       cursor: pointer;
       user-select: none;
     }
     .guia-mapa-titulo {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--tinta-suave, #6B675F);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--tinta-suave, #5D5951);
     }
     .guia-mapa-toggle {
       font-size: 12px;
       font-weight: 600;
-      color: var(--tinta-suave, #6B675F);
+      color: var(--tinta-suave, #5D5951);
       display: inline-flex;
       align-items: center;
       gap: 4px;
@@ -224,6 +243,7 @@ function asegurarEstilos() {
       flex-direction: column;
       cursor: pointer;
       user-select: none;
+      min-width: 0;
       transition: transform 0.16s cubic-bezier(.2,.8,.2,1);
     }
     .guia-item-grid:active {
@@ -255,7 +275,7 @@ function asegurarEstilos() {
       position: absolute;
       top: 10px;
       right: 10px;
-      background: rgba(23, 23, 26, 0.78);
+      background: rgba(23, 23, 26, 0.88);
       color: var(--lima, #C8F03C);
       border-radius: 999px;
       padding: 4px 8px;
@@ -264,7 +284,6 @@ function asegurarEstilos() {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      backdrop-filter: blur(4px);
     }
     .guia-item-placeholder {
       width: 100%;
@@ -272,7 +291,7 @@ function asegurarEstilos() {
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--tinta-suave, #6B675F);
+      color: var(--tinta-suave, #5D5951);
       background: var(--papel2, #E9E4D8);
     }
     .guia-item-nombre {
@@ -296,7 +315,7 @@ function asegurarEstilos() {
     .guia-chip-micro {
       font-size: 11px;
       font-weight: 500;
-      color: var(--tinta-suave, #6B675F);
+      color: var(--tinta-suave, #5D5951);
       background: var(--papel2, #E9E4D8);
       padding: 2px 7px;
       border-radius: 999px;
@@ -307,6 +326,7 @@ function asegurarEstilos() {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 8px;
       margin-bottom: 12px;
     }
     .guia-btn-pill {
@@ -314,6 +334,7 @@ function asegurarEstilos() {
       color: var(--tinta, #17171A);
       border: none;
       border-radius: 999px;
+      min-height: 48px;
       padding: 8px 16px;
       font-size: 13px;
       font-weight: 600;
@@ -385,24 +406,24 @@ function asegurarEstilos() {
       position: absolute;
       bottom: 12px;
       right: 12px;
-      background: rgba(23, 23, 26, 0.78);
+      background: rgba(23, 23, 26, 0.88);
       color: #F3F0E8;
       border: none;
       border-radius: 999px;
-      padding: 6px 14px;
+      min-height: 48px;
+      padding: 8px 16px;
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      backdrop-filter: blur(4px);
       z-index: 2;
     }
 
     .guia-credito-foto {
       font-size: 12px;
-      color: var(--tinta-suave, #6B675F);
+      color: var(--tinta-suave, #5D5951);
       margin-top: 2px;
       margin-bottom: 10px;
       padding-left: 4px;
@@ -418,7 +439,7 @@ function asegurarEstilos() {
     }
     .guia-ficha-subtitular {
       font-size: 14px;
-      color: var(--tinta-suave, #6B675F);
+      color: var(--tinta-suave, #5D5951);
       font-style: italic;
       margin-bottom: 12px;
     }
@@ -451,7 +472,7 @@ function asegurarEstilos() {
     .guia-chip-bullet-suave {
       width: 7px;
       height: 7px;
-      background: var(--tinta-suave, #6B675F);
+      background: var(--tinta-suave, #5D5951);
       border-radius: 999px;
       display: inline-block;
     }
@@ -459,7 +480,7 @@ function asegurarEstilos() {
     /* BOTÓN YOUTUBE ESTILO REVISTA */
     .guia-btn-yt-v2 {
       width: 100%;
-      height: 56px;
+      height: 60px;
       background: #17171A;
       color: #F3F0E8;
       border-radius: 999px;
@@ -480,8 +501,8 @@ function asegurarEstilos() {
       transform: scale(0.97);
     }
     .guia-btn-yt-bubble {
-      width: 38px;
-      height: 38px;
+      width: 40px;
+      height: 40px;
       background: var(--lima, #C8F03C);
       color: #17171A;
       border-radius: 999px;
@@ -550,7 +571,7 @@ function asegurarEstilos() {
     }
     .guia-aprender-sub {
       font-size: 14px;
-      color: var(--tinta-suave, #6B675F);
+      color: var(--tinta-suave, #5D5951);
       line-height: 1.4;
       margin-bottom: 18px;
     }
@@ -578,13 +599,13 @@ function asegurarEstilos() {
     }
     .guia-art-desc {
       font-size: 13px;
-      color: var(--tinta-suave, #6B675F);
+      color: var(--tinta-suave, #5D5951);
       margin-top: 4px;
       line-height: 1.4;
     }
     .guia-art-bubble {
-      width: 40px;
-      height: 40px;
+      width: 48px;
+      height: 48px;
       border-radius: 999px;
       background: var(--papel, #F3F0E8);
       display: flex;
@@ -594,7 +615,7 @@ function asegurarEstilos() {
       flex-shrink: 0;
     }
 
-    /* RENDERIZADO MARKDOWN ESTILO REVISTA */
+    /* RENDERIZADO MARKDOWN ESTILO REVISTA (Radios SOLO 28px y 999px) */
     .guia-articulo-md {
       background: var(--papel2, #E9E4D8);
       border-radius: 28px;
@@ -640,11 +661,10 @@ function asegurarEstilos() {
       margin-bottom: 6px;
     }
     .guia-articulo-md blockquote {
-      border-left: 4px solid var(--lima, #C8F03C);
       background: var(--papel, #F3F0E8);
-      padding: 12px 16px;
+      padding: 16px 20px;
       margin: 16px 0;
-      border-radius: 0 16px 16px 0;
+      border-radius: 28px;
       font-style: italic;
       color: var(--tinta, #17171A);
     }
@@ -658,26 +678,29 @@ function asegurarEstilos() {
     .guia-articulo-md pre {
       background: #17171A;
       color: #F3F0E8;
-      border-radius: 16px;
-      padding: 14px;
+      border-radius: 28px;
+      padding: 16px 20px;
       overflow-x: auto;
       margin: 16px 0;
     }
     .guia-articulo-md code {
       font-family: inherit;
+      font-variant-numeric: tabular-nums;
       background: rgba(23, 23, 26, 0.08);
-      padding: 2px 6px;
-      border-radius: 6px;
+      padding: 2px 8px;
+      border-radius: 999px;
     }
     .guia-articulo-md pre code {
       background: transparent;
       padding: 0;
+      border-radius: 0;
     }
     .guia-articulo-md .tabla-scroll {
       overflow-x: auto;
       margin: 16px 0;
-      border-radius: 16px;
+      border-radius: 28px;
       background: var(--papel, #F3F0E8);
+      padding: 6px;
     }
     .guia-articulo-md table {
       width: 100%;
@@ -686,8 +709,10 @@ function asegurarEstilos() {
     }
     .guia-articulo-md th, .guia-articulo-md td {
       padding: 10px 14px;
-      border-bottom: 1px solid rgba(23, 23, 26, 0.08);
       text-align: left;
+    }
+    .guia-articulo-md tbody tr:nth-child(even) {
+      background: rgba(23, 23, 26, 0.03);
     }
     .guia-articulo-md th {
       font-weight: 700;
@@ -840,7 +865,7 @@ async function renderizarListaEjercicios() {
   const tituloMapa = document.createElement('span');
   tituloMapa.className = 'guia-mapa-titulo';
   tituloMapa.textContent = estado.filtroMusculo
-    ? `Músculo: ${estado.filtroMusculo.toUpperCase()}`
+    ? `Músculo: ${estado.filtroMusculo.charAt(0).toUpperCase() + estado.filtroMusculo.slice(1)}`
     : 'Mapa muscular (toca para filtrar)';
 
   const btnToggleMapa = document.createElement('span');
@@ -885,7 +910,7 @@ async function renderizarListaEjercicios() {
 
   function actualizarMapaYLista() {
     tituloMapa.textContent = estado.filtroMusculo
-      ? `Músculo: ${estado.filtroMusculo.toUpperCase()}`
+      ? `Músculo: ${estado.filtroMusculo.charAt(0).toUpperCase() + estado.filtroMusculo.slice(1)}`
       : 'Mapa muscular (toca para filtrar)';
     btnToggleMapa.innerHTML = estado.mapaColapsado
       ? `<span>Mostrar</span> ${renderIcono('chevron-abajo', { tam: 14 })}`
@@ -955,7 +980,7 @@ async function renderizarListaEjercicios() {
     // Contador de resultados
     const contador = document.createElement('div');
     contador.style.fontSize = '12px';
-    contador.style.color = '#6B675F';
+    contador.style.color = 'var(--tinta-suave, #5D5951)';
     contador.style.fontWeight = '500';
     contador.style.marginBottom = '12px';
     contador.style.paddingLeft = '4px';
@@ -968,9 +993,9 @@ async function renderizarListaEjercicios() {
       vacio.style.textAlign = 'center';
       vacio.style.padding = '36px 16px';
       vacio.innerHTML = `
-        <div style="margin-bottom: 8px; color: #6B675F;">${renderIcono('buscar', { tam: 32 })}</div>
+        <div style="margin-bottom: 8px; color: var(--tinta-suave, #5D5951);">${renderIcono('buscar', { tam: 32 })}</div>
         <p style="font-weight: 700; margin-bottom: 4px; font-size: 16px;">Sin ejercicios con esos filtros</p>
-        <p style="font-size: 13px; color: #6B675F;">Prueba buscando con otra palabra o limpia los filtros.</p>
+        <p style="font-size: 13px; color: var(--tinta-suave, #5D5951);">Prueba buscando con otra palabra o limpia los filtros.</p>
       `;
       listado.appendChild(vacio);
       return;
@@ -1076,7 +1101,8 @@ async function renderizarListaEjercicios() {
 /**
  * Renderiza la ficha técnica completa de un ejercicio.
  * Con video grande arriba (o animación de 2 fotos), titular en Instrument Serif,
- * pasos numerados con números grandes en lima, chips de músculos en papel2.
+ * pasos numerados con números grandes en lima, chips de músculos en papel2 y metadatos
+ * que no se deforman a 360 px.
  * @param {string} id - ID del ejercicio
  */
 async function renderizarFichaEjercicio(id) {
@@ -1106,7 +1132,7 @@ async function renderizarFichaEjercicio(id) {
       </div>
       <div class="guia-card-v2" style="text-align: center; padding: 36px 16px;">
         <p style="font-size: 18px; font-weight: bold;">Ejercicio no encontrado</p>
-        <p style="color: #6B675F; font-size: 14px; margin-top: 4px;">No se encontró la ficha técnica para «${id}».</p>
+        <p style="color: var(--tinta-suave, #5D5951); font-size: 14px; margin-top: 4px;">No se encontró la ficha técnica para «${escaparHtml(id)}».</p>
       </div>
     `;
     div.querySelector('#btn-volver-guia').onclick = () => ir('guia');
@@ -1127,7 +1153,7 @@ async function renderizarFichaEjercicio(id) {
   const btnEntrenar = document.createElement('button');
   btnEntrenar.className = 'guia-btn-pill lima';
   btnEntrenar.innerHTML = `<span>+ Registrar serie</span>`;
-  btnEntrenar.onclick = () => ir('registrar');
+  btnEntrenar.onclick = () => ir('registrar/' + ej.id);
   navFila.appendChild(btnEntrenar);
 
   div.appendChild(navFila);
@@ -1296,14 +1322,14 @@ async function renderizarFichaEjercicio(id) {
   princ.forEach((m) => {
     const chip = document.createElement('span');
     chip.className = 'guia-chip-musculo-papel2';
-    chip.innerHTML = `<span class="guia-chip-bullet-lima"></span> <span>${m}</span>`;
+    chip.innerHTML = `<span class="guia-chip-bullet-lima"></span> <span>${escaparHtml(m)}</span>`;
     chipsDiv.appendChild(chip);
   });
 
   sec.forEach((m) => {
     const chip = document.createElement('span');
     chip.className = 'guia-chip-musculo-papel2';
-    chip.innerHTML = `<span class="guia-chip-bullet-suave"></span> <span>${m}</span>`;
+    chip.innerHTML = `<span class="guia-chip-bullet-suave"></span> <span>${escaparHtml(m)}</span>`;
     chipsDiv.appendChild(chip);
   });
 
@@ -1338,7 +1364,9 @@ async function renderizarFichaEjercicio(id) {
   bloqueMapa.appendChild(svgEl);
   div.appendChild(bloqueMapa);
 
-  // METADATOS TÉCNICOS: Equipo, Tipo, Series/Reps, Descanso, Tempo
+  // METADATOS TÉCNICOS: Equipo, Tipo, Series/Reps, Descanso, Tempo, Respiración
+  // (Adaptados a 360 px sin deformación elíptica: radio 999px para píldoras cortas <= 25 chars y
+  // radio 28px ocupando ancho completo para textos largos como Respiración — diseno ALTO-07)
   const bloqueMeta = document.createElement('div');
   bloqueMeta.className = 'guia-card-v2';
 
@@ -1349,21 +1377,26 @@ async function renderizarFichaEjercicio(id) {
 
   function agregarDato(etiqueta, valor) {
     if (!valor) return;
+    const textoValor = String(valor);
+    const esTextoLargo = textoValor.length > 25 || etiqueta === 'Respiración';
     const item = document.createElement('div');
+    item.style.gridColumn = esTextoLargo ? '1 / -1' : 'auto';
     item.style.background = 'var(--papel, #F3F0E8)';
-    item.style.padding = '10px 14px';
-    item.style.borderRadius = '999px';
+    item.style.padding = esTextoLargo ? '16px 20px' : '10px 16px';
+    item.style.borderRadius = esTextoLargo ? '28px' : '999px';
+    item.style.minWidth = '0';
+    item.style.overflowWrap = 'break-word';
     item.innerHTML = `
-      <div style="font-size: 11px; text-transform: uppercase; color: #6B675F; font-weight: 700; letter-spacing: 0.06em;">${etiqueta}</div>
-      <div style="font-weight: 700; font-size: 14px; margin-top: 2px; color: #17171A;">${valor}</div>
+      <span style="display: block; font-size: 11px; color: var(--tinta-suave, #5D5951); font-weight: 600;">${escaparHtml(etiqueta)}</span>
+      <span style="display: block; font-size: 13px; color: var(--tinta, #17171A); font-weight: 600; line-height: 1.4; margin-top: 2px;">${escaparHtml(textoValor)}</span>
     `;
     gridMeta.appendChild(item);
   }
 
   agregarDato('Equipo', ej.equipo);
   agregarDato('Tipo', ej.tipo);
-  agregarDato('Reps Hipertrofia', ej.series_reps_hipertrofia);
-  agregarDato('Reps Fuerza', ej.series_reps_fuerza);
+  agregarDato('Reps hipertrofia', ej.series_reps_hipertrofia);
+  agregarDato('Reps fuerza', ej.series_reps_fuerza);
   if (ej.descanso_seg) {
     const minDesc = (ej.descanso_seg / 60).toFixed(1).replace('.0', '');
     agregarDato('Descanso', `${ej.descanso_seg} s (~${minDesc} min)`);
@@ -1413,7 +1446,7 @@ async function renderizarFichaEjercicio(id) {
     bloqueClaves.innerHTML = `
       <div class="guia-card-titulo">${renderIcono('foco', { tam: 17 })} <span>Claves de técnica</span></div>
       <ul style="margin: 0; padding-left: 20px; line-height: 1.6; color: #17171A;">
-        ${ej.claves_tecnica.map((c) => `<li style="margin-bottom: 6px;">${c}</li>`).join('')}
+        ${ej.claves_tecnica.map((c) => `<li style="margin-bottom: 6px;">${escaparHtml(c)}</li>`).join('')}
       </ul>
     `;
     div.appendChild(bloqueClaves);
@@ -1423,13 +1456,12 @@ async function renderizarFichaEjercicio(id) {
   if (Array.isArray(ej.errores_comunes) && ej.errores_comunes.length > 0) {
     const bloqueErrores = document.createElement('div');
     bloqueErrores.className = 'guia-card-v2';
-    bloqueErrores.style.borderLeft = '4px solid #E2553A';
     bloqueErrores.innerHTML = `
-      <div class="guia-card-titulo" style="color: #E2553A;">
+      <div class="guia-card-titulo" style="color: #A02B14;">
         ${renderIcono('alerta', { tam: 17, color: '#E2553A' })} <span>Errores comunes</span>
       </div>
       <ul style="margin: 0; padding-left: 20px; line-height: 1.6; color: #17171A;">
-        ${ej.errores_comunes.map((err) => `<li style="margin-bottom: 6px;">${err}</li>`).join('')}
+        ${ej.errores_comunes.map((err) => `<li style="margin-bottom: 6px;">${escaparHtml(err)}</li>`).join('')}
       </ul>
     `;
     div.appendChild(bloqueErrores);
@@ -1441,7 +1473,7 @@ async function renderizarFichaEjercicio(id) {
     bloqueProg.className = 'guia-card-v2';
     bloqueProg.innerHTML = `
       <div class="guia-card-titulo">${renderIcono('tendencia', { tam: 17 })} <span>Progresión sugerida</span></div>
-      <p style="margin: 0; line-height: 1.5; color: #17171A;">${ej.progresion}</p>
+      <p style="margin: 0; line-height: 1.5; color: #17171A;">${escaparHtml(ej.progresion)}</p>
     `;
     div.appendChild(bloqueProg);
   }
@@ -1485,7 +1517,7 @@ async function renderizarFichaEjercicio(id) {
     bloqueSeg.className = 'guia-card-v2';
     bloqueSeg.innerHTML = `
       <div class="guia-card-titulo">${renderIcono('escudo', { tam: 17 })} <span>Seguridad</span></div>
-      <p style="margin: 0; line-height: 1.5; color: #17171A;">${ej.seguridad}</p>
+      <p style="margin: 0; line-height: 1.5; color: #17171A;">${escaparHtml(ej.seguridad)}</p>
     `;
     div.appendChild(bloqueSeg);
   }
@@ -1494,11 +1526,11 @@ async function renderizarFichaEjercicio(id) {
   if (ej.evidencia || ej.fuente) {
     const bloqueEvid = document.createElement('div');
     bloqueEvid.style.fontSize = '12px';
-    bloqueEvid.style.color = '#6B675F';
+    bloqueEvid.style.color = 'var(--tinta-suave, #5D5951)';
     bloqueEvid.style.padding = '0 8px 12px';
     let html = '';
-    if (ej.evidencia) html += `<div><strong>Evidencia:</strong> ${ej.evidencia}</div>`;
-    if (ej.fuente) html += `<div style="margin-top: 4px;"><strong>Fuente:</strong> ${ej.fuente}</div>`;
+    if (ej.evidencia) html += `<div><strong>Evidencia:</strong> ${escaparHtml(ej.evidencia)}</div>`;
+    if (ej.fuente) html += `<div style="margin-top: 4px;"><strong>Fuente:</strong> ${escaparHtml(ej.fuente)}</div>`;
     bloqueEvid.innerHTML = html;
     div.appendChild(bloqueEvid);
   }
@@ -1600,9 +1632,9 @@ async function renderizarIndiceAprender() {
     console.warn('No se pudo cargar data/guia/indice.json:', err);
     listaCont.innerHTML = `
       <div class="guia-card-v2" style="text-align: center; padding: 32px 16px;">
-        <div style="margin-bottom: 8px; color: #6B675F;">${renderIcono('libro', { tam: 32 })}</div>
+        <div style="margin-bottom: 8px; color: var(--tinta-suave, #5D5951);">${renderIcono('libro', { tam: 32 })}</div>
         <p style="font-weight: 700; margin-bottom: 6px; font-size: 16px;">Guías en preparación</p>
-        <p style="font-size: 13px; color: #6B675F; margin-bottom: 16px;">
+        <p style="font-size: 13px; color: var(--tinta-suave, #5D5951); margin-bottom: 16px;">
           Los artículos de <code>data/guia/</code> se cargarán automáticamente al estar disponibles.
         </p>
         <button class="guia-btn-pill lima" id="btn-reintentar-aprender">Reintentar</button>
@@ -1638,13 +1670,18 @@ async function renderizarArticuloAprender(archivo) {
 
   const cuerpoArticulo = document.createElement('div');
   cuerpoArticulo.className = 'guia-articulo-md';
-  cuerpoArticulo.innerHTML = '<p style="color: #6B675F;">Cargando guía...</p>';
+  cuerpoArticulo.innerHTML = '<p style="color: var(--tinta-suave, #5D5951);">Cargando guía...</p>';
   div.appendChild(cuerpoArticulo);
 
   contenedorRaiz.appendChild(div);
 
   try {
-    const ruta = `data/guia/${archivo}`;
+    // Validar que el nombre de archivo sea seguro y relativo a data/guia/
+    const nombreSeguro = String(archivo || '').trim();
+    if (!/^[a-zA-Z0-9._-]+\.md$/i.test(nombreSeguro) || nombreSeguro.includes('..')) {
+      throw new Error('Nombre de archivo inválido');
+    }
+    const ruta = `data/guia/${nombreSeguro}`;
     const res = await fetch(ruta);
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`);
@@ -1656,8 +1693,8 @@ async function renderizarArticuloAprender(archivo) {
     console.error('Error al cargar archivo markdown:', err);
     cuerpoArticulo.innerHTML = `
       <div style="text-align: center; padding: 24px;">
-        <p style="font-weight: 700; color: #E2553A;">No se pudo cargar la guía</p>
-        <p style="font-size: 13px; color: #6B675F; margin-top: 4px;">No fue posible leer el archivo «${archivo}».</p>
+        <p style="font-weight: 700; color: #A02B14;">No se pudo cargar la guía</p>
+        <p style="font-size: 13px; color: var(--tinta-suave, #5D5951); margin-top: 4px;">No fue posible leer el archivo «${escaparHtml(archivo)}».</p>
         <button class="guia-btn-pill lima" style="margin-top: 14px;" id="btn-reintentar-md">Reintentar</button>
       </div>
     `;
